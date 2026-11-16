@@ -63,26 +63,32 @@ import com.example.util.QrCodeGenerator
 fun QrCodeCanvas(
     payload: String,
     modifier: Modifier = Modifier,
-    darkColor: Color = Color(0xFF070B14),
+    darkColor: Color = Color.Black,
     lightColor: Color = Color.White
 ) {
     val matrix = remember(payload) { QrCodeGenerator.generateMatrix(payload) }
     Canvas(
         modifier = modifier
             .background(lightColor, RoundedCornerShape(14.dp))
-            .padding(10.dp)
+            .padding(6.dp)
     ) {
+        drawRect(color = lightColor)
         val count = matrix.size
+        if (count == 0) return@Canvas
         val cellSize = size.minDimension / count.toFloat()
         val offsetX = (size.width - cellSize * count) / 2f
         val offsetY = (size.height - cellSize * count) / 2f
         for (r in 0 until count) {
+            val top = kotlin.math.floor((offsetY + r * cellSize).toDouble()).toFloat()
+            val bottom = kotlin.math.ceil((offsetY + (r + 1) * cellSize).toDouble()).toFloat()
             for (c in 0 until count) {
                 if (matrix[r][c]) {
+                    val left = kotlin.math.floor((offsetX + c * cellSize).toDouble()).toFloat()
+                    val right = kotlin.math.ceil((offsetX + (c + 1) * cellSize).toDouble()).toFloat()
                     drawRect(
                         color = darkColor,
-                        topLeft = Offset(offsetX + c * cellSize, offsetY + r * cellSize),
-                        size = Size(cellSize + 0.4f, cellSize + 0.4f)
+                        topLeft = Offset(left, top),
+                        size = Size((right - left).coerceAtLeast(1f), (bottom - top).coerceAtLeast(1f))
                     )
                 }
             }
@@ -267,8 +273,8 @@ fun PerforatedTicketCard(
                     ) {
                         Box {
                             QrCodeCanvas(
-                                payload = "DORI|${booking.ticketCode}|${booking.venueId}|${booking.customerPhone}",
-                                modifier = Modifier.size(108.dp)
+                                payload = QrCodeGenerator.buildTicketPayload(booking),
+                                modifier = Modifier.size(116.dp)
                             )
                             Surface(
                                 shape = CircleShape,

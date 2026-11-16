@@ -199,15 +199,16 @@ fun InstantTicketPassDialog(
                         }
                     }
 
-                    // Large Crisp QR Pass
+                    // Large Crisp Scannable QR Pass
                     Surface(
                         shape = RoundedCornerShape(22.dp),
+                        color = Color.White,
                         border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)),
                         shadowElevation = 4.dp
                     ) {
                         QrCodeCanvas(
-                            payload = "DORI|${booking.ticketCode}|${booking.venueId}|${booking.customerPhone}",
-                            modifier = Modifier.size(182.dp)
+                            payload = com.example.util.QrCodeGenerator.buildTicketPayload(booking),
+                            modifier = Modifier.size(196.dp)
                         )
                     }
 

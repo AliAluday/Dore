@@ -1,6 +1,8 @@
 package com.example.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -21,30 +24,28 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -75,7 +76,6 @@ import com.example.data.model.FieldBookingDuration
 import com.example.data.model.ServiceCategory
 import com.example.data.model.UserProfileSettings
 import com.example.ui.theme.AmberGold
-import com.example.ui.theme.EmeraldPrimary
 import com.example.ui.theme.StatusOpen
 import com.example.ui.theme.StatusUrgent
 import com.example.util.IntentHelpers
@@ -121,14 +121,17 @@ fun VenueDetailsSheet(
     var customerPhone by remember(venue.id, userProfile.userPhone) {
         mutableStateOf(userProfile.userPhone)
     }
+    var editingMandatory by remember(venue.id) { mutableStateOf(!userProfile.hasMandatoryInfo) }
 
-    // Optional fields
+    // Optional fields (collapsed by default to reduce clutter)
+    var showOptionalFields by remember(venue.id) { mutableStateOf(false) }
     var optionalAge by remember(venue.id, userProfile.userAge) {
         mutableStateOf(userProfile.userAge)
     }
     var optionalNote by remember(venue.id, userProfile.optionalNote) {
         mutableStateOf(userProfile.optionalNote)
     }
+    var showReviews by remember(venue.id) { mutableStateOf(false) }
     var hasAttemptedSubmit by remember(venue.id) { mutableStateOf(false) }
 
     val isNameValid = UserProfileSettings.isValidFullName(customerName)
@@ -152,258 +155,115 @@ fun VenueDetailsSheet(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .navigationBarsPadding()
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(bottom = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header: Venue Name, Specialty & Dynamic Price
+            // Minimal Header + Quick Contact Icons (no verbose descriptions)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    if (venue.specialty.isNotBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.secondaryContainer
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = if (isClinic) Icons.Default.MedicalServices else Icons.Default.SportsSoccer,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = venue.specialty,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                    }
                     Text(
                         text = venue.name,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "${venue.category} • ${venue.city} - ${venue.area}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "${venue.city} • ${venue.area} • ${IntentHelpers.formatDinar(calculatedPrice)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalAlignment = Alignment.End
+
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilledTonalIconButton(
+                        onClick = { IntentHelpers.dialPhone(context, venue.phone) },
+                        modifier = Modifier
+                            .size(42.dp)
+                            .testTag("venue_detail_call_button")
                     ) {
-                        Text(
-                            text = if (isField) "الإجمالي" else "التكلفة",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                        )
-                        Text(
-                            text = IntentHelpers.formatDinar(calculatedPrice),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        if (isField) {
-                            Text(
-                                text = "(${IntentHelpers.formatDinar(venue.priceDinar)}/س)",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
-                            )
-                        }
+                        Icon(Icons.Default.Phone, contentDescription = "اتصال", modifier = Modifier.size(18.dp))
+                    }
+                    FilledTonalIconButton(
+                        onClick = {
+                            IntentHelpers.openMapLocation(context, venue.latitude, venue.longitude, venue.name)
+                        },
+                        modifier = Modifier
+                            .size(42.dp)
+                            .testTag("venue_detail_map_button")
+                    ) {
+                        Icon(Icons.Default.LocationOn, contentDescription = "الموقع", modifier = Modifier.size(18.dp))
+                    }
+                    FilledTonalIconButton(
+                        onClick = {
+                            IntentHelpers.openMessaging(context, venue.whatsapp, "مرحباً، أود الحجز في ${venue.name}")
+                        },
+                        modifier = Modifier
+                            .size(42.dp)
+                            .testTag("venue_detail_message_button")
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "رسالة", modifier = Modifier.size(18.dp))
                     }
                 }
             }
 
-            Text(
-                text = venue.description,
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            // SECTION 1: Organized Live Queue Status (Order from #1, People Ahead, Estimated Wait)
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "١. حالة الطابور المباشرة في هذه الشركة",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        QueueMetricBox(
-                            icon = Icons.Default.ConfirmationNumber,
-                            label = "ترتيب تذكرتك",
-                            value = "#${venue.nextTicketNumber}",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.weight(1f)
-                        )
-                        QueueMetricBox(
-                            icon = Icons.Default.Groups,
-                            label = "الأشخاص قبلك",
-                            value = "${venue.queueAheadCount}",
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.weight(1f)
-                        )
-                        QueueMetricBox(
-                            icon = Icons.Default.AccessTime,
-                            label = "الوقت التقديري",
-                            value = if (venue.estimatedWaitMinutes <= 0) "فوري (0 د)" else "${venue.estimatedWaitMinutes} د",
-                            tint = StatusOpen,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-
-            // Rating, Hours, and Direct Actions
+            // Compact 3-Metric Queue Summary
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                InfoStatPill(
-                    icon = Icons.Default.Star,
-                    text = "${venue.rating} (${venue.reviewCount})",
-                    tint = AmberGold,
+                QueueMetricBox(
+                    icon = Icons.Default.ConfirmationNumber,
+                    label = "دورك القادم",
+                    value = "#${venue.nextTicketNumber}",
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
                 )
-                InfoStatPill(
-                    icon = Icons.Default.Schedule,
-                    text = venue.workingHours,
-                    tint = EmeraldPrimary,
-                    modifier = Modifier.weight(1.8f)
+                QueueMetricBox(
+                    icon = Icons.Default.Groups,
+                    label = "قبلك",
+                    value = "${venue.queueAheadCount}",
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.weight(1f)
+                )
+                QueueMetricBox(
+                    icon = Icons.Default.AccessTime,
+                    label = "التقديري",
+                    value = if (venue.estimatedWaitMinutes <= 0) "فوري" else "${venue.estimatedWaitMinutes} د",
+                    tint = StatusOpen,
+                    modifier = Modifier.weight(1f)
                 )
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { IntentHelpers.dialPhone(context, venue.phone) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("venue_detail_call_button")
-                ) {
-                    Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("الهاتف", style = MaterialTheme.typography.labelMedium)
-                }
-                OutlinedButton(
-                    onClick = {
-                        IntentHelpers.openMapLocation(
-                            context,
-                            venue.latitude,
-                            venue.longitude,
-                            venue.name
-                        )
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("venue_detail_map_button")
-                ) {
-                    Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("الموقع", style = MaterialTheme.typography.labelMedium)
-                }
-                OutlinedButton(
-                    onClick = {
-                        IntentHelpers.openMessaging(
-                            context,
-                            venue.whatsapp,
-                            "مرحباً، أود الاستفسار عن الحجز في ${venue.name}"
-                        )
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("venue_detail_message_button")
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("الرسائل", style = MaterialTheme.typography.labelMedium)
-                }
-            }
-
-            HorizontalDivider()
-
-            // SECTION 2: Service Customization
-            Text(
-                text = if (isField) "٢. اختيار الملعب وعدد الساعات" else if (isClinic) "٢. تخصيص الموعد الطبي" else "٢. تخصيص الخدمة المطلوبة",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            // Compact Service Options
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 venue.customOptions.forEach { option ->
                     FilterChip(
                         selected = selectedOption == option,
                         onClick = { selectedOption = option },
-                        label = { Text(option) }
+                        label = { Text(option, style = MaterialTheme.typography.labelMedium) }
                     )
                 }
             }
 
-            // Sports Fields Hours Stepper (Min 1.5h, Step 0.5h, Max 3.0h)
+            // Sports Fields Hours Stepper (1.5h min, 0.5h step, 3.0h max)
             if (isField) {
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.SportsSoccer,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = "تحديد عدد ساعات حجز الملعب",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Text(
-                            text = "أقل مدة ساعة ونصف (1.5) • الزيادة نصف ساعة (0.5) • أقصى مدة 3 ساعات",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -420,23 +280,32 @@ fun VenueDetailsSheet(
                                     containerColor = MaterialTheme.colorScheme.primary
                                 ),
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(44.dp)
                                     .testTag("field_hours_decrease")
                             ) {
                                 Icon(Icons.Default.Remove, contentDescription = "إنقاص نصف ساعة")
                             }
 
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = FieldBookingDuration.formatArabic(selectedHours),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.testTag("field_hours_label")
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.SportsSoccer,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = FieldBookingDuration.formatArabic(selectedHours),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.testTag("field_hours_label")
+                                    )
+                                }
                                 Text(
                                     text = "الإجمالي: ${IntentHelpers.formatDinar(calculatedPrice)}",
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -452,16 +321,14 @@ fun VenueDetailsSheet(
                                     containerColor = MaterialTheme.colorScheme.primary
                                 ),
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(44.dp)
                                     .testTag("field_hours_increase")
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = "زيادة نصف ساعة")
                             }
                         }
 
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             FieldBookingDuration.validSteps.forEach { step ->
                                 FilterChip(
                                     selected = selectedHours == step,
@@ -479,45 +346,24 @@ fun VenueDetailsSheet(
                 }
             }
 
-            // Doctors & Clinics Distinct Medical Flow
+            // Clinics Compact Medical Selection
             if (isClinic) {
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.45f)),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LocalHospital,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = "تفاصيل الحجز الطبي (${venue.specialty})",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Text(
-                            text = "نوع الزيارة (يختلف السعر حسب نوع الزيارة):",
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             DoctorVisitType.entries.forEach { visit ->
                                 FilterChip(
                                     selected = doctorVisitType == visit,
                                     onClick = { doctorVisitType = visit },
-                                    label = { Text(visit.displayName) },
+                                    label = { Text(visit.displayName, style = MaterialTheme.typography.labelSmall) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = MaterialTheme.colorScheme.secondary,
                                         selectedLabelColor = Color.White
@@ -526,33 +372,21 @@ fun VenueDetailsSheet(
                                 )
                             }
                         }
-
-                        Text(
-                            text = "فترة المعاينة المفضلة:",
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             DoctorTimePeriod.entries.forEach { period ->
                                 FilterChip(
                                     selected = doctorPeriod == period,
                                     onClick = { doctorPeriod = period },
-                                    label = { Text("${period.displayName} (${period.rangeText})") },
+                                    label = { Text(period.displayName, style = MaterialTheme.typography.labelSmall) },
                                     modifier = Modifier.testTag("doctor_period_${period.name.lowercase()}")
                                 )
                             }
-                        }
-
-                        Text(
-                            text = "أولوية الحالة:",
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             DoctorUrgency.entries.forEach { urgency ->
                                 val isUrgent = urgency == DoctorUrgency.URGENT
                                 FilterChip(
                                     selected = doctorUrgency == urgency,
                                     onClick = { doctorUrgency = urgency },
-                                    label = { Text(urgency.displayName) },
+                                    label = { Text(urgency.displayName, style = MaterialTheme.typography.labelSmall) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = if (isUrgent) StatusUrgent else MaterialTheme.colorScheme.primary,
                                         selectedLabelColor = Color.White
@@ -565,53 +399,65 @@ fun VenueDetailsSheet(
             }
 
             if (isLab) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FilterChip(
-                        selected = labFasting,
-                        onClick = { labFasting = !labFasting },
-                        label = { Text("يتطلب صيام (8-12 ساعة)") }
-                    )
-                }
+                FilterChip(
+                    selected = labFasting,
+                    onClick = { labFasting = !labFasting },
+                    label = { Text("يتطلب صيام (8-12 ساعة)") }
+                )
             }
 
-            HorizontalDivider()
-
-            // SECTION 3: MANDATORY USER INFO
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                border = BorderStroke(
-                    1.dp,
-                    if (hasAttemptedSubmit && (!isNameValid || !isPhoneValid)) StatusUrgent
-                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+            // MANDATORY USER INFO: Compact summary if saved, expanded form if missing or editing
+            if (!editingMandatory && isNameValid && isPhoneValid) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "٣. معلوماتك الشخصية",
+                                text = "$customerName • $customerPhone",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        TextButton(onClick = { editingMandatory = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("تعديل")
+                        }
+                    }
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    border = BorderStroke(
+                        1.dp,
+                        if (hasAttemptedSubmit && (!isNameValid || !isPhoneValid)) StatusUrgent
+                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "معلوماتك للحجز",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold
                             )
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = StatusUrgent.copy(alpha = 0.16f)
-                            ) {
+                            Surface(shape = CircleShape, color = StatusUrgent.copy(alpha = 0.16f)) {
                                 Text(
                                     text = "إلزامي *",
                                     style = MaterialTheme.typography.labelSmall,
@@ -622,94 +468,69 @@ fun VenueDetailsSheet(
                             }
                         }
 
-                        if (userProfile.hasMandatoryInfo) {
-                            TextButton(
-                                onClick = {
-                                    customerName = userProfile.userName
-                                    customerPhone = userProfile.userPhone
-                                }
-                            ) {
-                                Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("ملء من ملفك")
-                            }
-                        }
+                        OutlinedTextField(
+                            value = customerName,
+                            onValueChange = { customerName = it },
+                            label = { Text("الاسم الكامل *") },
+                            placeholder = { Text("مثال: علي حسين الجبوري") },
+                            isError = hasAttemptedSubmit && !isNameValid,
+                            supportingText = if (hasAttemptedSubmit && !isNameValid) {
+                                { Text("الاسم الكامل إلزامي (3 أحرف على الأقل)", color = StatusUrgent) }
+                            } else null,
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("booking_name_input")
+                        )
+
+                        OutlinedTextField(
+                            value = customerPhone,
+                            onValueChange = { customerPhone = it },
+                            label = { Text("رقم الهاتف *") },
+                            placeholder = { Text("0770xxxxxxx") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            isError = hasAttemptedSubmit && !isPhoneValid,
+                            supportingText = if (hasAttemptedSubmit && !isPhoneValid) {
+                                { Text("رقم الهاتف إلزامي (10 إلى 14 رقماً)", color = StatusUrgent) }
+                            } else null,
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("booking_phone_input")
+                        )
                     }
-
-                    OutlinedTextField(
-                        value = customerName,
-                        onValueChange = { customerName = it },
-                        label = { Text(if (isClinic) "اسم المراجع الكامل *" else "الاسم الكامل *") },
-                        placeholder = { Text("مثال: علي حسين الجبوري") },
-                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                        isError = hasAttemptedSubmit && !isNameValid,
-                        supportingText = if (hasAttemptedSubmit && !isNameValid) {
-                            { Text("الاسم الكامل إلزامي (3 أحرف على الأقل)", color = StatusUrgent) }
-                        } else null,
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("booking_name_input")
-                    )
-
-                    OutlinedTextField(
-                        value = customerPhone,
-                        onValueChange = { customerPhone = it },
-                        label = { Text("رقم الهاتف *") },
-                        placeholder = { Text("0770xxxxxxx") },
-                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        isError = hasAttemptedSubmit && !isPhoneValid,
-                        supportingText = if (hasAttemptedSubmit && !isPhoneValid) {
-                            { Text("رقم الهاتف إلزامي (10 إلى 14 رقماً)", color = StatusUrgent) }
-                        } else null,
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("booking_phone_input")
-                    )
                 }
             }
 
-            // SECTION 4: OPTIONAL USER INFO
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
-                modifier = Modifier.fillMaxWidth()
+            // Collapsible Optional Information Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showOptionalFields = !showOptionalFields }
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = "٤. معلومات إضافية",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.surfaceVariant
-                        ) {
-                            Text(
-                                text = "اختياري",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
+                Text(
+                    text = "معلومات اختيارية (العمر أو ملاحظة)",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Icon(
+                    imageVector = if (showOptionalFields) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
+            AnimatedVisibility(visible = showOptionalFields) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = optionalAge,
                         onValueChange = { optionalAge = it },
-                        label = { Text(if (isClinic) "عمر المريض (اختياري)" else "العمر أو الفئة (اختياري)") },
+                        label = { Text("العمر (اختياري)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
@@ -717,17 +538,10 @@ fun VenueDetailsSheet(
                             .fillMaxWidth()
                             .testTag("booking_optional_age_input")
                     )
-
                     OutlinedTextField(
                         value = optionalNote,
                         onValueChange = { optionalNote = it },
-                        label = {
-                            Text(
-                                if (isClinic) "الأعراض أو تفاصيل المعاينة (اختياري)"
-                                else if (isField) "ملاحظة الفريق أو التوقيت (اختياري)"
-                                else "تفاصيل أو ملاحظات اختيارية"
-                            )
-                        },
+                        label = { Text("ملاحظة إضافية (اختياري)") },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier
@@ -737,10 +551,12 @@ fun VenueDetailsSheet(
                 }
             }
 
+            // Primary Direct Confirm Button
             Button(
                 onClick = {
                     hasAttemptedSubmit = true
                     if (!isNameValid || !isPhoneValid) {
+                        editingMandatory = true
                         return@Button
                     }
 
@@ -778,76 +594,67 @@ fun VenueDetailsSheet(
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp)
+                    .height(52.dp)
                     .testTag("confirm_venue_booking_button")
             ) {
                 Text(
                     text = if (!venue.isAcceptingBookings) {
                         "الاستقبال متوقف مؤقتاً"
-                    } else if (venue.isPaused) {
-                        "احجز تذكرة #${venue.nextTicketNumber} (متوقف مؤقتاً)"
                     } else if (isField) {
                         "تأكيد #${venue.nextTicketNumber} • ${FieldBookingDuration.shortLabel(selectedHours)} (${IntentHelpers.formatDinar(calculatedPrice)})"
-                    } else if (isClinic) {
-                        "حجز تذكرة #${venue.nextTicketNumber} • ${IntentHelpers.formatDinar(calculatedPrice)}"
                     } else {
-                        "إصدار تذكرة #${venue.nextTicketNumber} ورمز QR"
+                        "تأكيد الحجز #${venue.nextTicketNumber} وإصدار QR"
                     },
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            HorizontalDivider()
+            // Optional Collapsed Customer Reviews
+            if (reviews.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showReviews = !showReviews }
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Star, contentDescription = null, tint = AmberGold, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "آراء الزبائن (${reviews.size}) • ${venue.rating}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        imageVector = if (showReviews) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
-            // SECTION 5: Customer Reviews
-            Text(
-                text = "٥. آراء الزبائن (${reviews.size})",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            if (reviews.isEmpty()) {
-                Text(
-                    text = "لا توجد تقييمات بعد، كن أول من يقيم هذا المكان بعد إتمام خدمتك!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                reviews.forEach { rev ->
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                AnimatedVisibility(visible = showReviews) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        reviews.forEach { rev ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(
-                                    text = rev.authorName,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = AmberGold,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(2.dp))
-                                    Text(
-                                        text = "${rev.rating}.0",
-                                        style = MaterialTheme.typography.labelMedium
-                                    )
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = rev.authorName, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                                        Text(text = rev.comment, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    Text(text = "★ ${rev.rating}", style = MaterialTheme.typography.labelMedium, color = AmberGold)
                                 }
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = rev.comment,
-                                style = MaterialTheme.typography.bodySmall
-                            )
                         }
                     }
                 }
@@ -866,16 +673,16 @@ private fun QueueMetricBox(
 ) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
         border = BorderStroke(1.dp, tint.copy(alpha = 0.25f)),
         modifier = modifier
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleSmall,
@@ -888,34 +695,6 @@ private fun QueueMetricBox(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
-private fun InfoStatPill(
-    icon: ImageVector,
-    text: String,
-    tint: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1
             )
         }
     }

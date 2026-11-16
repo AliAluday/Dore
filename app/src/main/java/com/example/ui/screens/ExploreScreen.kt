@@ -90,6 +90,7 @@ fun ExploreScreen(
     onToggleFavoritesOnly: () -> Unit,
     onSortSelect: (SortOption) -> Unit,
     onBookFastestTurn: () -> Unit,
+    onDirectBookVenue: (VenueEntity) -> Unit,
     onVenueClick: (VenueEntity) -> Unit,
     onToggleFavorite: (VenueEntity) -> Unit,
     modifier: Modifier = Modifier
@@ -105,17 +106,17 @@ fun ExploreScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Futuristic Nineveh Hero Banner
+            // Compact Nineveh Hero Banner
             item {
                 Card(
-                    shape = RoundedCornerShape(26.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 5.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(190.dp)
+                            .height(152.dp)
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.img_nineveh_hero),
@@ -139,33 +140,21 @@ fun ExploreScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(20.dp),
+                                .padding(18.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = MintPrimaryDark.copy(alpha = 0.2f),
-                                    border = BorderStroke(1.dp, MintPrimaryDark.copy(alpha = 0.55f))
-                                ) {
-                                    Text(
-                                        text = "محافظة نينوى • ${state.preferences.selectedDistrict.displayName}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MintPrimaryDark,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                    )
-                                }
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(
-                                    text = "دورك أسرع في كل نينوى",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = Color.White,
+                                    text = "نينوى • ${state.preferences.selectedDistrict.displayName}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MintPrimaryDark,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "جميع أقضية وأحياء نينوى بانتظارك بتذكرة رقمية ذكية",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White.copy(alpha = 0.85f)
+                                    text = "اضغط على أي مكان للحجز المباشر",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
 
@@ -175,13 +164,13 @@ fun ExploreScreen(
                                     containerColor = MintPrimaryDark,
                                     contentColor = Color(0xFF04221B)
                                 ),
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier.testTag("fastest_turn_button")
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Bolt,
                                     contentDescription = null,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
@@ -225,75 +214,51 @@ fun ExploreScreen(
                 }
             }
 
-            // Nineveh Districts Strip (جميع أقضية نينوى)
+            // Nineveh Districts Strip
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.LocationCity,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(NinevehDistrict.entries) { district ->
+                        val selected = state.preferences.selectedDistrict == district
+                        FilterChip(
+                            selected = selected,
+                            onClick = { onSelectDistrict(district) },
+                            label = { Text(district.displayName) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                                selectedLabelColor = Color.White
+                            ),
+                            modifier = Modifier.testTag("explore_district_chip_${district.name.lowercase()}")
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "أقضية ومناطق نينوى (${NinevehDistrict.selectableDistricts.size} قضاء ومنطقة)",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(NinevehDistrict.entries) { district ->
-                            val selected = state.preferences.selectedDistrict == district
-                            FilterChip(
-                                selected = selected,
-                                onClick = { onSelectDistrict(district) },
-                                label = { Text(district.displayName) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.secondary,
-                                    selectedLabelColor = Color.White
-                                ),
-                                modifier = Modifier.testTag("explore_district_chip_${district.name.lowercase()}")
-                            )
-                        }
                     }
                 }
             }
 
-            // Neighborhoods / Areas Strip within Selected Nineveh District
+            // Neighborhoods Strip within Selected District
             if (state.availableAreas.isNotEmpty()) {
                 item {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "الأحياء والمناطق (${state.availableAreas.size} منطقة)",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            item {
-                                FilterChip(
-                                    selected = state.selectedArea == null,
-                                    onClick = { onSelectArea(null) },
-                                    label = { Text("جميع المناطق", style = MaterialTheme.typography.labelMedium) }
-                                )
-                            }
-                            items(state.availableAreas) { area ->
-                                FilterChip(
-                                    selected = state.selectedArea == area,
-                                    onClick = { onSelectArea(area) },
-                                    label = { Text(area, style = MaterialTheme.typography.labelMedium) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                    ),
-                                    modifier = Modifier.testTag("area_chip_$area")
-                                )
-                            }
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = state.selectedArea == null,
+                                onClick = { onSelectArea(null) },
+                                label = { Text("كل المناطق", style = MaterialTheme.typography.labelMedium) }
+                            )
+                        }
+                        items(state.availableAreas) { area ->
+                            FilterChip(
+                                selected = state.selectedArea == area,
+                                onClick = { onSelectArea(area) },
+                                label = { Text(area, style = MaterialTheme.typography.labelMedium) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                modifier = Modifier.testTag("area_chip_$area")
+                            )
                         }
                     }
                 }
@@ -485,7 +450,8 @@ fun ExploreScreen(
                 items(state.filteredVenues, key = { it.id }) { venue ->
                     FuturisticVenueCard(
                         venue = venue,
-                        onClick = { onVenueClick(venue) },
+                        onDirectBook = { onDirectBookVenue(venue) },
+                        onOpenCustomize = { onVenueClick(venue) },
                         onToggleFavorite = { onToggleFavorite(venue) }
                     )
                 }
@@ -554,14 +520,11 @@ private fun NeoStatCard(
 @Composable
 private fun FuturisticVenueCard(
     venue: VenueEntity,
-    onClick: () -> Unit,
+    onDirectBook: () -> Unit,
+    onOpenCustomize: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
-    val statusText = when {
-        !venue.isAcceptingBookings -> "مغلق مؤقتاً"
-        venue.isPaused -> "متوقف مؤقتاً"
-        else -> "مفتوح الآن"
-    }
+    val isAvailable = venue.isOpen && venue.isAcceptingBookings
     val statusColor = when {
         !venue.isAcceptingBookings -> StatusUrgent
         venue.isPaused -> StatusPaused
@@ -569,98 +532,55 @@ private fun FuturisticVenueCard(
     }
 
     Card(
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable { onDirectBook() }
             .testTag("venue_card_${venue.id}")
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // Concise Header: Name, Area + Status dot, Favorite
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = IndigoAccentLight.copy(alpha = 0.14f)
-                        ) {
-                            Text(
-                                text = venue.category,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.secondary,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = statusColor.copy(alpha = 0.14f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(statusColor)
-                                )
-                                Text(
-                                    text = statusText,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = statusColor
-                                )
-                            }
-                        }
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(statusColor)
+                        )
+                        Text(
+                            text = venue.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = venue.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        text = "${venue.city} • ${venue.area}" +
+                            if (venue.category == ServiceCategory.CLINICS.displayName && venue.specialty.isNotBlank()) " • ${venue.specialty}" else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    if (venue.specialty.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "التخصص: ${venue.specialty}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.secondary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = "${venue.city} • ${venue.area}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                 }
 
                 IconButton(
@@ -672,103 +592,72 @@ private fun FuturisticVenueCard(
                 ) {
                     Icon(
                         imageVector = if (venue.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "إضافة للمفضلة",
+                        contentDescription = "المفضلة",
                         tint = if (venue.isFavorite) StatusUrgent else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                modifier = Modifier.fillMaxWidth()
+            // Minimal 1-Line Queue + ETA + Price Strip
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
+                Text(
+                    text = "دور #${venue.nextTicketNumber}  •  قبلك ${venue.queueAheadCount}  •  " +
+                        if (venue.estimatedWaitMinutes <= 0) "فوري" else "${venue.estimatedWaitMinutes} د",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (venue.category == ServiceCategory.FIELDS.displayName) {
+                        "${IntentHelpers.formatDinar(venue.priceDinar)}/س"
+                    } else {
+                        IntentHelpers.formatDinar(venue.priceDinar)
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Direct 1-Tap Booking Button + Compact Customize Button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = onDirectBook,
+                    enabled = isAvailable,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .weight(1f)
+                        .height(46.dp)
+                        .testTag("direct_book_venue_${venue.id}")
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                tint = AmberGold,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text(
-                                text = "${venue.rating}",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                            ) {
-                                Text(
-                                    text = "الدور القادم #${venue.nextTicketNumber}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
+                    Text(
+                        text = if (isAvailable) "احجز مباشرة (#${venue.nextTicketNumber})" else "الاستقبال متوقف",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
-                        Text(
-                            text = if (venue.category == ServiceCategory.FIELDS.displayName) {
-                                "${IntentHelpers.formatDinar(venue.priceDinar)} / ساعة"
-                            } else {
-                                IntentHelpers.formatDinar(venue.priceDinar)
-                            },
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.AccessTime,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = if (venue.estimatedWaitMinutes <= 0) {
-                                    "الوقت التقديري: فوري (0 د)"
-                                } else {
-                                    "الوقت التقديري: ${venue.estimatedWaitMinutes} دقيقة"
-                                },
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        Text(
-                            text = if (venue.queueAheadCount == 0) {
-                                "قبلك: 0"
-                            } else {
-                                "قبلك: ${venue.queueAheadCount} بالانتظار"
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (venue.queueAheadCount == 0) StatusOpen else MaterialTheme.colorScheme.secondary
-                        )
-                    }
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onOpenCustomize,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .height(46.dp)
+                        .testTag("customize_venue_${venue.id}")
+                ) {
+                    Text("تخصيص", style = MaterialTheme.typography.labelMedium)
                 }
             }
         }

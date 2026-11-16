@@ -189,6 +189,7 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
                                 onToggleFavoritesOnly = viewModel::toggleFavoritesFilter,
                                 onSortSelect = viewModel::selectSortOption,
                                 onBookFastestTurn = viewModel::bookFastestTurn,
+                                onDirectBookVenue = viewModel::quickBookVenue,
                                 onVenueClick = { viewModel.openVenueDetails(it.id) },
                                 onToggleFavorite = viewModel::toggleVenueFavorite
                             )

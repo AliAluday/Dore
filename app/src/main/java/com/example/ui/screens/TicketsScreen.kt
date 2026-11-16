@@ -308,8 +308,8 @@ fun TicketsScreen(
                         fontWeight = FontWeight.Bold
                     )
                     QrCodeCanvas(
-                        payload = "DORI|${b.ticketCode}|${b.venueId}|${b.customerPhone}",
-                        modifier = Modifier.size(250.dp)
+                        payload = com.example.util.QrCodeGenerator.buildTicketPayload(b),
+                        modifier = Modifier.size(260.dp)
                     )
                     Text(
                         text = "اعرض هذا الرمز لموظف الاستقبال لمسح الدور",

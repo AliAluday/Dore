@@ -121,18 +121,41 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `qr code generator builds deterministic 25x25 matrix with finder patterns`() {
-        val m1 = QrCodeGenerator.generateMatrix("DORI|NIN-1-15|1|07701234567")
-        val m2 = QrCodeGenerator.generateMatrix("DORI|NIN-1-15|1|07701234567")
-        assertEquals(25, m1.size)
-        assertEquals(25, m1[0].size)
-        assertTrue(m1[0][0])
-        assertTrue(m1[6][6])
-        assertTrue(m1[3][3])
-        for (r in 0 until 25) {
-            for (c in 0 until 25) {
-                assertEquals(m1[r][c], m2[r][c])
-            }
+    fun `qr code generator outputs real scannable ISO QR readable by standard QRCodeReader`() {
+        val sampleBooking = com.example.data.local.BookingEntity(
+            ticketCode = "NIN-1-1",
+            queueNumber = 1,
+            venueId = 1,
+            venueName = "عيادة الحدباء",
+            venueCity = "الموصل - الأيسر",
+            venueCategory = "عيادات",
+            venuePhone = "+9647701112233",
+            customerName = "علي حسين الجبوري",
+            customerPhone = "07701234567",
+            selectedOption = "فحص وتشخيص",
+            priceDinar = 20000,
+            peopleAhead = 0,
+            estimatedMinutes = 0
+        )
+        val payload = QrCodeGenerator.buildTicketPayload(sampleBooking)
+        val matrix = QrCodeGenerator.generateMatrix(payload)
+        assertTrue(matrix.isNotEmpty())
+        assertEquals(matrix.size, matrix[0].size)
+
+        // Render matrix scaled 4x into ARGB pixels and decode with standard ZXing QRCodeReader
+        val scale = 4
+        val dim = matrix.size * scale
+        val pixels = IntArray(dim * dim) { idx ->
+            val r = (idx / dim) / scale
+            val c = (idx % dim) / scale
+            if (matrix[r][c]) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
         }
+        val source = com.google.zxing.RGBLuminanceSource(dim, dim, pixels)
+        val bitmap = com.google.zxing.BinaryBitmap(com.google.zxing.common.HybridBinarizer(source))
+        val decoded = com.google.zxing.qrcode.QRCodeReader().decode(
+            bitmap,
+            mapOf(com.google.zxing.DecodeHintType.CHARACTER_SET to "UTF-8")
+        )
+        assertEquals(payload, decoded.text)
     }
 }

@@ -129,7 +129,7 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val availableAreas = if (district == NinevehDistrict.ALL_NINEVEH) {
-            NinevehDistrict.selectableDistricts.flatMap { it.areas }.distinct()
+            emptyList()
         } else {
             district.areas
         }
@@ -287,6 +287,49 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openVenueDetails(venueId: Int?) {
         filterState.update { it.copy(selectedVenueIdForDetails = venueId) }
+    }
+
+    fun quickBookVenue(venue: VenueEntity) {
+        viewModelScope.launch {
+            if (!venue.isOpen || !venue.isAcceptingBookings) {
+                _toastMessage.emit("هذا المكان متوقف عن استقبال الحجوزات حالياً")
+                return@launch
+            }
+            val prefsNow = uiState.value.preferences
+            if (!prefsNow.hasMandatoryInfo) {
+                openVenueDetails(venue.id)
+                _toastMessage.emit("سجّل الاسم ورقم الهاتف لمرة واحدة للحجز المباشر")
+                return@launch
+            }
+            val defaultOption = when (venue.category) {
+                ServiceCategory.FIELDS.displayName ->
+                    "${venue.customOptions.firstOrNull() ?: "ملعب"} • ${com.example.data.model.FieldBookingDuration.shortLabel(com.example.data.model.FieldBookingDuration.MIN_HOURS)}"
+                ServiceCategory.CLINICS.displayName ->
+                    "${venue.customOptions.firstOrNull() ?: "كشف"} • ${com.example.data.model.DoctorVisitType.NEW_CHECKUP.displayName}"
+                else -> venue.customOptions.firstOrNull() ?: "حجز مباشر"
+            }
+            val defaultPrice = if (venue.category == ServiceCategory.FIELDS.displayName) {
+                (venue.priceDinar * com.example.data.model.FieldBookingDuration.MIN_HOURS).toInt()
+            } else {
+                venue.priceDinar
+            }
+            val optionalSummary = buildString {
+                if (prefsNow.userAge.isNotBlank()) append("العمر: ${prefsNow.userAge.trim()}")
+                if (prefsNow.optionalNote.isNotBlank()) {
+                    if (isNotEmpty()) append(" • ")
+                    append(prefsNow.optionalNote.trim())
+                }
+            }
+            bookTicket(
+                venueId = venue.id,
+                customerName = prefsNow.userName,
+                customerPhone = prefsNow.userPhone,
+                selectedOption = defaultOption,
+                notes = "",
+                optionalInfo = optionalSummary,
+                customPriceDinar = defaultPrice
+            )
+        }
     }
 
     fun bookTicket(

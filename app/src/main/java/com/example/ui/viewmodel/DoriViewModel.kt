@@ -18,6 +18,7 @@ import com.example.data.model.TicketStage
 import com.example.data.model.UserProfileSettings
 import com.example.data.repository.DoriRepository
 import com.example.util.AlertNotifier
+import com.example.util.DoriNotificationHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -61,7 +62,8 @@ data class DoriUiState(
     val queueItemsByVenue: Map<Int, List<MerchantQueueItemEntity>> = emptyMap(),
     val isLiveSimulationRunning: Boolean = false,
     val activeTurnAlert: LiveTurnAlert? = null,
-    val selectedVenueForDetails: VenueEntity? = null
+    val selectedVenueForDetails: VenueEntity? = null,
+    val newlyBookedTicket: BookingEntity? = null
 )
 
 private data class FilterState(
@@ -75,7 +77,8 @@ private data class FilterState(
     val selectedMerchantVenueId: Int = 1,
     val isLiveSimulationRunning: Boolean = false,
     val activeTurnAlert: LiveTurnAlert? = null,
-    val selectedVenueIdForDetails: Int? = null
+    val selectedVenueIdForDetails: Int? = null,
+    val newlyBookedTicket: BookingEntity? = null
 )
 
 class DoriViewModel(application: Application) : AndroidViewModel(application) {
@@ -201,7 +204,8 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
             queueItemsByVenue = queueItems.groupBy { it.venueId },
             isLiveSimulationRunning = filters.isLiveSimulationRunning,
             activeTurnAlert = filters.activeTurnAlert,
-            selectedVenueForDetails = detailVenue
+            selectedVenueForDetails = detailVenue,
+            newlyBookedTicket = filters.newlyBookedTicket
         )
     }.stateIn(
         scope = viewModelScope,
@@ -284,15 +288,17 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
                 notes = notes
             )
             result.onSuccess { booking ->
+                DoriNotificationHelper.showBookingCreatedNotification(getApplication(), booking)
                 filterState.update {
                     it.copy(
                         selectedVenueIdForDetails = null,
                         selectedActiveBookingId = booking.id,
+                        newlyBookedTicket = booking,
                         currentTab = AppTab.TICKETS,
                         selectedMerchantVenueId = venueId
                     )
                 }
-                _toastMessage.emit("تم حجز دورك بنجاح (${booking.ticketCode})")
+                _toastMessage.emit("تم إصدار التكت ورمز QR (${booking.ticketCode})")
             }.onFailure { err ->
                 _toastMessage.emit(err.message ?: "تعذر إتمام الحجز")
             }
@@ -304,18 +310,24 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
             val district = uiState.value.preferences.selectedDistrict
             val result = repository.bookFastestTurnInDistrict(district)
             result.onSuccess { booking ->
+                DoriNotificationHelper.showBookingCreatedNotification(getApplication(), booking)
                 filterState.update {
                     it.copy(
                         selectedActiveBookingId = booking.id,
+                        newlyBookedTicket = booking,
                         currentTab = AppTab.TICKETS,
                         selectedMerchantVenueId = booking.venueId
                     )
                 }
-                _toastMessage.emit("⚡ تم حجز أسرع دور في ${booking.venueName} (${booking.ticketCode})")
+                _toastMessage.emit("⚡ تم إصدار تكت أسرع دور في ${booking.venueName} (${booking.ticketCode})")
             }.onFailure { err ->
                 _toastMessage.emit(err.message ?: "لا يوجد دور متاح حالياً")
             }
         }
+    }
+
+    fun dismissNewlyBookedTicket() {
+        filterState.update { it.copy(newlyBookedTicket = null) }
     }
 
     fun selectActiveBooking(bookingId: Long) {
@@ -441,6 +453,7 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
     private fun handleTurnAlerts(alerts: List<LiveTurnAlert>) {
         val mostUrgent = alerts.maxByOrNull { it.stage.stepIndex } ?: return
         filterState.update { it.copy(activeTurnAlert = mostUrgent) }
+        DoriNotificationHelper.showTurnAlertNotification(getApplication(), mostUrgent)
         val prefsNow = uiState.value.preferences
         AlertNotifier.triggerTurnAlert(
             context = getApplication(),

@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LocationCity
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
@@ -71,6 +72,8 @@ import com.example.ui.viewmodel.DoriUiState
 @Composable
 fun ProfileScreen(
     state: DoriUiState,
+    hasNotificationPermission: Boolean,
+    onRequestNotificationPermission: () -> Unit,
     onSaveProfile: (String, String, NinevehDistrict) -> Unit,
     onToggleDarkMode: () -> Unit,
     onSetMuteSound: (Boolean) -> Unit,
@@ -334,6 +337,62 @@ fun ProfileScreen(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.NotificationsActive,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "إذن إشعارات النظام",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = if (hasNotificationPermission) {
+                                            "مفعّل — ستصلك إشعارات فورية للتذاكر والدور"
+                                        } else {
+                                            "غير مفعّل — اضغط لتفعيل إشعارات الأندرويد"
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            if (hasNotificationPermission) {
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Text(
+                                        text = "مفعّل",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+                            } else {
+                                Button(
+                                    onClick = onRequestNotificationPermission,
+                                    modifier = Modifier.testTag("profile_enable_notifications_button")
+                                ) {
+                                    Text("تفعيل")
+                                }
+                            }
+                        }
 
                         SettingToggleRow(
                             icon = Icons.Default.DarkMode,

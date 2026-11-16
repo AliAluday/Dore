@@ -293,7 +293,7 @@ fun VenueDetailsSheet(
                     } else if (venue.isPaused) {
                         "احجز الآن (الطابور متوقف مؤقتاً)"
                     } else {
-                        "تأكيد حجز الدور وإصدار تذكرة QR"
+                        "تأكيد الحجز وإصدار التكت ورمز QR"
                     },
                     style = MaterialTheme.typography.labelLarge
                 )

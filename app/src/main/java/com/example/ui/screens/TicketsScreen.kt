@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
@@ -68,6 +69,8 @@ import com.example.util.IntentHelpers
 @Composable
 fun TicketsScreen(
     state: DoriUiState,
+    hasNotificationPermission: Boolean,
+    onRequestNotificationPermission: () -> Unit,
     onSelectActiveBooking: (Long) -> Unit,
     onCompleteBooking: (Long, Int?, String?) -> Unit,
     onCancelBooking: (Long) -> Unit,
@@ -154,6 +157,47 @@ fun TicketsScreen(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 104.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
+                        if (!hasNotificationPermission) {
+                            item {
+                                Surface(
+                                    shape = RoundedCornerShape(18.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.NotificationsActive,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "فعّل إذن الإشعارات لتنبيهك عند اقتراب وحلول دورك",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        }
+                                        TextButton(
+                                            onClick = onRequestNotificationPermission,
+                                            modifier = Modifier.testTag("tickets_enable_notifications_button")
+                                        ) {
+                                            Text("تفعيل", fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         if (state.activeBookings.size > 1) {
                             item {
                                 Text(

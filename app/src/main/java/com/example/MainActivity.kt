@@ -1,10 +1,14 @@
 package com.example
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -45,11 +49,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +66,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ui.components.InstantTicketPassDialog
 import com.example.ui.components.LiveOverlayAlertBanner
 import com.example.ui.components.TopStickyHeader
 import com.example.ui.components.VenueDetailsSheet
@@ -68,12 +77,15 @@ import com.example.ui.screens.TicketsScreen
 import com.example.ui.theme.DoriTheme
 import com.example.ui.viewmodel.AppTab
 import com.example.ui.viewmodel.DoriViewModel
+import com.example.util.DoriNotificationHelper
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        DoriNotificationHelper.ensureChannel(this)
         setContent {
             val viewModel: DoriViewModel = viewModel()
             DoriAppRoot(viewModel = viewModel)
@@ -83,8 +95,42 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun DoriAppRoot(viewModel: DoriViewModel) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    var hasNotificationPermission by remember {
+        mutableStateOf(DoriNotificationHelper.hasNotificationPermission(context))
+    }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasNotificationPermission = granted || DoriNotificationHelper.hasNotificationPermission(context)
+        scope.launch {
+            snackbarHostState.showSnackbar(
+                if (granted) "تم تفعيل إشعارات الدور بنجاح"
+                else "يمكنك تفعيل الإشعارات لاحقاً من صفحة الحساب"
+            )
+        }
+    }
+
+    val requestNotificationPermission: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            hasNotificationPermission = DoriNotificationHelper.hasNotificationPermission(context)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !DoriNotificationHelper.hasNotificationPermission(context)
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.toastMessage.collect { msg ->
@@ -148,6 +194,8 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
 
                             AppTab.TICKETS -> TicketsScreen(
                                 state = state,
+                                hasNotificationPermission = hasNotificationPermission,
+                                onRequestNotificationPermission = requestNotificationPermission,
                                 onSelectActiveBooking = viewModel::selectActiveBooking,
                                 onCompleteBooking = viewModel::completeBooking,
                                 onCancelBooking = viewModel::cancelBooking,
@@ -171,6 +219,8 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
 
                             AppTab.PROFILE -> ProfileScreen(
                                 state = state,
+                                hasNotificationPermission = hasNotificationPermission,
+                                onRequestNotificationPermission = requestNotificationPermission,
                                 onSaveProfile = viewModel::updateProfile,
                                 onToggleDarkMode = viewModel::toggleDarkMode,
                                 onSetMuteSound = viewModel::setMuteSound,
@@ -207,6 +257,21 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
                                 notes = notes
                             )
                         }
+                    )
+                }
+
+                // Instant Ticket + Scannable QR Pass Modal right upon booking
+                state.newlyBookedTicket?.let { booked ->
+                    InstantTicketPassDialog(
+                        booking = booked,
+                        hasNotificationPermission = hasNotificationPermission,
+                        onRequestNotificationPermission = requestNotificationPermission,
+                        onViewInTickets = {
+                            viewModel.dismissNewlyBookedTicket()
+                            viewModel.selectActiveBooking(booked.id)
+                            viewModel.selectTab(AppTab.TICKETS)
+                        },
+                        onDismiss = viewModel::dismissNewlyBookedTicket
                     )
                 }
 

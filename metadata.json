@@ -1,0 +1,6 @@
+{
+  "name": "دوري",
+  "description": "تطبيق حجز الدور الذكي وإدارة الطوابير في العراق مع تذاكر QR تفاعلية، لوحة تحكم للمحلات، ونقاط ولاء محفوظة محلياً.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

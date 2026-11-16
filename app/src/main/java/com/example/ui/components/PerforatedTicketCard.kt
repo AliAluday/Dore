@@ -226,15 +226,20 @@ fun PerforatedTicketCard(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "رقم التذكرة",
+                                text = "ترتيب التذكرة",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.White.copy(alpha = 0.85f)
                             )
                             Text(
-                                text = booking.ticketCode,
-                                style = MaterialTheme.typography.titleMedium,
+                                text = "#${booking.queueNumber}",
+                                style = MaterialTheme.typography.headlineSmall,
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = booking.ticketCode,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.8f)
                             )
                         }
                     }
@@ -288,36 +293,63 @@ fun PerforatedTicketCard(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                            border = BorderStroke(1.dp, stageColor.copy(alpha = 0.35f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                                border = BorderStroke(1.dp, stageColor.copy(alpha = 0.35f)),
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.AccessTime,
-                                    contentDescription = null,
-                                    tint = stageColor,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
                                     Text(
-                                        text = "الوقت المتوقع للوصول",
+                                        text = "الأشخاص قبلك",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Text(
-                                        text = if (booking.estimatedMinutes <= 0) "حان دورك الآن!" else "${booking.estimatedMinutes} دقيقة (أمامك ${booking.peopleAhead})",
-                                        style = MaterialTheme.typography.titleSmall,
+                                        text = "${booking.peopleAhead}",
+                                        style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = stageColor
                                     )
+                                }
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                                border = BorderStroke(1.dp, stageColor.copy(alpha = 0.35f)),
+                                modifier = Modifier.weight(1.2f)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "الوقت التقديري",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.AccessTime,
+                                            contentDescription = null,
+                                            tint = stageColor,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(
+                                            text = if (booking.estimatedMinutes <= 0) "الآن!" else "${booking.estimatedMinutes} دقيقة",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = stageColor
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -390,20 +422,29 @@ fun PerforatedTicketCard(
                     }
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "التكلفة: ${IntentHelpers.formatDinar(booking.priceDinar)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (booking.notes.isNotBlank()) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
                         Text(
-                            text = "ملاحظة: ${booking.notes}",
+                            text = "التكلفة: ${IntentHelpers.formatDinar(booking.priceDinar)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (booking.notes.isNotBlank()) {
+                            Text(
+                                text = booking.notes,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    if (booking.optionalInfo.isNotBlank()) {
+                        Text(
+                            text = "معلومات اختيارية: ${booking.optionalInfo}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
                 }

@@ -16,7 +16,7 @@ import com.example.data.model.ServiceCategory
         BookingEntity::class,
         MerchantQueueItemEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class DoriDatabase : RoomDatabase() {
@@ -61,9 +61,9 @@ object SeedData {
             longitude = 43.1755,
             description = "بإشراف د. سرمد العبيدي — زراعة وتجميل الأسنان وعلاج العصب بأحدث الأجهزة الرقمية.",
             customOptionsCsv = "فحص وتشخيص|تنظيف وتبييض|حشوة تجميلية|علاج عصب",
-            currentServingNumber = 12,
-            nextTicketNumber = 15,
-            servedTodayCount = 29,
+            currentServingNumber = 1,
+            nextTicketNumber = 4,
+            servedTodayCount = 2,
             avgMinutesPerPerson = 6,
             waitingCount = 2
         ),
@@ -84,11 +84,11 @@ object SeedData {
             longitude = 43.1490,
             description = "فحص كمبيوتر، برمجة حساسات، وصيانة كهرباء وميكانيك السيارات الحديثة.",
             customOptionsCsv = "فحص كمبيوتر|تبديل زيت وفلاتر|صيانة تبريد|فحص بريكات",
-            currentServingNumber = 8,
-            nextTicketNumber = 11,
-            servedTodayCount = 19,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 10,
-            waitingCount = 2
+            waitingCount = 1
         ),
         VenueEntity(
             id = 3,
@@ -107,11 +107,11 @@ object SeedData {
             longitude = 43.1680,
             description = "جلسات نضارة البشرة، عناية بالشعر، وتجهيز متكامل بأجواء عصرية.",
             customOptionsCsv = "تنظيف بشرة|تسريح احترافي|علاج كيراتين|مكياج",
-            currentServingNumber = 5,
-            nextTicketNumber = 7,
-            servedTodayCount = 14,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 9,
-            waitingCount = 1
+            waitingCount = 0
         ),
         VenueEntity(
             id = 4,
@@ -130,9 +130,9 @@ object SeedData {
             longitude = 43.1180,
             description = "ملاعب كرة خماسية وسداسية وبادل بإضاءة LED قوية ومواقف خاصة (السعر لكل ساعة).",
             customOptionsCsv = "ملعب خماسي|ملعب سداسي|ملعب بادل",
-            currentServingNumber = 3,
-            nextTicketNumber = 5,
-            servedTodayCount = 11,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 14,
             waitingCount = 1
         ),
@@ -153,11 +153,11 @@ object SeedData {
             longitude = 43.1530,
             description = "تحاليل دم شاملة، فحص فيتامينات وهرمونات مع نتائج إلكترونية فورية.",
             customOptionsCsv = "تحليل دم شامل|فحص فيتامينات|تحليل غدة|فحص سكري",
-            currentServingNumber = 22,
-            nextTicketNumber = 24,
-            servedTodayCount = 41,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 4,
-            waitingCount = 1
+            waitingCount = 0
         ),
         VenueEntity(
             id = 6,
@@ -176,9 +176,9 @@ object SeedData {
             longitude = 43.1620,
             description = "فحص نظر رقمي، تشخيص شبكية العين، ومتابعة عمليات الليزك في الساحل الأيسر.",
             customOptionsCsv = "فحص نظر رقمي|فحص شبكية|متابعة ليزك",
-            currentServingNumber = 14,
-            nextTicketNumber = 16,
-            servedTodayCount = 23,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 6,
             waitingCount = 1
         ),
@@ -199,11 +199,11 @@ object SeedData {
             longitude = 43.1585,
             description = "حلاقة عصرية وتنظيف بشرة بالبخار في حي القاهرة والرشيدية.",
             customOptionsCsv = "حلاقة وتحديد|تنظيف بشرة|باقة عرسان",
-            currentServingNumber = 7,
-            nextTicketNumber = 9,
-            servedTodayCount = 18,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 8,
-            waitingCount = 1
+            waitingCount = 0
         ),
         VenueEntity(
             id = 8,
@@ -222,9 +222,9 @@ object SeedData {
             longitude = 43.2080,
             description = "فحوصات مخبرية دقيقة وسحب عينات سريع لأهالي التحرير والزهراء والكرامة.",
             customOptionsCsv = "فحص شامل|فحص وظائف كلى|تحليل مناعة",
-            currentServingNumber = 10,
-            nextTicketNumber = 12,
-            servedTodayCount = 26,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 5,
             waitingCount = 1
         ),
@@ -245,9 +245,9 @@ object SeedData {
             longitude = 43.1710,
             description = "متابعة نمو الأطفال، اللقاحات، وأمراض الجهاز التنفسي والحساسية.",
             customOptionsCsv = "فحص طفل|استشارة تغذية ولقاح|متابعة تنفسية",
-            currentServingNumber = 6,
-            nextTicketNumber = 8,
-            servedTodayCount = 21,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 7,
             waitingCount = 1
         ),
@@ -268,11 +268,11 @@ object SeedData {
             longitude = 43.1440,
             description = "بإشراف د. ريم الجبوري — علاج الأمراض الجلدية، الليزر التجميلي، والنضارة.",
             customOptionsCsv = "استشارة جلدية|جلسة ليزر|علاج حب الشباب",
-            currentServingNumber = 9,
-            nextTicketNumber = 11,
-            servedTodayCount = 18,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 8,
-            waitingCount = 1
+            waitingCount = 0
         ),
 
         // الموصل - الساحل الأيمن
@@ -293,9 +293,9 @@ object SeedData {
             longitude = 43.1335,
             description = "استشاري الباطنية والقلب والضغط والسكري مع تخطيط قلب وإيكو فوري.",
             customOptionsCsv = "كشف باطنية|تخطيط قلب وإيكو|متابعة ضغط وسكري",
-            currentServingNumber = 16,
-            nextTicketNumber = 19,
-            servedTodayCount = 31,
+            currentServingNumber = 1,
+            nextTicketNumber = 4,
+            servedTodayCount = 2,
             avgMinutesPerPerson = 6,
             waitingCount = 2
         ),
@@ -316,11 +316,11 @@ object SeedData {
             longitude = 43.1180,
             description = "بإشراف د. مهند الشمري — جراحة العظام والعمود الفقري وإصابات الملاعب.",
             customOptionsCsv = "كشف عظام ومفاصل|متابعة كسور|علاج إصابات رياضية",
-            currentServingNumber = 7,
-            nextTicketNumber = 9,
-            servedTodayCount = 17,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 8,
-            waitingCount = 1
+            waitingCount = 0
         ),
         VenueEntity(
             id = 10,
@@ -339,9 +339,9 @@ object SeedData {
             longitude = 43.1120,
             description = "صيانة سيارات، تبديل زيوت، وتكييف في حي المنصور والمأمون.",
             customOptionsCsv = "فحص إلكتروني|تبديل زيت|تعبئة تبريد",
-            currentServingNumber = 4,
-            nextTicketNumber = 6,
-            servedTodayCount = 15,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 10,
             waitingCount = 1
         ),
@@ -362,11 +362,11 @@ object SeedData {
             longitude = 43.0950,
             description = "ملاعب عشب صناعي حديثة لخدمة اليرموك وموصل الجديدة ووادي حجر (السعر لكل ساعة).",
             customOptionsCsv = "ملعب خماسي|ملعب سداسي|ملعب سباعي",
-            currentServingNumber = 2,
-            nextTicketNumber = 4,
-            servedTodayCount = 9,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 12,
-            waitingCount = 1
+            waitingCount = 0
         ),
         VenueEntity(
             id = 12,
@@ -385,9 +385,9 @@ object SeedData {
             longitude = 43.1160,
             description = "مجمع تحاليل سريعة قرب المجمع الطبي في الشفاء والزنجيلي.",
             customOptionsCsv = "تحليل دم شامل|فحص كبد وكلى|تحليل التهابات",
-            currentServingNumber = 19,
-            nextTicketNumber = 21,
-            servedTodayCount = 37,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 4,
             waitingCount = 1
         ),
@@ -408,11 +408,11 @@ object SeedData {
             longitude = 43.1050,
             description = "خدمات تجميل وعناية بالبشرة في موصل الجديدة وباب الطوب.",
             customOptionsCsv = "تنظيف بشرة|عناية شعر|حلاقة وعناية",
-            currentServingNumber = 6,
-            nextTicketNumber = 8,
-            servedTodayCount = 13,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 9,
-            waitingCount = 1
+            waitingCount = 0
         ),
 
         // قضاء تلعفر
@@ -433,9 +433,9 @@ object SeedData {
             longitude = 42.4480,
             description = "عيادة د. مصطفى التلعفري للباطنية والقلب وطب الأسنان في مركز تلعفر.",
             customOptionsCsv = "باطنية وقلب|طب أسنان|فحص ضغط وسكري",
-            currentServingNumber = 11,
-            nextTicketNumber = 14,
-            servedTodayCount = 25,
+            currentServingNumber = 1,
+            nextTicketNumber = 4,
+            servedTodayCount = 2,
             avgMinutesPerPerson = 6,
             waitingCount = 2
         ),
@@ -456,9 +456,9 @@ object SeedData {
             longitude = 42.4050,
             description = "صيانة سيارات وشاحنات خفيفة وفحص كمبيوتر في العياضية وربيعة.",
             customOptionsCsv = "فحص كمبيوتر|تبديل زيت|كهرباء سيارات",
-            currentServingNumber = 5,
-            nextTicketNumber = 7,
-            servedTodayCount = 14,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 9,
             waitingCount = 1
         ),
@@ -479,11 +479,11 @@ object SeedData {
             longitude = 42.6310,
             description = "تحاليل طبية دقيقة لخدمة أهالي المحلبية وتلعفر وزمار.",
             customOptionsCsv = "فحص شامل|فحص سكري|هرمونات",
-            currentServingNumber = 9,
-            nextTicketNumber = 11,
-            servedTodayCount = 21,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 4,
-            waitingCount = 1
+            waitingCount = 0
         ),
 
         // قضاء الحمدانية (بغديدا)
@@ -504,9 +504,9 @@ object SeedData {
             longitude = 43.3770,
             description = "بإشراف د. بهنام متي — رعاية طبية وتقويم وزراعة الأسنان في قره قوش والحمدانية.",
             customOptionsCsv = "كشف وتشخيص|تنظيف أسنان|تقويم وزراعة",
-            currentServingNumber = 13,
-            nextTicketNumber = 15,
-            servedTodayCount = 27,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 5,
             waitingCount = 1
         ),
@@ -527,11 +527,11 @@ object SeedData {
             longitude = 43.3780,
             description = "ملاعب حديثة في برطلة وكرمليس مع كافتيريا وإضاءة ممتازة (السعر لكل ساعة).",
             customOptionsCsv = "ملعب خماسي|ملعب بادل|ملعب سداسي",
-            currentServingNumber = 2,
-            nextTicketNumber = 4,
-            servedTodayCount = 8,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 12,
-            waitingCount = 1
+            waitingCount = 0
         ),
         VenueEntity(
             id = 19,
@@ -550,9 +550,9 @@ object SeedData {
             longitude = 43.4110,
             description = "عناية شاملة بالبشرة والشعر لأهالي كرمليس والنمرود وبغديدا.",
             customOptionsCsv = "عناية بشرة|تسريح|حلاقة",
-            currentServingNumber = 4,
-            nextTicketNumber = 6,
-            servedTodayCount = 11,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 8,
             waitingCount = 1
         ),
@@ -575,9 +575,9 @@ object SeedData {
             longitude = 43.0950,
             description = "بإشراف د. يوسف خوشابا — رعاية الأطفال والرضع ومتابعة النمو في ألقوش وتلكيف.",
             customOptionsCsv = "فحص أطفال|متابعة لقاحات|استشارة تغذية",
-            currentServingNumber = 9,
-            nextTicketNumber = 11,
-            servedTodayCount = 20,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 5,
             waitingCount = 1
         ),
@@ -598,11 +598,11 @@ object SeedData {
             longitude = 43.1200,
             description = "صيانة سريعة للسيارات وأجهزة التبريد في مركز تلكيف والشريخان.",
             customOptionsCsv = "فحص سيارة|صيانة سبالت|تبديل زيت",
-            currentServingNumber = 6,
-            nextTicketNumber = 8,
-            servedTodayCount = 14,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 8,
-            waitingCount = 1
+            waitingCount = 0
         ),
         VenueEntity(
             id = 22,
@@ -621,9 +621,9 @@ object SeedData {
             longitude = 43.1160,
             description = "تحاليل مخبرية دقيقة وسريعة مع إرسال النتائج مباشرة.",
             customOptionsCsv = "تحليل دم|فيتامينات|فحص دوري",
-            currentServingNumber = 7,
-            nextTicketNumber = 9,
-            servedTodayCount = 18,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 4,
             waitingCount = 1
         ),
@@ -646,9 +646,9 @@ object SeedData {
             longitude = 43.3460,
             description = "فحص النظر وأمراض العيون لبعشيقة وبحزاني والفاضلية.",
             customOptionsCsv = "فحص نظر|تشخيص جفاف وحساسية|نظارات طبية",
-            currentServingNumber = 10,
-            nextTicketNumber = 12,
-            servedTodayCount = 22,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 6,
             waitingCount = 1
         ),
@@ -669,11 +669,11 @@ object SeedData {
             longitude = 43.3630,
             description = "ملاعب كرة خماسية عشب صناعي مع استراحة في بحزاني (السعر لكل ساعة).",
             customOptionsCsv = "ملعب خماسي|ملعب سداسي",
-            currentServingNumber = 3,
-            nextTicketNumber = 5,
-            servedTodayCount = 7,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 12,
-            waitingCount = 1
+            waitingCount = 0
         ),
 
         // قضاء سنجار
@@ -694,9 +694,9 @@ object SeedData {
             longitude = 41.8766,
             description = "عيادة العظام والمفاصل وإصابات العمود الفقري في مركز سنجار وسنوني.",
             customOptionsCsv = "كشف عظام|علاج طبيعي|متابعة مفاصل",
-            currentServingNumber = 8,
-            nextTicketNumber = 10,
-            servedTodayCount = 19,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 5,
             waitingCount = 1
         ),
@@ -717,11 +717,11 @@ object SeedData {
             longitude = 41.8600,
             description = "تحاليل دم شاملة وفحوصات دورية سريعة في سنوني وشمال سنجار.",
             customOptionsCsv = "فحص عام|تحليل سكري|فحص التهابات",
-            currentServingNumber = 12,
-            nextTicketNumber = 14,
-            servedTodayCount = 24,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 4,
-            waitingCount = 1
+            waitingCount = 0
         ),
 
         // قضاء الشيخان
@@ -742,9 +742,9 @@ object SeedData {
             longitude = 43.3520,
             description = "علاج الأمراض الجلدية والحساسية والليزر في عين سفني وباعذرة ومهد.",
             customOptionsCsv = "كشف جلدية|علاج حساسية|جلسة ليزر",
-            currentServingNumber = 7,
-            nextTicketNumber = 9,
-            servedTodayCount = 17,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 5,
             waitingCount = 1
         ),
@@ -765,11 +765,11 @@ object SeedData {
             longitude = 43.2590,
             description = "فحص كهرباء وميكانيك السيارات في باعذرة والشيخان.",
             customOptionsCsv = "فحص كمبيوتر|تبديل زيت|كهرباء",
-            currentServingNumber = 4,
-            nextTicketNumber = 6,
-            servedTodayCount = 10,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 9,
-            waitingCount = 1
+            waitingCount = 0
         ),
 
         // قضاء البعاج
@@ -790,9 +790,9 @@ object SeedData {
             longitude = 41.7160,
             description = "استشارات باطنية ورعاية صحية لخدمة مركز البعاج والقحطانية والجرن.",
             customOptionsCsv = "استشارة باطنية|قياس ضغط وسكري|رعاية صحية",
-            currentServingNumber = 6,
-            nextTicketNumber = 8,
-            servedTodayCount = 16,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 5,
             waitingCount = 1
         ),
@@ -815,9 +815,9 @@ object SeedData {
             longitude = 43.2510,
             description = "علاج المفاصل والعلاج الطبيعي في حمام العليل والشورة.",
             customOptionsCsv = "كشف مفاصل|علاج طبيعي|آلام الظهر",
-            currentServingNumber = 11,
-            nextTicketNumber = 13,
-            servedTodayCount = 24,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 6,
             waitingCount = 1
         ),
@@ -838,11 +838,11 @@ object SeedData {
             longitude = 43.2930,
             description = "صيانة سيارات ومولدات وأجهزة تبريد في القيارة والحود.",
             customOptionsCsv = "صيانة سيارات|صيانة تبريد|فحص عام",
-            currentServingNumber = 5,
-            nextTicketNumber = 7,
-            servedTodayCount = 12,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 8,
-            waitingCount = 1
+            waitingCount = 0
         ),
 
         // الحضر ومخمور
@@ -863,9 +863,9 @@ object SeedData {
             longitude = 43.5800,
             description = "طب وجراحة الأسنان والتقويم لخدمة مخمور والكوير والحضر.",
             customOptionsCsv = "فحص أسنان|حشوة وعلاج عصب|تنظيف وتبييض",
-            currentServingNumber = 8,
-            nextTicketNumber = 10,
-            servedTodayCount = 18,
+            currentServingNumber = 1,
+            nextTicketNumber = 3,
+            servedTodayCount = 1,
             avgMinutesPerPerson = 5,
             waitingCount = 1
         ),
@@ -886,11 +886,11 @@ object SeedData {
             longitude = 42.7180,
             description = "تحاليل طبية شاملة لخدمة الحضر وتل عبطة والكوير.",
             customOptionsCsv = "فحص شامل|تحليل دم|سكري وضغط",
-            currentServingNumber = 9,
-            nextTicketNumber = 11,
-            servedTodayCount = 20,
+            currentServingNumber = 0,
+            nextTicketNumber = 1,
+            servedTodayCount = 0,
             avgMinutesPerPerson = 4,
-            waitingCount = 1
+            waitingCount = 0
         )
     )
 
@@ -922,17 +922,19 @@ object SeedData {
         venues.forEach { venue ->
             val currentNum = venue.currentServingNumber
             val opt = venue.customOptions.firstOrNull() ?: "خدمة قياسية"
-            items.add(
-                MerchantQueueItemEntity(
-                    venueId = venue.id,
-                    ticketNumber = currentNum,
-                    ticketCode = "NIN-${venue.id}-$currentNum",
-                    customerName = sampleNames[venue.id % sampleNames.size],
-                    customerPhone = "0770123${1000 + venue.id}",
-                    selectedOption = opt,
-                    status = QueueItemStatus.SERVING.name
+            if (currentNum > 0) {
+                items.add(
+                    MerchantQueueItemEntity(
+                        venueId = venue.id,
+                        ticketNumber = currentNum,
+                        ticketCode = "NIN-${venue.id}-$currentNum",
+                        customerName = sampleNames[venue.id % sampleNames.size],
+                        customerPhone = "0770123${1000 + venue.id}",
+                        selectedOption = opt,
+                        status = QueueItemStatus.SERVING.name
+                    )
                 )
-            )
+            }
             for (i in 1..venue.waitingCount) {
                 val num = currentNum + i
                 items.add(

@@ -13,7 +13,7 @@ import com.example.data.model.UserProfileSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "dori_nineveh_prefs")
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "dori_nineveh_prefs_v2")
 
 class UserPreferencesDataStore(private val context: Context) {
 
@@ -22,6 +22,8 @@ class UserPreferencesDataStore(private val context: Context) {
         val IS_DARK_MODE = booleanPreferencesKey("is_dark_mode")
         val USER_NAME = stringPreferencesKey("user_name")
         val USER_PHONE = stringPreferencesKey("user_phone")
+        val USER_AGE = stringPreferencesKey("user_age")
+        val OPTIONAL_NOTE = stringPreferencesKey("optional_note")
         val LOYALTY_POINTS = intPreferencesKey("loyalty_points")
         val MUTE_SOUND = booleanPreferencesKey("mute_sound")
         val MUTE_VIBRATION = booleanPreferencesKey("mute_vibration")
@@ -33,8 +35,10 @@ class UserPreferencesDataStore(private val context: Context) {
                 prefs[Keys.SELECTED_DISTRICT] ?: NinevehDistrict.ALL_NINEVEH.displayName
             ),
             isDarkMode = prefs[Keys.IS_DARK_MODE] ?: true,
-            userName = prefs[Keys.USER_NAME] ?: "علي الحديدي",
-            userPhone = prefs[Keys.USER_PHONE] ?: "07701234567",
+            userName = prefs[Keys.USER_NAME] ?: "",
+            userPhone = prefs[Keys.USER_PHONE] ?: "",
+            userAge = prefs[Keys.USER_AGE] ?: "",
+            optionalNote = prefs[Keys.OPTIONAL_NOTE] ?: "",
             loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 60,
             muteSound = prefs[Keys.MUTE_SOUND] ?: false,
             muteVibration = prefs[Keys.MUTE_VIBRATION] ?: false
@@ -49,11 +53,30 @@ class UserPreferencesDataStore(private val context: Context) {
         context.dataStore.edit { it[Keys.IS_DARK_MODE] = enabled }
     }
 
-    suspend fun updateProfile(name: String, phone: String, district: NinevehDistrict) {
+    suspend fun updateProfile(
+        name: String,
+        phone: String,
+        district: NinevehDistrict,
+        age: String = "",
+        optionalNote: String = ""
+    ) {
         context.dataStore.edit {
-            it[Keys.USER_NAME] = name.ifBlank { "علي الحديدي" }
-            it[Keys.USER_PHONE] = phone.ifBlank { "07701234567" }
+            it[Keys.USER_NAME] = name.trim()
+            it[Keys.USER_PHONE] = phone.trim()
             it[Keys.SELECTED_DISTRICT] = district.displayName
+            it[Keys.USER_AGE] = age.trim()
+            it[Keys.OPTIONAL_NOTE] = optionalNote.trim()
+        }
+    }
+
+    suspend fun ensureMandatorySaved(name: String, phone: String) {
+        context.dataStore.edit {
+            if (it[Keys.USER_NAME].isNullOrBlank()) {
+                it[Keys.USER_NAME] = name.trim()
+            }
+            if (it[Keys.USER_PHONE].isNullOrBlank()) {
+                it[Keys.USER_PHONE] = phone.trim()
+            }
         }
     }
 

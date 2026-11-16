@@ -16,6 +16,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+import com.example.data.model.UserProfileSettings
+import org.junit.Assert.assertFalse
+
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ExampleRobolectricTest {
@@ -36,6 +39,50 @@ class ExampleRobolectricTest {
         assertEquals(NinevehDistrict.selectableDistricts.map { it.displayName }.toSet(), districts)
         assertEquals(ServiceCategory.fiveCategories.map { it.displayName }.toSet(), categories)
         assertTrue(NinevehDistrict.selectableDistricts.all { it.areas.isNotEmpty() })
+    }
+
+    @Test
+    fun `every company queue starts cleanly at ticket 1 and above`() {
+        val venues = SeedData.initialVenues()
+        val itemsByVenue = SeedData.initialQueueItems(venues).groupBy { it.venueId }
+
+        venues.forEach { venue ->
+            assertTrue("Venue ${venue.id} nextTicketNumber must be >= 1", venue.nextTicketNumber >= 1)
+            assertTrue("Venue ${venue.id} serving must be 0 or 1", venue.currentServingNumber in 0..1)
+            val items = itemsByVenue[venue.id].orEmpty().sortedBy { it.ticketNumber }
+            if (items.isNotEmpty()) {
+                assertEquals(1, items.first().ticketNumber)
+                items.forEachIndexed { idx, item ->
+                    assertEquals(idx + 1, item.ticketNumber)
+                }
+                assertEquals(items.size + 1, venue.nextTicketNumber)
+                assertEquals(items.size, venue.queueAheadCount)
+            } else {
+                assertEquals(1, venue.nextTicketNumber)
+                assertEquals(0, venue.queueAheadCount)
+            }
+            assertEquals(venue.queueAheadCount * venue.avgMinutesPerPerson, venue.estimatedWaitMinutes)
+        }
+    }
+
+    @Test
+    fun `mandatory user profile validation rejects empty or invalid details`() {
+        val defaultProfile = UserProfileSettings()
+        assertFalse(defaultProfile.hasMandatoryInfo)
+        assertFalse(UserProfileSettings.isValidFullName(""))
+        assertFalse(UserProfileSettings.isValidFullName("أب"))
+        assertTrue(UserProfileSettings.isValidFullName("علي حسين"))
+
+        assertFalse(UserProfileSettings.isValidPhone(""))
+        assertFalse(UserProfileSettings.isValidPhone("077012"))
+        assertTrue(UserProfileSettings.isValidPhone("07701234567"))
+        assertTrue(UserProfileSettings.isValidPhone("+9647701234567"))
+
+        val completeProfile = UserProfileSettings(
+            userName = "علي حسين الجبوري",
+            userPhone = "07701234567"
+        )
+        assertTrue(completeProfile.hasMandatoryInfo)
     }
 
     @Test

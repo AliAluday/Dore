@@ -683,15 +683,15 @@ private fun FuturisticVenueCard(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 9.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -707,34 +707,68 @@ private fun FuturisticVenueCard(
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold
                             )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                            ) {
+                                Text(
+                                    text = "الدور القادم #${venue.nextTicketNumber}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
                         }
 
+                        Text(
+                            text = if (venue.category == ServiceCategory.FIELDS.displayName) {
+                                "${IntentHelpers.formatDinar(venue.priceDinar)} / ساعة"
+                            } else {
+                                IntentHelpers.formatDinar(venue.priceDinar)
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.AccessTime,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
-                            Spacer(modifier = Modifier.width(3.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "${venue.estimatedWaitMinutes} د • ${venue.waitingCount} بالانتظار",
+                                text = if (venue.estimatedWaitMinutes <= 0) {
+                                    "الوقت التقديري: فوري (0 د)"
+                                } else {
+                                    "الوقت التقديري: ${venue.estimatedWaitMinutes} دقيقة"
+                                },
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
 
-                    Text(
-                        text = if (venue.category == ServiceCategory.FIELDS.displayName) {
-                            "${IntentHelpers.formatDinar(venue.priceDinar)} / ساعة"
-                        } else {
-                            IntentHelpers.formatDinar(venue.priceDinar)
-                        },
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
+                        Text(
+                            text = if (venue.queueAheadCount == 0) {
+                                "قبلك: 0"
+                            } else {
+                                "قبلك: ${venue.queueAheadCount} بالانتظار"
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (venue.queueAheadCount == 0) StatusOpen else MaterialTheme.colorScheme.secondary
+                        )
+                    }
                 }
             }
         }

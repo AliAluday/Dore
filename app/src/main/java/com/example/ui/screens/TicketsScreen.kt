@@ -213,7 +213,7 @@ fun TicketsScreen(
                                         FilterChip(
                                             selected = item.id == selectedBooking.id,
                                             onClick = { onSelectActiveBooking(item.id) },
-                                            label = { Text("${item.ticketCode} • ${item.venueName}") },
+                                            label = { Text("#${item.queueNumber} • ${item.venueName}") },
                                             modifier = Modifier.testTag("multi_booking_chip_${item.id}")
                                         )
                                     }

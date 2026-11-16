@@ -249,13 +249,14 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
                         reviews = state.reviewsByVenue[venue.id].orEmpty(),
                         userProfile = state.preferences,
                         onDismiss = { viewModel.openVenueDetails(null) },
-                        onConfirmBooking = { name, phone, option, notes, calculatedPrice ->
+                        onConfirmBooking = { name, phone, option, notes, optionalInfo, calculatedPrice ->
                             viewModel.bookTicket(
                                 venueId = venue.id,
                                 customerName = name,
                                 customerPhone = phone,
                                 selectedOption = option,
                                 notes = notes,
+                                optionalInfo = optionalInfo,
                                 customPriceDinar = calculatedPrice
                             )
                         }

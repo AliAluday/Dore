@@ -295,6 +295,7 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
         customerPhone: String,
         selectedOption: String,
         notes: String = "",
+        optionalInfo: String = "",
         customPriceDinar: Int? = null
     ) {
         viewModelScope.launch {
@@ -304,6 +305,7 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
                 customerPhone = customerPhone,
                 selectedOption = selectedOption,
                 notes = notes,
+                optionalInfo = optionalInfo,
                 customPriceDinar = customPriceDinar
             )
             result.onSuccess { booking ->
@@ -317,7 +319,7 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
                         selectedMerchantVenueId = venueId
                     )
                 }
-                _toastMessage.emit("تم إصدار التكت ورمز QR (${booking.ticketCode})")
+                _toastMessage.emit("تم إصدار التكت #${booking.queueNumber} ورمز QR (${booking.ticketCode})")
             }.onFailure { err ->
                 _toastMessage.emit(err.message ?: "تعذر إتمام الحجز")
             }
@@ -326,7 +328,18 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
 
     fun bookFastestTurn() {
         viewModelScope.launch {
-            val district = uiState.value.preferences.selectedDistrict
+            val prefsNow = uiState.value.preferences
+            val district = prefsNow.selectedDistrict
+            if (!prefsNow.hasMandatoryInfo) {
+                val fastest = repository.findFastestVenueInDistrict(district)
+                if (fastest != null) {
+                    openVenueDetails(fastest.id)
+                    _toastMessage.emit("يرجى تسجيل معلوماتك الإلزامية (الاسم والهاتف) أولاً لإصدار التذكرة")
+                } else {
+                    _toastMessage.emit("لا توجد أماكن متاحة للحجز السريع في ${district.displayName} حالياً")
+                }
+                return@launch
+            }
             val result = repository.bookFastestTurnInDistrict(district)
             result.onSuccess { booking ->
                 DoriNotificationHelper.showBookingCreatedNotification(getApplication(), booking)
@@ -338,7 +351,7 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
                         selectedMerchantVenueId = booking.venueId
                     )
                 }
-                _toastMessage.emit("⚡ تم إصدار تكت أسرع دور في ${booking.venueName} (${booking.ticketCode})")
+                _toastMessage.emit("⚡ تم إصدار تكت #${booking.queueNumber} لأسرع دور في ${booking.venueName}")
             }.onFailure { err ->
                 _toastMessage.emit(err.message ?: "لا يوجد دور متاح حالياً")
             }
@@ -376,11 +389,20 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
 
     fun quickRebook(historyBooking: BookingEntity) {
         val prefsNow = uiState.value.preferences
+        if (!prefsNow.hasMandatoryInfo) {
+            openVenueDetails(historyBooking.venueId)
+            viewModelScope.launch {
+                _toastMessage.emit("يرجى تسجيل معلوماتك الإلزامية (الاسم والهاتف) لإعادة الحجز")
+            }
+            return
+        }
         bookTicket(
             venueId = historyBooking.venueId,
             customerName = prefsNow.userName,
             customerPhone = prefsNow.userPhone,
-            selectedOption = historyBooking.selectedOption
+            selectedOption = historyBooking.selectedOption,
+            notes = historyBooking.notes,
+            optionalInfo = historyBooking.optionalInfo
         )
     }
 
@@ -483,10 +505,16 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Profile & local settings
-    fun updateProfile(name: String, phone: String, district: NinevehDistrict) {
+    fun updateProfile(
+        name: String,
+        phone: String,
+        district: NinevehDistrict,
+        age: String = "",
+        optionalNote: String = ""
+    ) {
         viewModelScope.launch {
-            repository.updateProfile(name, phone, district)
-            _toastMessage.emit("تم حفظ بياناتك وإعدادات القضاء في نينوى محلياً")
+            repository.updateProfile(name.trim(), phone.trim(), district, age.trim(), optionalNote.trim())
+            _toastMessage.emit("تم حفظ معلوماتك الإلزامية والاختيارية في نينوى محلياً")
         }
     }
 

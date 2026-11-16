@@ -175,7 +175,7 @@ fun MerchantDashboardScreen(
                     )
                     MerchantStatCard(
                         label = "الرقم الحالي",
-                        value = "#${selectedVenue.currentServingNumber}",
+                        value = if (selectedVenue.currentServingNumber <= 0) "—" else "#${selectedVenue.currentServingNumber}",
                         icon = Icons.Default.ConfirmationNumber,
                         tint = EmeraldPrimary,
                         modifier = Modifier.weight(1f)

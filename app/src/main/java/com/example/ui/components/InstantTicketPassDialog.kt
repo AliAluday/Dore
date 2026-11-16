@@ -124,27 +124,78 @@ fun InstantTicketPassDialog(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.primaryContainer
+                    // Organized 3-Column Metrics Strip: Order (#1+), People Ahead, Estimated Wait
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.ConfirmationNumber,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "رقم التكت: ${booking.ticketCode}",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Column(
+                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "ترتيبك",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                )
+                                Text(
+                                    text = "#${booking.queueNumber}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "قبلك",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                )
+                                Text(
+                                    text = "${booking.peopleAhead}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = StatusOpen.copy(alpha = 0.14f),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "الوقت التقديري",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = StatusOpen
+                                )
+                                Text(
+                                    text = if (booking.estimatedMinutes <= 0) "الآن" else "${booking.estimatedMinutes} د",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = StatusOpen
+                                )
+                            }
                         }
                     }
 
@@ -156,7 +207,7 @@ fun InstantTicketPassDialog(
                     ) {
                         QrCodeCanvas(
                             payload = "DORI|${booking.ticketCode}|${booking.venueId}|${booking.customerPhone}",
-                            modifier = Modifier.size(196.dp)
+                            modifier = Modifier.size(182.dp)
                         )
                     }
 
@@ -171,7 +222,7 @@ fun InstantTicketPassDialog(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = "امسح رمز الـ QR عند الاستقبال في ${booking.venueCity}",
+                            text = "رمز التذكرة: ${booking.ticketCode} • ${booking.venueCity}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
@@ -183,38 +234,40 @@ fun InstantTicketPassDialog(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
                                     text = booking.selectedOption,
                                     style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    text = "${booking.customerName} • ${IntentHelpers.formatDinar(booking.priceDinar)}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = IntentHelpers.formatDinar(booking.priceDinar),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.AccessTime,
-                                    contentDescription = null,
-                                    tint = StatusOpen,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "${booking.customerName} • ${booking.customerPhone}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (booking.optionalInfo.isNotBlank()) {
                                 Text(
-                                    text = if (booking.estimatedMinutes <= 0) "الآن" else "${booking.estimatedMinutes} د",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = StatusOpen,
-                                    fontWeight = FontWeight.Bold
+                                    text = "معلومات اختيارية: ${booking.optionalInfo}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.secondary
                                 )
                             }
                         }

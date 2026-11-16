@@ -68,13 +68,19 @@ import com.example.ui.theme.DiamondBlue
 import com.example.ui.theme.MintPrimaryDark
 import com.example.ui.viewmodel.DoriUiState
 
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import com.example.data.model.UserProfileSettings
+import com.example.ui.theme.StatusOpen
+import com.example.ui.theme.StatusUrgent
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProfileScreen(
     state: DoriUiState,
     hasNotificationPermission: Boolean,
     onRequestNotificationPermission: () -> Unit,
-    onSaveProfile: (String, String, NinevehDistrict) -> Unit,
+    onSaveProfile: (name: String, phone: String, district: NinevehDistrict, age: String, optionalNote: String) -> Unit,
     onToggleDarkMode: () -> Unit,
     onSetMuteSound: (Boolean) -> Unit,
     onSetMuteVibration: (Boolean) -> Unit,
@@ -92,7 +98,13 @@ fun ProfileScreen(
 
     var nameInput by remember(prefs.userName) { mutableStateOf(prefs.userName) }
     var phoneInput by remember(prefs.userPhone) { mutableStateOf(prefs.userPhone) }
+    var ageInput by remember(prefs.userAge) { mutableStateOf(prefs.userAge) }
+    var optionalNoteInput by remember(prefs.optionalNote) { mutableStateOf(prefs.optionalNote) }
     var districtInput by remember(prefs.selectedDistrict) { mutableStateOf(prefs.selectedDistrict) }
+    var hasAttemptedSave by remember { mutableStateOf(false) }
+
+    val isNameValid = UserProfileSettings.isValidFullName(nameInput)
+    val isPhoneValid = UserProfileSettings.isValidPhone(phoneInput)
 
     Box(
         modifier = modifier.fillMaxSize(),
@@ -235,22 +247,54 @@ fun ProfileScreen(
                         modifier = Modifier.padding(18.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "بياناتك الشخصية وقضاء نينوى",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = if (prefs.hasMandatoryInfo) StatusOpen.copy(alpha = 0.14f)
+                                else StatusUrgent.copy(alpha = 0.14f)
+                            ) {
+                                Text(
+                                    text = if (prefs.hasMandatoryInfo) "مكتملة ✓" else "مطلوب التسجيل *",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (prefs.hasMandatoryInfo) StatusOpen else StatusUrgent,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
                         Text(
-                            text = "بياناتك الشخصية وقضاء نينوى المحلي",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "تُستخدم للمسح التلقائي عند الحجز وتُحفظ محلياً بالكامل على جهازك.",
+                            text = "تسجيل الاسم الكامل ورقم الهاتف إلزامي لإصدار التذاكر وحفظها محلياً على جهازك.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Text(
+                            text = "١. المعلومات الإلزامية (* مطلوب)",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
                         )
 
                         OutlinedTextField(
                             value = nameInput,
                             onValueChange = { nameInput = it },
-                            label = { Text("الاسم الكامل") },
+                            label = { Text("الاسم الكامل *") },
+                            placeholder = { Text("مثال: علي حسين الجبوري") },
                             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                            isError = hasAttemptedSave && !isNameValid,
+                            supportingText = if (hasAttemptedSave && !isNameValid) {
+                                { Text("الاسم الكامل إلزامي (3 أحرف على الأقل)", color = StatusUrgent) }
+                            } else null,
                             singleLine = true,
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier
@@ -261,13 +305,49 @@ fun ProfileScreen(
                         OutlinedTextField(
                             value = phoneInput,
                             onValueChange = { phoneInput = it },
-                            label = { Text("رقم الهاتف") },
+                            label = { Text("رقم الهاتف *") },
+                            placeholder = { Text("0770xxxxxxx") },
                             leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            isError = hasAttemptedSave && !isPhoneValid,
+                            supportingText = if (hasAttemptedSave && !isPhoneValid) {
+                                { Text("رقم الهاتف إلزامي (10 إلى 14 رقماً)", color = StatusUrgent) }
+                            } else null,
                             singleLine = true,
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("profile_phone_input")
+                        )
+
+                        Text(
+                            text = "٢. المعلومات الاختيارية (اختياري)",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        OutlinedTextField(
+                            value = ageInput,
+                            onValueChange = { ageInput = it },
+                            label = { Text("العمر (اختياري)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("profile_age_input")
+                        )
+
+                        OutlinedTextField(
+                            value = optionalNoteInput,
+                            onValueChange = { optionalNoteInput = it },
+                            label = { Text("ملاحظات أو تفاصيل اختيارية دائمة") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("profile_optional_note_input")
                         )
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -303,7 +383,12 @@ fun ProfileScreen(
                         }
 
                         Button(
-                            onClick = { onSaveProfile(nameInput, phoneInput, districtInput) },
+                            onClick = {
+                                hasAttemptedSave = true
+                                if (isNameValid && isPhoneValid) {
+                                    onSaveProfile(nameInput, phoneInput, districtInput, ageInput, optionalNoteInput)
+                                }
+                            },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier
@@ -313,7 +398,7 @@ fun ProfileScreen(
                         ) {
                             Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("حفظ البيانات محلياً")
+                            Text("حفظ المعلومات محلياً")
                         }
                     }
                 }

@@ -27,18 +27,21 @@ data class VenueEntity(
     val isOpen: Boolean = true,
     val isPaused: Boolean = false,
     val isAcceptingBookings: Boolean = true,
-    val currentServingNumber: Int = 10,
-    val nextTicketNumber: Int = 14,
-    val servedTodayCount: Int = 24,
+    val currentServingNumber: Int = 0,
+    val nextTicketNumber: Int = 1,
+    val servedTodayCount: Int = 0,
     val avgMinutesPerPerson: Int = 8,
     val isFavorite: Boolean = false,
-    val waitingCount: Int = 3
+    val waitingCount: Int = 0
 ) {
     val customOptions: List<String>
         get() = customOptionsCsv.split("|").map { it.trim() }.filter { it.isNotEmpty() }
 
+    val queueAheadCount: Int
+        get() = waitingCount.coerceAtLeast(0) + if (currentServingNumber > 0) 1 else 0
+
     val estimatedWaitMinutes: Int
-        get() = if (!isOpen) 999 else (waitingCount.coerceAtLeast(0)) * avgMinutesPerPerson
+        get() = if (!isOpen) 999 else queueAheadCount * avgMinutesPerPerson
 }
 
 @Entity(tableName = "reviews")
@@ -65,6 +68,7 @@ data class BookingEntity(
     val customerPhone: String,
     val selectedOption: String,
     val notes: String = "",
+    val optionalInfo: String = "",
     val priceDinar: Int,
     val status: String = BookingStatus.ACTIVE.name,
     val stage: String = TicketStage.MONITORED.name,

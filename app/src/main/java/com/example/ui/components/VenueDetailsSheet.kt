@@ -14,17 +14,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Schedule
@@ -56,9 +59,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.data.local.ReviewEntity
 import com.example.data.local.VenueEntity
@@ -70,6 +76,7 @@ import com.example.data.model.ServiceCategory
 import com.example.data.model.UserProfileSettings
 import com.example.ui.theme.AmberGold
 import com.example.ui.theme.EmeraldPrimary
+import com.example.ui.theme.StatusOpen
 import com.example.ui.theme.StatusUrgent
 import com.example.util.IntentHelpers
 
@@ -85,6 +92,7 @@ fun VenueDetailsSheet(
         customerPhone: String,
         selectedOption: String,
         notes: String,
+        optionalInfo: String,
         calculatedPriceDinar: Int
     ) -> Unit
 ) {
@@ -104,16 +112,27 @@ fun VenueDetailsSheet(
     var doctorVisitType by remember(venue.id) { mutableStateOf(DoctorVisitType.NEW_CHECKUP) }
     var doctorPeriod by remember(venue.id) { mutableStateOf(DoctorTimePeriod.EVENING) }
     var doctorUrgency by remember(venue.id) { mutableStateOf(DoctorUrgency.NORMAL) }
-    var patientAge by remember(venue.id) { mutableStateOf("") }
     var labFasting by remember(venue.id) { mutableStateOf(false) }
 
+    // Mandatory fields
     var customerName by remember(venue.id, userProfile.userName) {
         mutableStateOf(userProfile.userName)
     }
     var customerPhone by remember(venue.id, userProfile.userPhone) {
         mutableStateOf(userProfile.userPhone)
     }
-    var notes by remember(venue.id) { mutableStateOf("") }
+
+    // Optional fields
+    var optionalAge by remember(venue.id, userProfile.userAge) {
+        mutableStateOf(userProfile.userAge)
+    }
+    var optionalNote by remember(venue.id, userProfile.optionalNote) {
+        mutableStateOf(userProfile.optionalNote)
+    }
+    var hasAttemptedSubmit by remember(venue.id) { mutableStateOf(false) }
+
+    val isNameValid = UserProfileSettings.isValidFullName(customerName)
+    val isPhoneValid = UserProfileSettings.isValidPhone(customerPhone)
 
     val calculatedPrice = remember(venue.id, selectedHours, doctorVisitType) {
         when {
@@ -136,7 +155,7 @@ fun VenueDetailsSheet(
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Title + Specialty Badge + Dynamic Price
+            // Header: Venue Name, Specialty & Dynamic Price
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -216,7 +235,53 @@ fun VenueDetailsSheet(
                 style = MaterialTheme.typography.bodyMedium
             )
 
-            // Info Pills: Rating, Hours, Wait
+            // SECTION 1: Organized Live Queue Status (Order from #1, People Ahead, Estimated Wait)
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "١. حالة الطابور المباشرة في هذه الشركة",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        QueueMetricBox(
+                            icon = Icons.Default.ConfirmationNumber,
+                            label = "ترتيب تذكرتك",
+                            value = "#${venue.nextTicketNumber}",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        QueueMetricBox(
+                            icon = Icons.Default.Groups,
+                            label = "الأشخاص قبلك",
+                            value = "${venue.queueAheadCount}",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        QueueMetricBox(
+                            icon = Icons.Default.AccessTime,
+                            label = "الوقت التقديري",
+                            value = if (venue.estimatedWaitMinutes <= 0) "فوري (0 د)" else "${venue.estimatedWaitMinutes} د",
+                            tint = StatusOpen,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            // Rating, Hours, and Direct Actions
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -231,17 +296,10 @@ fun VenueDetailsSheet(
                     icon = Icons.Default.Schedule,
                     text = venue.workingHours,
                     tint = EmeraldPrimary,
-                    modifier = Modifier.weight(1.4f)
-                )
-                InfoStatPill(
-                    icon = Icons.Default.AccessTime,
-                    text = "${venue.estimatedWaitMinutes} د",
-                    tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.weight(0.8f)
+                    modifier = Modifier.weight(1.8f)
                 )
             }
 
-            // Direct Action Buttons: Phone, Map, Messaging
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -293,9 +351,9 @@ fun VenueDetailsSheet(
 
             HorizontalDivider()
 
-            // Base Venue Options
+            // SECTION 2: Service Customization
             Text(
-                text = if (isField) "اختر نوع الملعب" else if (isClinic) "اختر الإجراء أو الفحص الطبي" else "اختر نوع الخدمة المخصصة",
+                text = if (isField) "٢. اختيار الملعب وعدد الساعات" else if (isClinic) "٢. تخصيص الموعد الطبي" else "٢. تخصيص الخدمة المطلوبة",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -312,7 +370,7 @@ fun VenueDetailsSheet(
                 }
             }
 
-            // SPECIALIZED FLOW 1: Sports Fields Hours Stepper (Min 1.5h, Step 0.5h, Max 3.0h)
+            // Sports Fields Hours Stepper (Min 1.5h, Step 0.5h, Max 3.0h)
             if (isField) {
                 Surface(
                     shape = RoundedCornerShape(18.dp),
@@ -421,7 +479,7 @@ fun VenueDetailsSheet(
                 }
             }
 
-            // SPECIALIZED FLOW 2: Doctors & Clinics Distinct Medical Booking Flow
+            // Doctors & Clinics Distinct Medical Flow
             if (isClinic) {
                 Surface(
                     shape = RoundedCornerShape(18.dp),
@@ -502,20 +560,10 @@ fun VenueDetailsSheet(
                                 )
                             }
                         }
-
-                        OutlinedTextField(
-                            value = patientAge,
-                            onValueChange = { patientAge = it },
-                            label = { Text("عمر المريض (اختياري)") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        )
                     }
                 }
             }
 
-            // SPECIALIZED FLOW 3: Labs fasting option
             if (isLab) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -529,85 +577,199 @@ fun VenueDetailsSheet(
                 }
             }
 
-            // Auto-filled user data
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            HorizontalDivider()
+
+            // SECTION 3: MANDATORY USER INFO
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                border = BorderStroke(
+                    1.dp,
+                    if (hasAttemptedSubmit && (!isNameValid || !isPhoneValid)) StatusUrgent
+                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                ),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = if (isClinic) "بيانات المراجع (مسح تلقائي)" else "بيانات الحجز (مسح تلقائي من ملفك)",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                TextButton(
-                    onClick = {
-                        customerName = userProfile.userName
-                        customerPhone = userProfile.userPhone
-                    }
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("ملء تلقائي")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "٣. معلوماتك الشخصية",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = StatusUrgent.copy(alpha = 0.16f)
+                            ) {
+                                Text(
+                                    text = "إلزامي *",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = StatusUrgent,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        if (userProfile.hasMandatoryInfo) {
+                            TextButton(
+                                onClick = {
+                                    customerName = userProfile.userName
+                                    customerPhone = userProfile.userPhone
+                                }
+                            ) {
+                                Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("ملء من ملفك")
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = customerName,
+                        onValueChange = { customerName = it },
+                        label = { Text(if (isClinic) "اسم المراجع الكامل *" else "الاسم الكامل *") },
+                        placeholder = { Text("مثال: علي حسين الجبوري") },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        isError = hasAttemptedSubmit && !isNameValid,
+                        supportingText = if (hasAttemptedSubmit && !isNameValid) {
+                            { Text("الاسم الكامل إلزامي (3 أحرف على الأقل)", color = StatusUrgent) }
+                        } else null,
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("booking_name_input")
+                    )
+
+                    OutlinedTextField(
+                        value = customerPhone,
+                        onValueChange = { customerPhone = it },
+                        label = { Text("رقم الهاتف *") },
+                        placeholder = { Text("0770xxxxxxx") },
+                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        isError = hasAttemptedSubmit && !isPhoneValid,
+                        supportingText = if (hasAttemptedSubmit && !isPhoneValid) {
+                            { Text("رقم الهاتف إلزامي (10 إلى 14 رقماً)", color = StatusUrgent) }
+                        } else null,
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("booking_phone_input")
+                    )
                 }
             }
 
-            OutlinedTextField(
-                value = customerName,
-                onValueChange = { customerName = it },
-                label = { Text(if (isClinic) "اسم المراجع الكامل" else "الاسم الكامل") },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("booking_name_input")
-            )
-
-            OutlinedTextField(
-                value = customerPhone,
-                onValueChange = { customerPhone = it },
-                label = { Text("رقم الهاتف") },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("booking_phone_input")
-            )
-
-            OutlinedTextField(
-                value = notes,
-                onValueChange = { notes = it },
-                label = { Text(if (isClinic) "الأعراض أو ملاحظات للطبيب (اختياري)" else "ملاحظات إضافية (اختياري)") },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
+            // SECTION 4: OPTIONAL USER INFO
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
                 modifier = Modifier.fillMaxWidth()
-            )
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "٤. معلومات إضافية",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                text = "اختياري",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = optionalAge,
+                        onValueChange = { optionalAge = it },
+                        label = { Text(if (isClinic) "عمر المريض (اختياري)" else "العمر أو الفئة (اختياري)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("booking_optional_age_input")
+                    )
+
+                    OutlinedTextField(
+                        value = optionalNote,
+                        onValueChange = { optionalNote = it },
+                        label = {
+                            Text(
+                                if (isClinic) "الأعراض أو تفاصيل المعاينة (اختياري)"
+                                else if (isField) "ملاحظة الفريق أو التوقيت (اختياري)"
+                                else "تفاصيل أو ملاحظات اختيارية"
+                            )
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("booking_optional_note_input")
+                    )
+                }
+            }
 
             Button(
                 onClick = {
+                    hasAttemptedSubmit = true
+                    if (!isNameValid || !isPhoneValid) {
+                        return@Button
+                    }
+
                     val finalOption = when {
                         isField -> "$selectedOption • ${FieldBookingDuration.shortLabel(selectedHours)}"
                         isClinic -> "$selectedOption • ${doctorVisitType.displayName} (${doctorPeriod.displayName})"
                         isLab && labFasting -> "$selectedOption • صائم"
                         else -> selectedOption
                     }
-                    val finalNotes = buildString {
+                    val serviceNotes = buildString {
                         if (isClinic) {
                             append("التخصص: ${venue.specialty} • ${doctorUrgency.displayName}")
-                            if (patientAge.isNotBlank()) append(" • العمر: $patientAge")
-                            if (notes.isNotBlank()) append(" • $notes")
                         } else if (isField) {
                             append("المدة: ${FieldBookingDuration.formatArabic(selectedHours)}")
-                            if (notes.isNotBlank()) append(" • $notes")
-                        } else {
-                            append(notes)
+                        }
+                    }
+                    val combinedOptional = buildString {
+                        if (optionalAge.isNotBlank()) append("العمر: ${optionalAge.trim()}")
+                        if (optionalNote.isNotBlank()) {
+                            if (isNotEmpty()) append(" • ")
+                            append(optionalNote.trim())
                         }
                     }
                     onConfirmBooking(
-                        customerName,
-                        customerPhone,
+                        customerName.trim(),
+                        customerPhone.trim(),
                         finalOption,
-                        finalNotes,
+                        serviceNotes,
+                        combinedOptional,
                         calculatedPrice
                     )
                 },
@@ -623,13 +785,13 @@ fun VenueDetailsSheet(
                     text = if (!venue.isAcceptingBookings) {
                         "الاستقبال متوقف مؤقتاً"
                     } else if (venue.isPaused) {
-                        "احجز الآن (الطابور متوقف مؤقتاً)"
+                        "احجز تذكرة #${venue.nextTicketNumber} (متوقف مؤقتاً)"
                     } else if (isField) {
-                        "تأكيد حجز ${FieldBookingDuration.shortLabel(selectedHours)} (${IntentHelpers.formatDinar(calculatedPrice)})"
+                        "تأكيد #${venue.nextTicketNumber} • ${FieldBookingDuration.shortLabel(selectedHours)} (${IntentHelpers.formatDinar(calculatedPrice)})"
                     } else if (isClinic) {
-                        "حجز الموعد الطبي • ${IntentHelpers.formatDinar(calculatedPrice)}"
+                        "حجز تذكرة #${venue.nextTicketNumber} • ${IntentHelpers.formatDinar(calculatedPrice)}"
                     } else {
-                        "تأكيد الحجز وإصدار التكت ورمز QR"
+                        "إصدار تذكرة #${venue.nextTicketNumber} ورمز QR"
                     },
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold
@@ -638,9 +800,9 @@ fun VenueDetailsSheet(
 
             HorizontalDivider()
 
-            // Customer Reviews
+            // SECTION 5: Customer Reviews
             Text(
-                text = "آراء الزبائن (${reviews.size})",
+                text = "٥. آراء الزبائن (${reviews.size})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -695,8 +857,45 @@ fun VenueDetailsSheet(
 }
 
 @Composable
+private fun QueueMetricBox(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, tint.copy(alpha = 0.25f)),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = tint,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
 private fun InfoStatPill(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     text: String,
     tint: Color,
     modifier: Modifier = Modifier

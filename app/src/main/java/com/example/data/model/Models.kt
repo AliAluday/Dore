@@ -222,12 +222,26 @@ enum class LoyaltyTier(
 data class UserProfileSettings(
     val selectedDistrict: NinevehDistrict = NinevehDistrict.ALL_NINEVEH,
     val isDarkMode: Boolean = true,
-    val userName: String = "علي الحديدي",
-    val userPhone: String = "07701234567",
+    val userName: String = "",
+    val userPhone: String = "",
+    val userAge: String = "",
+    val optionalNote: String = "",
     val loyaltyPoints: Int = 60,
     val muteSound: Boolean = false,
     val muteVibration: Boolean = false
-)
+) {
+    val hasMandatoryInfo: Boolean
+        get() = isValidFullName(userName) && isValidPhone(userPhone)
+
+    companion object {
+        fun isValidFullName(name: String): Boolean = name.trim().length >= 3
+
+        fun isValidPhone(phone: String): Boolean {
+            val digits = phone.filter { it.isDigit() }
+            return digits.length in 10..14
+        }
+    }
+}
 
 data class LiveTurnAlert(
     val bookingId: Long,

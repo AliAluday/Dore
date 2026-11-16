@@ -73,4 +73,13 @@ interface DoriDao {
 
     @Update
     suspend fun updateQueueItem(item: MerchantQueueItemEntity)
+
+    @Query("DELETE FROM venues")
+    suspend fun deleteAllVenues()
+
+    @Query("DELETE FROM reviews")
+    suspend fun deleteAllReviews()
+
+    @Query("DELETE FROM merchant_queue_items")
+    suspend fun deleteAllQueueItems()
 }

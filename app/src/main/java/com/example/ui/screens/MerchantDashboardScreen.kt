@@ -80,10 +80,11 @@ fun MerchantDashboardScreen(
     onToggleLiveSimulation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val cityAndAllVenues = remember(state.allVenues, state.preferences.selectedCity) {
-        val inCity = state.allVenues.filter { it.city == state.preferences.selectedCity.displayName }
-        val others = state.allVenues.filter { it.city != state.preferences.selectedCity.displayName }
-        inCity + others
+    val cityAndAllVenues = remember(state.allVenues, state.preferences.selectedDistrict) {
+        val districtName = state.preferences.selectedDistrict.displayName
+        val inDistrict = state.allVenues.filter { it.city == districtName }
+        val others = state.allVenues.filter { it.city != districtName }
+        inDistrict + others
     }
     val selectedVenue = cityAndAllVenues.find { it.id == state.selectedMerchantVenueId }
         ?: cityAndAllVenues.firstOrNull()
@@ -112,7 +113,7 @@ fun MerchantDashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 680.dp),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Venue Switcher

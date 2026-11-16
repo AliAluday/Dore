@@ -8,17 +8,17 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.example.data.model.IraqiCity
+import com.example.data.model.NinevehDistrict
 import com.example.data.model.UserProfileSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "dori_prefs")
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "dori_nineveh_prefs")
 
 class UserPreferencesDataStore(private val context: Context) {
 
     private object Keys {
-        val SELECTED_CITY = stringPreferencesKey("selected_city")
+        val SELECTED_DISTRICT = stringPreferencesKey("selected_district")
         val IS_DARK_MODE = booleanPreferencesKey("is_dark_mode")
         val USER_NAME = stringPreferencesKey("user_name")
         val USER_PHONE = stringPreferencesKey("user_phone")
@@ -29,8 +29,10 @@ class UserPreferencesDataStore(private val context: Context) {
 
     val userPreferences: Flow<UserProfileSettings> = context.dataStore.data.map { prefs ->
         UserProfileSettings(
-            selectedCity = IraqiCity.fromName(prefs[Keys.SELECTED_CITY] ?: IraqiCity.BAGHDAD.displayName),
-            isDarkMode = prefs[Keys.IS_DARK_MODE] ?: false,
+            selectedDistrict = NinevehDistrict.fromName(
+                prefs[Keys.SELECTED_DISTRICT] ?: NinevehDistrict.ALL_NINEVEH.displayName
+            ),
+            isDarkMode = prefs[Keys.IS_DARK_MODE] ?: true,
             userName = prefs[Keys.USER_NAME] ?: "علي الحديدي",
             userPhone = prefs[Keys.USER_PHONE] ?: "07701234567",
             loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 60,
@@ -39,19 +41,19 @@ class UserPreferencesDataStore(private val context: Context) {
         )
     }
 
-    suspend fun setSelectedCity(city: IraqiCity) {
-        context.dataStore.edit { it[Keys.SELECTED_CITY] = city.displayName }
+    suspend fun setSelectedDistrict(district: NinevehDistrict) {
+        context.dataStore.edit { it[Keys.SELECTED_DISTRICT] = district.displayName }
     }
 
     suspend fun setDarkMode(enabled: Boolean) {
         context.dataStore.edit { it[Keys.IS_DARK_MODE] = enabled }
     }
 
-    suspend fun updateProfile(name: String, phone: String, city: IraqiCity) {
+    suspend fun updateProfile(name: String, phone: String, district: NinevehDistrict) {
         context.dataStore.edit {
             it[Keys.USER_NAME] = name.ifBlank { "علي الحديدي" }
             it[Keys.USER_PHONE] = phone.ifBlank { "07701234567" }
-            it[Keys.SELECTED_CITY] = city.displayName
+            it[Keys.SELECTED_DISTRICT] = district.displayName
         }
     }
 

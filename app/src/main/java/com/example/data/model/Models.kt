@@ -1,15 +1,109 @@
 package com.example.data.model
 
-enum class IraqiCity(val displayName: String, val code: String) {
-    BAGHDAD("بغداد", "BGW"),
-    MOSUL("الموصل", "OSM"),
-    ERBIL("أربيل", "EBL"),
-    BASRA("البصرة", "BSR"),
-    NAJAF("النجف", "NJF");
+enum class NinevehDistrict(
+    val displayName: String,
+    val code: String,
+    val areas: List<String>
+) {
+    ALL_NINEVEH(
+        displayName = "كل مناطق نينوى",
+        code = "NIN",
+        areas = emptyList()
+    ),
+    MOSUL_LEFT(
+        displayName = "الموصل - الأيسر",
+        code = "MSL-L",
+        areas = listOf(
+            "حي الزهور", "المجموعة الثقافية", "المهندسين", "حي المثنى",
+            "القاهرة", "الزهراء", "الحدباء", "حي الجامعة", "الغابات",
+            "الفيصلية", "النبي يونس", "البكر", "التحرير", "الكرامة",
+            "الجزائر", "الصديق", "العربي", "البلديات", "القادسية",
+            "الكفاءات", "السلام", "السماح", "الرشيدية"
+        )
+    ),
+    MOSUL_RIGHT(
+        displayName = "الموصل - الأيمن",
+        code = "MSL-R",
+        areas = listOf(
+            "الدواسة", "المنصور", "اليرموك", "المأمون", "موصل الجديدة",
+            "باب الطوب", "باب لكش", "النجفي", "الزنجيلي", "الشفاء",
+            "وادي حجر", "تل الرمان", "رجم حديد", "العريبي", "مشيرفة",
+            "حي العامل", "17 تموز", "بادوش", "حليلة"
+        )
+    ),
+    TAL_AFAR(
+        displayName = "تلعفر",
+        code = "TLF",
+        areas = listOf(
+            "مركز تلعفر", "العياضية", "المحلبية", "القادسية تلعفر",
+            "الخضراء", "حسن كوي", "الجزيرة", "ربيعة", "زمار", "بردية"
+        )
+    ),
+    HAMDANIYA(
+        displayName = "الحمدانية (بغديدا)",
+        code = "HMD",
+        areas = listOf(
+            "قره قوش (بغديدا)", "برطلة", "كرمليس", "النمرود",
+            "الخازر", "وردك", "ترجلة", "قره تبة"
+        )
+    ),
+    TEL_KEPE(
+        displayName = "تلكيف",
+        code = "TLK",
+        areas = listOf(
+            "مركز تلكيف", "ألقوش", "باطنايا", "تللسقف",
+            "وانة", "الشريخان", "فايدة", "القوسيات"
+        )
+    ),
+    BASHIQA(
+        displayName = "بعشيقة وبحزاني",
+        code = "BSH",
+        areas = listOf(
+            "مركز بعشيقة", "بحزاني", "الفاضلية", "خورساباد",
+            "جبل مقلوب", "عمر قابجي"
+        )
+    ),
+    SINJAR(
+        displayName = "سنجار",
+        code = "SNJ",
+        areas = listOf(
+            "مركز سنجار", "سنوني", "القيروان", "القحطانية (تل عزير)",
+            "تل بنات", "خانصور"
+        )
+    ),
+    SHEIKHAN(
+        displayName = "الشيخان",
+        code = "SHK",
+        areas = listOf(
+            "عين سفني", "باعذرة", "مهد", "لالش", "شيخان"
+        )
+    ),
+    BAJ(
+        displayName = "البعاج",
+        code = "BAJ",
+        areas = listOf(
+            "مركز البعاج", "القحطانية البعاج", "البليع", "الجرن"
+        )
+    ),
+    QAYYARAH(
+        displayName = "القيارة وحمام العليل",
+        code = "QYR",
+        areas = listOf(
+            "القيارة", "حمام العليل", "الشورة", "الحود", "الحاج علي"
+        )
+    ),
+    HATRA_MAKHMOUR(
+        displayName = "الحضر ومخمور",
+        code = "HTR",
+        areas = listOf(
+            "الحضر", "تل عبطة", "مخمور", "الكوير", "قراج"
+        )
+    );
 
     companion object {
-        fun fromName(name: String): IraqiCity =
-            entries.find { it.displayName == name || it.name == name } ?: BAGHDAD
+        val selectableDistricts = entries.filter { it != ALL_NINEVEH }
+        fun fromName(name: String): NinevehDistrict =
+            entries.find { it.displayName == name || it.name == name } ?: ALL_NINEVEH
     }
 }
 
@@ -23,8 +117,6 @@ enum class ServiceCategory(val displayName: String) {
 
     companion object {
         val fiveCategories = listOf(CLINICS, MAINTENANCE, BEAUTY, FIELDS, LABS)
-        fun fromName(name: String): ServiceCategory =
-            entries.find { it.displayName == name || it.name == name } ?: CLINICS
     }
 }
 
@@ -61,7 +153,7 @@ enum class LoyaltyTier(
     val perkDescription: String
 ) {
     SILVER("فضية", 0, 100, "أولوية إشعارات فورية وتذكرة رقمية ذكية"),
-    GOLD("ذهبية", 100, 250, "خصم 10% لدى الشركاء وتنبيه مسبق مضاعف"),
+    GOLD("ذهبية", 100, 250, "خصم 10% لدى شركاء نينوى وتنبيه مسبق مضاعف"),
     DIAMOND("ماسية", 250, null, "مسار VIP سريع وأولوية الحجز في أوقات الذروة");
 
     companion object {
@@ -74,8 +166,8 @@ enum class LoyaltyTier(
 }
 
 data class UserProfileSettings(
-    val selectedCity: IraqiCity = IraqiCity.BAGHDAD,
-    val isDarkMode: Boolean = false,
+    val selectedDistrict: NinevehDistrict = NinevehDistrict.ALL_NINEVEH,
+    val isDarkMode: Boolean = true,
     val userName: String = "علي الحديدي",
     val userPhone: String = "07701234567",
     val loyaltyPoints: Int = 60,

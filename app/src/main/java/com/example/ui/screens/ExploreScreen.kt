@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LocalHospital
+import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
@@ -64,11 +66,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.local.VenueEntity
+import com.example.data.model.NinevehDistrict
 import com.example.data.model.ServiceCategory
 import com.example.data.model.SortOption
 import com.example.ui.theme.AmberGold
-import com.example.ui.theme.EmeraldDeep
-import com.example.ui.theme.EmeraldPrimary
+import com.example.ui.theme.IndigoAccentLight
+import com.example.ui.theme.MintPrimaryDark
 import com.example.ui.theme.StatusOpen
 import com.example.ui.theme.StatusPaused
 import com.example.ui.theme.StatusUrgent
@@ -78,6 +81,8 @@ import com.example.util.IntentHelpers
 @Composable
 fun ExploreScreen(
     state: DoriUiState,
+    onSelectDistrict: (NinevehDistrict) -> Unit,
+    onSelectArea: (String?) -> Unit,
     onSearchChange: (String) -> Unit,
     onCategorySelect: (ServiceCategory) -> Unit,
     onToggleFavoritesOnly: () -> Unit,
@@ -95,24 +100,24 @@ fun ExploreScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 680.dp),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Hero Banner + Fastest Turn Shortcut
+            // Futuristic Nineveh Hero Banner
             item {
                 Card(
-                    shape = RoundedCornerShape(22.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(176.dp)
+                            .height(190.dp)
                     ) {
                         Image(
-                            painter = painterResource(id = R.drawable.img_hero_queue),
-                            contentDescription = "تنظيم الدور الذكي في العراق",
+                            painter = painterResource(id = R.drawable.img_nineveh_hero),
+                            contentDescription = "معالم نينوى والموصل الرقمية",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -122,9 +127,9 @@ fun ExploreScreen(
                                 .background(
                                     Brush.horizontalGradient(
                                         colors = listOf(
-                                            EmeraldDeep.copy(alpha = 0.92f),
-                                            EmeraldPrimary.copy(alpha = 0.72f),
-                                            Color.Transparent
+                                            Color(0xFF070B14).copy(alpha = 0.94f),
+                                            Color(0xFF0B1426).copy(alpha = 0.78f),
+                                            Color(0xFF070B14).copy(alpha = 0.35f)
                                         )
                                     )
                                 )
@@ -132,30 +137,43 @@ fun ExploreScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(18.dp),
+                                .padding(20.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = MintPrimaryDark.copy(alpha = 0.2f),
+                                    border = BorderStroke(1.dp, MintPrimaryDark.copy(alpha = 0.55f))
+                                ) {
+                                    Text(
+                                        text = "محافظة نينوى • ${state.preferences.selectedDistrict.displayName}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MintPrimaryDark,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
                                 Text(
-                                    text = "أهلاً بك في ${state.preferences.selectedCity.displayName}",
+                                    text = "دورك أسرع في كل نينوى",
                                     style = MaterialTheme.typography.headlineSmall,
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "احجز دورك عن بُعد وتابع التذكرة لحظة بلحظة",
+                                    text = "جميع أقضية وأحياء نينوى بانتظارك بتذكرة رقمية ذكية",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White.copy(alpha = 0.9f)
+                                    color = Color.White.copy(alpha = 0.85f)
                                 )
                             }
 
                             Button(
                                 onClick = onBookFastestTurn,
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = AmberGold,
-                                    contentColor = EmeraldDeep
+                                    containerColor = MintPrimaryDark,
+                                    contentColor = Color(0xFF04221B)
                                 ),
-                                shape = RoundedCornerShape(14.dp),
+                                shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier.testTag("fastest_turn_button")
                             ) {
                                 Icon(
@@ -175,33 +193,107 @@ fun ExploreScreen(
                 }
             }
 
-            // Instant Stats Row: Open Places, Fastest ETA, Average Rating
+            // Neo-Bento Instant Stats Row
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    QuickStatCard(
+                    NeoStatCard(
                         title = "أماكن مفتوحة",
-                        value = "${state.openCountInCity}",
+                        value = "${state.openCountInDistrict}",
                         icon = Icons.Default.Storefront,
-                        tint = StatusOpen,
+                        accent = StatusOpen,
                         modifier = Modifier.weight(1f)
                     )
-                    QuickStatCard(
+                    NeoStatCard(
                         title = "أسرع انتظار",
                         value = "${state.fastestWaitMinutes} د",
                         icon = Icons.Default.AccessTime,
-                        tint = EmeraldPrimary,
+                        accent = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f)
                     )
-                    QuickStatCard(
+                    NeoStatCard(
                         title = "متوسط التقييم",
-                        value = "${state.averageRatingInCity} ★",
+                        value = "${state.averageRatingInDistrict} ★",
                         icon = Icons.Default.Star,
-                        tint = AmberGold,
+                        accent = AmberGold,
                         modifier = Modifier.weight(1f)
                     )
+                }
+            }
+
+            // Nineveh Districts Strip (جميع أقضية نينوى)
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.LocationCity,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "أقضية ومناطق نينوى (${NinevehDistrict.selectableDistricts.size} قضاء ومنطقة)",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(NinevehDistrict.entries) { district ->
+                            val selected = state.preferences.selectedDistrict == district
+                            FilterChip(
+                                selected = selected,
+                                onClick = { onSelectDistrict(district) },
+                                label = { Text(district.displayName) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                                    selectedLabelColor = Color.White
+                                ),
+                                modifier = Modifier.testTag("explore_district_chip_${district.name.lowercase()}")
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Neighborhoods / Areas Strip within Selected Nineveh District
+            if (state.availableAreas.isNotEmpty()) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "الأحياء والمناطق (${state.availableAreas.size} منطقة)",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            item {
+                                FilterChip(
+                                    selected = state.selectedArea == null,
+                                    onClick = { onSelectArea(null) },
+                                    label = { Text("جميع المناطق", style = MaterialTheme.typography.labelMedium) }
+                                )
+                            }
+                            items(state.availableAreas) { area ->
+                                FilterChip(
+                                    selected = state.selectedArea == area,
+                                    onClick = { onSelectArea(area) },
+                                    label = { Text(area, style = MaterialTheme.typography.labelMedium) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                    ),
+                                    modifier = Modifier.testTag("area_chip_$area")
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -215,7 +307,7 @@ fun ExploreScreen(
                     OutlinedTextField(
                         value = state.searchQuery,
                         onValueChange = onSearchChange,
-                        placeholder = { Text("ابحث عن عيادة، صيانة، صالون، ملعب...") },
+                        placeholder = { Text("ابحث باسم المحل، الحي، أو القضاء...") },
                         leadingIcon = {
                             Icon(Icons.Default.Search, contentDescription = "بحث")
                         },
@@ -227,19 +319,24 @@ fun ExploreScreen(
                             }
                         },
                         singleLine = true,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         modifier = Modifier
                             .weight(1f)
                             .testTag("explore_search_input")
                     )
 
                     Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = if (state.showFavoritesOnly) StatusUrgent.copy(alpha = 0.14f)
+                        shape = RoundedCornerShape(18.dp),
+                        color = if (state.showFavoritesOnly) StatusUrgent.copy(alpha = 0.16f)
                         else MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(
+                            1.dp,
+                            if (state.showFavoritesOnly) StatusUrgent.copy(alpha = 0.5f)
+                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                        ),
                         modifier = Modifier
                             .size(54.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(18.dp))
                             .clickable { onToggleFavoritesOnly() }
                             .testTag("favorites_filter_button")
                     ) {
@@ -275,9 +372,9 @@ fun ExploreScreen(
                                 }
                             },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = EmeraldPrimary,
-                                selectedLabelColor = Color.White,
-                                selectedLeadingIconColor = Color.White
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
                             ),
                             modifier = Modifier.testTag("category_chip_${category.name.lowercase()}")
                         )
@@ -293,7 +390,7 @@ fun ExploreScreen(
                 ) {
                     item {
                         Text(
-                            text = "ترتيب:",
+                            text = "فرز:",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -313,14 +410,15 @@ fun ExploreScreen(
             if (state.filteredVenues.isEmpty()) {
                 item {
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(22.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 24.dp)
+                            .padding(vertical = 18.dp)
                     ) {
                         Column(
-                            modifier = Modifier.padding(28.dp),
+                            modifier = Modifier.padding(26.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -331,21 +429,29 @@ fun ExploreScreen(
                                 modifier = Modifier.size(44.dp)
                             )
                             Text(
-                                text = "لا توجد نتائج مطابقة",
+                                text = "لا توجد مراكز مطابقة لهذا الحي أو البحث",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "جرّب تغيير التصنيف أو إلغاء فلتر المفضلة لعرض جميع الأماكن المفتوحة.",
+                                text = "جرّب اختيار \"جميع المناطق\" أو قضاء مجاور في نينوى لعرض المراكز المفتوحة القريبة.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (state.selectedArea != null) {
+                                Button(
+                                    onClick = { onSelectArea(null) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Text("عرض جميع مناطق ${state.preferences.selectedDistrict.displayName}")
+                                }
+                            }
                         }
                     }
                 }
             } else {
                 items(state.filteredVenues, key = { it.id }) { venue ->
-                    VenueCard(
+                    FuturisticVenueCard(
                         venue = venue,
                         onClick = { onVenueClick(venue) },
                         onToggleFavorite = { onToggleFavorite(venue) }
@@ -357,24 +463,46 @@ fun ExploreScreen(
 }
 
 @Composable
-private fun QuickStatCard(
+private fun NeoStatCard(
     title: String,
     value: String,
     icon: ImageVector,
-    tint: Color,
+    accent: Color,
     modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        tonalElevation = 2.dp,
+        shape = RoundedCornerShape(18.dp),
+        tonalElevation = 3.dp,
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.25f)),
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(accent.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
+                }
+                Box(
+                    modifier = Modifier
+                        .width(18.dp)
+                        .height(3.dp)
+                        .clip(CircleShape)
+                        .background(accent)
+                )
+            }
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,
@@ -392,14 +520,26 @@ private fun QuickStatCard(
 }
 
 @Composable
-private fun VenueCard(
+private fun FuturisticVenueCard(
     venue: VenueEntity,
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
+    val statusText = when {
+        !venue.isAcceptingBookings -> "مغلق مؤقتاً"
+        venue.isPaused -> "متوقف مؤقتاً"
+        else -> "مفتوح الآن"
+    }
+    val statusColor = when {
+        !venue.isAcceptingBookings -> StatusUrgent
+        venue.isPaused -> StatusPaused
+        else -> StatusOpen
+    }
+
     Card(
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(22.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
             .fillMaxWidth()
@@ -424,36 +564,38 @@ private fun VenueCard(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.primaryContainer
+                            color = IndigoAccentLight.copy(alpha = 0.14f)
                         ) {
                             Text(
                                 text = venue.category,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                color = MaterialTheme.colorScheme.secondary,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
                             )
                         }
 
-                        val statusText = when {
-                            !venue.isAcceptingBookings -> "مغلق مؤقتاً"
-                            venue.isPaused -> "متوقف مؤقتاً"
-                            else -> "مفتوح الآن"
-                        }
-                        val statusColor = when {
-                            !venue.isAcceptingBookings -> StatusUrgent
-                            venue.isPaused -> StatusPaused
-                            else -> StatusOpen
-                        }
                         Surface(
                             shape = RoundedCornerShape(50),
                             color = statusColor.copy(alpha = 0.14f)
                         ) {
-                            Text(
-                                text = statusText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = statusColor,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(statusColor)
+                                )
+                                Text(
+                                    text = statusText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = statusColor
+                                )
+                            }
                         }
                     }
 
@@ -468,12 +610,12 @@ private fun VenueCard(
                         Icon(
                             imageVector = Icons.Default.LocationOn,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
-                            text = venue.area,
+                            text = "${venue.city} • ${venue.area}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -495,52 +637,60 @@ private fun VenueCard(
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = null,
-                            tint = AmberGold,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = "${venue.rating}",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = AmberGold,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "${venue.rating}",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.AccessTime,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "${venue.estimatedWaitMinutes} د • ${venue.waitingCount} بالانتظار",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.AccessTime,
-                            contentDescription = null,
-                            tint = EmeraldPrimary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = "${venue.estimatedWaitMinutes} د • ${venue.waitingCount} بالانتظار",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = IntentHelpers.formatDinar(venue.priceDinar),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
-
-                Text(
-                    text = IntentHelpers.formatDinar(venue.priceDinar),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = EmeraldPrimary,
-                    fontWeight = FontWeight.Bold
-                )
             }
         }
     }

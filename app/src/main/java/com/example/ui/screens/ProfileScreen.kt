@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -59,19 +60,18 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.R
-import com.example.data.model.IraqiCity
 import com.example.data.model.LoyaltyTier
+import com.example.data.model.NinevehDistrict
 import com.example.ui.theme.AmberGold
 import com.example.ui.theme.DiamondBlue
-import com.example.ui.theme.EmeraldDeep
-import com.example.ui.theme.EmeraldPrimary
+import com.example.ui.theme.MintPrimaryDark
 import com.example.ui.viewmodel.DoriUiState
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProfileScreen(
     state: DoriUiState,
-    onSaveProfile: (String, String, IraqiCity) -> Unit,
+    onSaveProfile: (String, String, NinevehDistrict) -> Unit,
     onToggleDarkMode: () -> Unit,
     onSetMuteSound: (Boolean) -> Unit,
     onSetMuteVibration: (Boolean) -> Unit,
@@ -89,7 +89,7 @@ fun ProfileScreen(
 
     var nameInput by remember(prefs.userName) { mutableStateOf(prefs.userName) }
     var phoneInput by remember(prefs.userPhone) { mutableStateOf(prefs.userPhone) }
-    var cityInput by remember(prefs.selectedCity) { mutableStateOf(prefs.selectedCity) }
+    var districtInput by remember(prefs.selectedDistrict) { mutableStateOf(prefs.selectedDistrict) }
 
     Box(
         modifier = modifier.fillMaxSize(),
@@ -99,14 +99,14 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 680.dp),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Loyalty Points & Tier Card
+            // Futuristic Loyalty Card
             item {
                 Card(
-                    shape = RoundedCornerShape(24.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Box(
@@ -114,7 +114,7 @@ fun ProfileScreen(
                             .fillMaxWidth()
                             .background(
                                 Brush.linearGradient(
-                                    colors = listOf(EmeraldDeep, EmeraldPrimary)
+                                    colors = listOf(Color(0xFF0A1428), Color(0xFF064E3B), Color(0xFF312E81))
                                 )
                             )
                             .padding(20.dp)
@@ -128,7 +128,8 @@ fun ProfileScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Surface(
                                         shape = RoundedCornerShape(50),
-                                        color = Color.White.copy(alpha = 0.16f)
+                                        color = Color.White.copy(alpha = 0.14f),
+                                        border = BorderStroke(1.dp, MintPrimaryDark.copy(alpha = 0.45f))
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -163,7 +164,7 @@ fun ProfileScreen(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "+10 نقاط عند إتمام كل خدمة عبر التطبيق",
+                                        text = "+10 نقاط عند إتمام كل خدمة في نينوى",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = Color.White.copy(alpha = 0.85f)
                                     )
@@ -174,7 +175,7 @@ fun ProfileScreen(
                                     contentDescription = "وسام الولاء",
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
-                                        .size(76.dp)
+                                        .size(78.dp)
                                         .clip(CircleShape)
                                 )
                             }
@@ -193,14 +194,14 @@ fun ProfileScreen(
                                         Text(
                                             text = "المتبقي ${nextTarget - points}",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = AmberGold,
+                                            color = MintPrimaryDark,
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
                                 }
                                 LinearProgressIndicator(
                                     progress = { animatedProgress },
-                                    color = AmberGold,
+                                    color = MintPrimaryDark,
                                     trackColor = Color.White.copy(alpha = 0.2f),
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -218,10 +219,11 @@ fun ProfileScreen(
                 }
             }
 
-            // Local Governorate & Profile Form
+            // Local Nineveh District & Profile Form
             item {
                 Card(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -231,12 +233,12 @@ fun ProfileScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "بياناتك الشخصية والمحافظة المحلية",
+                            text = "بياناتك الشخصية وقضاء نينوى المحلي",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "تُستخدم هذه البيانات للمسح التلقائي عند الحجز وتُحفظ محلياً على جهازك.",
+                            text = "تُستخدم للمسح التلقائي عند الحجز وتُحفظ محلياً بالكامل على جهازك.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -247,6 +249,7 @@ fun ProfileScreen(
                             label = { Text("الاسم الكامل") },
                             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                             singleLine = true,
+                            shape = RoundedCornerShape(16.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("profile_name_input")
@@ -258,6 +261,7 @@ fun ProfileScreen(
                             label = { Text("رقم الهاتف") },
                             leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                             singleLine = true,
+                            shape = RoundedCornerShape(16.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("profile_phone_input")
@@ -267,12 +271,12 @@ fun ProfileScreen(
                             Icon(
                                 imageVector = Icons.Default.LocationCity,
                                 contentDescription = null,
-                                tint = EmeraldPrimary,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "المحافظة الافتراضية",
+                                text = "القضاء الافتراضي في نينوى",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -282,25 +286,26 @@ fun ProfileScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            IraqiCity.entries.forEach { city ->
+                            NinevehDistrict.entries.forEach { district ->
                                 FilterChip(
-                                    selected = cityInput == city,
-                                    onClick = { cityInput = city },
-                                    label = { Text(city.displayName) },
+                                    selected = districtInput == district,
+                                    onClick = { districtInput = district },
+                                    label = { Text(district.displayName) },
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = EmeraldPrimary,
-                                        selectedLabelColor = Color.White
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                                     )
                                 )
                             }
                         }
 
                         Button(
-                            onClick = { onSaveProfile(nameInput, phoneInput, cityInput) },
-                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                            onClick = { onSaveProfile(nameInput, phoneInput, districtInput) },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            shape = RoundedCornerShape(16.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp)
+                                .height(50.dp)
                                 .testTag("save_profile_button")
                         ) {
                             Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -311,10 +316,11 @@ fun ProfileScreen(
                 }
             }
 
-            // App Preferences: Dark Mode, Mute Sound, Mute Vibration
+            // Android Alert & Theme Settings
             item {
                 Card(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -383,7 +389,7 @@ private fun SettingToggleRow(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = EmeraldPrimary,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(22.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))

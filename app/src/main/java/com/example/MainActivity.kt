@@ -5,11 +5,23 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Explore
@@ -22,12 +34,13 @@ import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -35,9 +48,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.LiveOverlayAlertBanner
@@ -81,7 +99,6 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
         }
     }
 
-    // Return to Explore when pressing back from secondary tabs
     BackHandler(enabled = state.currentTab != AppTab.EXPLORE) {
         viewModel.selectTab(AppTab.EXPLORE)
     }
@@ -92,52 +109,22 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                    snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+                    snackbarHost = {
+                        SnackbarHost(
+                            hostState = snackbarHostState,
+                            modifier = Modifier.padding(bottom = 86.dp)
+                        )
+                    },
                     topBar = {
                         TopStickyHeader(
-                            selectedCity = state.preferences.selectedCity,
+                            selectedDistrict = state.preferences.selectedDistrict,
                             isDarkMode = state.preferences.isDarkMode,
                             activeBookingCount = state.activeBookings.size,
                             isSimulationRunning = state.isLiveSimulationRunning,
-                            onSelectCity = viewModel::selectCity,
+                            onSelectDistrict = viewModel::selectDistrict,
                             onToggleDarkMode = viewModel::toggleDarkMode,
                             onOpenTickets = { viewModel.selectTab(AppTab.TICKETS) }
                         )
-                    },
-                    bottomBar = {
-                        NavigationBar(
-                            windowInsets = WindowInsets.navigationBars
-                        ) {
-                            AppTab.entries.forEach { tab ->
-                                val selected = state.currentTab == tab
-                                val icon = when (tab) {
-                                    AppTab.EXPLORE -> if (selected) Icons.Filled.Explore else Icons.Outlined.Explore
-                                    AppTab.TICKETS -> if (selected) Icons.Filled.ConfirmationNumber else Icons.Outlined.ConfirmationNumber
-                                    AppTab.MERCHANT -> if (selected) Icons.Filled.Storefront else Icons.Outlined.Storefront
-                                    AppTab.PROFILE -> if (selected) Icons.Filled.Person else Icons.Outlined.Person
-                                }
-
-                                NavigationBarItem(
-                                    selected = selected,
-                                    onClick = { viewModel.selectTab(tab) },
-                                    label = { Text(tab.label) },
-                                    icon = {
-                                        if (tab == AppTab.TICKETS && state.activeBookings.isNotEmpty()) {
-                                            BadgedBox(
-                                                badge = {
-                                                    Badge { Text("${state.activeBookings.size}") }
-                                                }
-                                            ) {
-                                                Icon(icon, contentDescription = tab.label)
-                                            }
-                                        } else {
-                                            Icon(icon, contentDescription = tab.label)
-                                        }
-                                    },
-                                    modifier = Modifier.testTag("nav_tab_${tab.name.lowercase()}")
-                                )
-                            }
-                        }
                     }
                 ) { innerPadding ->
                     Box(
@@ -148,6 +135,8 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
                         when (state.currentTab) {
                             AppTab.EXPLORE -> ExploreScreen(
                                 state = state,
+                                onSelectDistrict = viewModel::selectDistrict,
+                                onSelectArea = viewModel::selectArea,
                                 onSearchChange = viewModel::updateSearchQuery,
                                 onCategorySelect = viewModel::selectCategory,
                                 onToggleFavoritesOnly = viewModel::toggleFavoritesFilter,
@@ -188,6 +177,17 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
                                 onSetMuteVibration = viewModel::setMuteVibration
                             )
                         }
+
+                        // Modern Floating Pill Bottom Navigation Dock
+                        FloatingBottomDock(
+                            currentTab = state.currentTab,
+                            activeTicketsCount = state.activeBookings.size,
+                            onSelectTab = viewModel::selectTab,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                        )
                     }
                 }
 
@@ -221,6 +221,86 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
                     onDismiss = viewModel::dismissTurnAlert,
                     modifier = Modifier.align(Alignment.TopCenter)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingBottomDock(
+    currentTab: AppTab,
+    activeTicketsCount: Int,
+    onSelectTab: (AppTab) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .widthIn(max = 560.dp)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(30.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+        shadowElevation = 14.dp,
+        tonalElevation = 8.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AppTab.entries.forEach { tab ->
+                val selected = currentTab == tab
+                val icon = when (tab) {
+                    AppTab.EXPLORE -> if (selected) Icons.Filled.Explore else Icons.Outlined.Explore
+                    AppTab.TICKETS -> if (selected) Icons.Filled.ConfirmationNumber else Icons.Outlined.ConfirmationNumber
+                    AppTab.MERCHANT -> if (selected) Icons.Filled.Storefront else Icons.Outlined.Storefront
+                    AppTab.PROFILE -> if (selected) Icons.Filled.Person else Icons.Outlined.Person
+                }
+                val bgColor by animateColorAsState(
+                    targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    label = "dockBg"
+                )
+                val fgColor by animateColorAsState(
+                    targetValue = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    label = "dockFg"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .minimumInteractiveComponentSize()
+                        .clip(CircleShape)
+                        .background(bgColor)
+                        .clickable { onSelectTab(tab) }
+                        .padding(vertical = 8.dp, horizontal = 4.dp)
+                        .testTag("nav_tab_${tab.name.lowercase()}"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        if (tab == AppTab.TICKETS && activeTicketsCount > 0) {
+                            BadgedBox(
+                                badge = { Badge { Text("$activeTicketsCount") } }
+                            ) {
+                                Icon(icon, contentDescription = tab.label, tint = fgColor, modifier = Modifier.size(20.dp))
+                            }
+                        } else {
+                            Icon(icon, contentDescription = tab.label, tint = fgColor, modifier = Modifier.size(20.dp))
+                        }
+                        Text(
+                            text = tab.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                            color = fgColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
         }
     }

@@ -10,8 +10,8 @@ import com.example.data.local.ReviewEntity
 import com.example.data.local.UserPreferencesDataStore
 import com.example.data.local.VenueEntity
 import com.example.data.model.BookingStatus
-import com.example.data.model.IraqiCity
 import com.example.data.model.LiveTurnAlert
+import com.example.data.model.NinevehDistrict
 import com.example.data.model.ServiceCategory
 import com.example.data.model.SortOption
 import com.example.data.model.TicketStage
@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -42,16 +41,18 @@ enum class AppTab(val label: String) {
 data class DoriUiState(
     val currentTab: AppTab = AppTab.EXPLORE,
     val preferences: UserProfileSettings = UserProfileSettings(),
+    val selectedArea: String? = null,
+    val availableAreas: List<String> = emptyList(),
     val searchQuery: String = "",
     val selectedCategory: ServiceCategory = ServiceCategory.ALL,
     val showFavoritesOnly: Boolean = false,
     val sortOption: SortOption = SortOption.HIGHEST_RATED,
     val allVenues: List<VenueEntity> = emptyList(),
-    val cityVenues: List<VenueEntity> = emptyList(),
+    val districtVenues: List<VenueEntity> = emptyList(),
     val filteredVenues: List<VenueEntity> = emptyList(),
-    val openCountInCity: Int = 0,
+    val openCountInDistrict: Int = 0,
     val fastestWaitMinutes: Int = 0,
-    val averageRatingInCity: Double = 0.0,
+    val averageRatingInDistrict: Double = 0.0,
     val reviewsByVenue: Map<Int, List<ReviewEntity>> = emptyMap(),
     val activeBookings: List<BookingEntity> = emptyList(),
     val selectedActiveBookingId: Long? = null,
@@ -65,6 +66,7 @@ data class DoriUiState(
 
 private data class FilterState(
     val currentTab: AppTab = AppTab.EXPLORE,
+    val selectedArea: String? = null,
     val searchQuery: String = "",
     val selectedCategory: ServiceCategory = ServiceCategory.ALL,
     val showFavoritesOnly: Boolean = false,
@@ -113,25 +115,42 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
         @Suppress("UNCHECKED_CAST")
         val queueItems = values[5] as List<MerchantQueueItemEntity>
 
-        val cityVenues = venues.filter { it.city == userPrefs.selectedCity.displayName }
-        val openCityVenues = cityVenues.filter { it.isOpen && it.isAcceptingBookings && !it.isPaused }
-        val fastestMinutes = openCityVenues.minOfOrNull { it.estimatedWaitMinutes } ?: 0
-        val avgRating = if (cityVenues.isNotEmpty()) {
-            kotlin.math.round((cityVenues.sumOf { it.rating } / cityVenues.size) * 10.0) / 10.0
+        val district = userPrefs.selectedDistrict
+        val districtVenues = if (district == NinevehDistrict.ALL_NINEVEH) {
+            venues
+        } else {
+            venues.filter { it.city == district.displayName }
+        }
+
+        val availableAreas = if (district == NinevehDistrict.ALL_NINEVEH) {
+            NinevehDistrict.selectableDistricts.flatMap { it.areas }.distinct()
+        } else {
+            district.areas
+        }
+
+        val activeArea = filters.selectedArea?.takeIf { it in availableAreas }
+        val openDistrictVenues = districtVenues.filter { it.isOpen && it.isAcceptingBookings && !it.isPaused }
+        val fastestMinutes = openDistrictVenues.minOfOrNull { it.estimatedWaitMinutes } ?: 0
+        val avgRating = if (districtVenues.isNotEmpty()) {
+            kotlin.math.round((districtVenues.sumOf { it.rating } / districtVenues.size) * 10.0) / 10.0
         } else 0.0
 
-        val filtered = cityVenues
+        val filtered = districtVenues
             .filter { venue ->
                 val matchesCategory = filters.selectedCategory == ServiceCategory.ALL ||
                     venue.category == filters.selectedCategory.displayName
+                val matchesArea = activeArea == null ||
+                    venue.area.contains(activeArea, ignoreCase = true) ||
+                    venue.description.contains(activeArea, ignoreCase = true)
                 val matchesFav = !filters.showFavoritesOnly || venue.isFavorite
                 val q = filters.searchQuery.trim()
                 val matchesSearch = q.isEmpty() ||
                     venue.name.contains(q, ignoreCase = true) ||
                     venue.area.contains(q, ignoreCase = true) ||
+                    venue.city.contains(q, ignoreCase = true) ||
                     venue.category.contains(q, ignoreCase = true) ||
                     venue.description.contains(q, ignoreCase = true)
-                matchesCategory && matchesFav && matchesSearch
+                matchesCategory && matchesArea && matchesFav && matchesSearch
             }
             .let { list ->
                 when (filters.sortOption) {
@@ -154,7 +173,7 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
         val effectiveMerchantId = if (venues.any { it.id == filters.selectedMerchantVenueId }) {
             filters.selectedMerchantVenueId
         } else {
-            cityVenues.firstOrNull()?.id ?: venues.firstOrNull()?.id ?: 1
+            districtVenues.firstOrNull()?.id ?: venues.firstOrNull()?.id ?: 1
         }
 
         val detailVenue = filters.selectedVenueIdForDetails?.let { id -> venues.find { it.id == id } }
@@ -162,16 +181,18 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
         DoriUiState(
             currentTab = filters.currentTab,
             preferences = userPrefs,
+            selectedArea = activeArea,
+            availableAreas = availableAreas,
             searchQuery = filters.searchQuery,
             selectedCategory = filters.selectedCategory,
             showFavoritesOnly = filters.showFavoritesOnly,
             sortOption = filters.sortOption,
             allVenues = venues,
-            cityVenues = cityVenues,
+            districtVenues = districtVenues,
             filteredVenues = filtered,
-            openCountInCity = openCityVenues.size,
+            openCountInDistrict = openDistrictVenues.size,
             fastestWaitMinutes = fastestMinutes,
-            averageRatingInCity = avgRating,
+            averageRatingInDistrict = avgRating,
             reviewsByVenue = reviews.groupBy { it.venueId },
             activeBookings = activeList,
             selectedActiveBookingId = effectiveBookingId,
@@ -192,13 +213,26 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
         filterState.update { it.copy(currentTab = tab) }
     }
 
-    fun selectCity(city: IraqiCity) {
+    fun selectDistrict(district: NinevehDistrict) {
         viewModelScope.launch {
-            repository.setSelectedCity(city)
-            val firstInCity = uiState.value.allVenues.firstOrNull { it.city == city.displayName }
-            if (firstInCity != null) {
-                filterState.update { it.copy(selectedMerchantVenueId = firstInCity.id) }
+            repository.setSelectedDistrict(district)
+            filterState.update {
+                val firstInDistrict = if (district == NinevehDistrict.ALL_NINEVEH) {
+                    uiState.value.allVenues.firstOrNull()?.id
+                } else {
+                    uiState.value.allVenues.firstOrNull { v -> v.city == district.displayName }?.id
+                }
+                it.copy(
+                    selectedArea = null,
+                    selectedMerchantVenueId = firstInDistrict ?: it.selectedMerchantVenueId
+                )
             }
+        }
+    }
+
+    fun selectArea(area: String?) {
+        filterState.update {
+            it.copy(selectedArea = if (it.selectedArea == area) null else area)
         }
     }
 
@@ -267,8 +301,8 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
 
     fun bookFastestTurn() {
         viewModelScope.launch {
-            val city = uiState.value.preferences.selectedCity
-            val result = repository.bookFastestTurnInCity(city)
+            val district = uiState.value.preferences.selectedDistrict
+            val result = repository.bookFastestTurnInDistrict(district)
             result.onSuccess { booking ->
                 filterState.update {
                     it.copy(
@@ -298,7 +332,7 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
     fun submitHistoryReview(bookingId: Long, rating: Int, comment: String) {
         viewModelScope.launch {
             repository.submitReviewForHistoryBooking(bookingId, rating, comment)
-            _toastMessage.emit("شكراً لتقييمك! تم نشر رأيك للمستخدمين")
+            _toastMessage.emit("شكراً لتقييمك! تم نشر رأيك لأهالي نينوى")
         }
     }
 
@@ -417,10 +451,10 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Profile & local settings
-    fun updateProfile(name: String, phone: String, city: IraqiCity) {
+    fun updateProfile(name: String, phone: String, district: NinevehDistrict) {
         viewModelScope.launch {
-            repository.updateProfile(name, phone, city)
-            _toastMessage.emit("تم حفظ بياناتك وإعدادات المحافظة محلياً")
+            repository.updateProfile(name, phone, district)
+            _toastMessage.emit("تم حفظ بياناتك وإعدادات القضاء في نينوى محلياً")
         }
     }
 

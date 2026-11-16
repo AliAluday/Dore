@@ -10,15 +10,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 private val LightColors = lightColorScheme(
-    primary = EmeraldPrimary,
+    primary = MintPrimaryLight,
     onPrimary = Color.White,
-    primaryContainer = EmeraldSoft,
-    onPrimaryContainer = EmeraldDeep,
-    secondary = AmberAccent,
+    primaryContainer = MintSoft,
+    onPrimaryContainer = MintDeep,
+    secondary = IndigoAccentLight,
     onSecondary = Color.White,
-    secondaryContainer = AmberSoft,
-    onSecondaryContainer = Color(0xFF451A03),
-    tertiary = EmeraldBright,
+    secondaryContainer = IndigoSoft,
+    onSecondaryContainer = Color(0xFF1E1B4B),
+    tertiary = AmberAccent,
     onTertiary = Color.White,
     background = LightBackground,
     onBackground = LightOnSurface,
@@ -32,16 +32,16 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF2DD4BF),
-    onPrimary = Color(0xFF003733),
-    primaryContainer = EmeraldDeep,
-    onPrimaryContainer = EmeraldSoft,
-    secondary = AmberGold,
-    onSecondary = Color(0xFF3E2200),
-    secondaryContainer = Color(0xFF4F2B00),
-    onSecondaryContainer = AmberSoft,
-    tertiary = EmeraldBright,
-    onTertiary = Color.White,
+    primary = MintPrimaryDark,
+    onPrimary = Color(0xFF00291D),
+    primaryContainer = Color(0xFF064E3B),
+    onPrimaryContainer = MintSoft,
+    secondary = IndigoAccentDark,
+    onSecondary = Color(0xFF1E1B4B),
+    secondaryContainer = Color(0xFF312E81),
+    onSecondaryContainer = IndigoSoft,
+    tertiary = AmberGold,
+    onTertiary = Color(0xFF3B2100),
     background = DarkBackground,
     onBackground = DarkOnSurface,
     surface = DarkSurface,
@@ -54,10 +54,10 @@ private val DarkColors = darkColorScheme(
 )
 
 val DoriShapes = Shapes(
-    small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(22.dp),
-    extraLarge = RoundedCornerShape(28.dp)
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(18.dp),
+    large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(30.dp)
 )
 
 @Composable

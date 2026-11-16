@@ -8,8 +8,8 @@ import com.example.data.local.SeedData
 import com.example.data.local.UserPreferencesDataStore
 import com.example.data.local.VenueEntity
 import com.example.data.model.BookingStatus
-import com.example.data.model.IraqiCity
 import com.example.data.model.LiveTurnAlert
+import com.example.data.model.NinevehDistrict
 import com.example.data.model.QueueItemStatus
 import com.example.data.model.TicketStage
 import com.example.data.model.UserProfileSettings
@@ -27,7 +27,10 @@ class DoriRepository(
     val userPreferences: Flow<UserProfileSettings> = prefs.userPreferences
 
     suspend fun ensureSeeded() {
-        if (dao.getVenueCount() == 0) {
+        val currentVenues = dao.observeAllVenues().first()
+        val validDistrictNames = NinevehDistrict.selectableDistricts.map { it.displayName }.toSet()
+        val needsReseed = currentVenues.isEmpty() || currentVenues.any { it.city !in validDistrictNames }
+        if (needsReseed) {
             val venues = SeedData.initialVenues()
             dao.insertVenues(venues)
             dao.insertReviews(SeedData.initialReviews())
@@ -35,13 +38,13 @@ class DoriRepository(
         }
     }
 
-    suspend fun setSelectedCity(city: IraqiCity) = prefs.setSelectedCity(city)
+    suspend fun setSelectedDistrict(district: NinevehDistrict) = prefs.setSelectedDistrict(district)
     suspend fun setDarkMode(enabled: Boolean) = prefs.setDarkMode(enabled)
     suspend fun setMuteSound(muted: Boolean) = prefs.setMuteSound(muted)
     suspend fun setMuteVibration(muted: Boolean) = prefs.setMuteVibration(muted)
 
-    suspend fun updateProfile(name: String, phone: String, city: IraqiCity) =
-        prefs.updateProfile(name, phone, city)
+    suspend fun updateProfile(name: String, phone: String, district: NinevehDistrict) =
+        prefs.updateProfile(name, phone, district)
 
     suspend fun toggleFavorite(venueId: Int, currentFavorite: Boolean) =
         dao.setFavorite(venueId, !currentFavorite)
@@ -63,7 +66,7 @@ class DoriRepository(
         val activeWaiting = queueItems.count { it.status == QueueItemStatus.WAITING.name }
         val activeServing = queueItems.count { it.status == QueueItemStatus.SERVING.name }
         val ticketNum = venue.nextTicketNumber
-        val ticketCode = "DR-${venue.id}-$ticketNum"
+        val ticketCode = "NIN-${venue.id}-$ticketNum"
         val peopleAhead = activeWaiting + activeServing
         val stage = when {
             peopleAhead == 0 -> TicketStage.YOUR_TURN
@@ -77,10 +80,10 @@ class DoriRepository(
             queueNumber = ticketNum,
             venueId = venue.id,
             venueName = venue.name,
-            venueCity = venue.city,
+            venueCity = "${venue.city} • ${venue.area}",
             venueCategory = venue.category,
             venuePhone = venue.phone,
-            customerName = customerName.ifBlank { "ضيف دوري" },
+            customerName = customerName.ifBlank { "ضيف نينوى" },
             customerPhone = customerPhone.ifBlank { "07700000000" },
             selectedOption = selectedOption.ifBlank { venue.customOptions.firstOrNull() ?: "خدمة قياسية" },
             notes = notes,
@@ -117,13 +120,18 @@ class DoriRepository(
         return Result.success(savedBooking)
     }
 
-    suspend fun bookFastestTurnInCity(city: IraqiCity): Result<BookingEntity> {
+    suspend fun bookFastestTurnInDistrict(district: NinevehDistrict): Result<BookingEntity> {
         val currentUser = prefs.userPreferences.first()
         val allVenues = dao.observeAllVenues().first()
-        val fastest = allVenues
-            .filter { it.city == city.displayName && it.isOpen && it.isAcceptingBookings && !it.isPaused }
+        val candidates = if (district == NinevehDistrict.ALL_NINEVEH) {
+            allVenues
+        } else {
+            allVenues.filter { it.city == district.displayName }
+        }
+        val fastest = candidates
+            .filter { it.isOpen && it.isAcceptingBookings && !it.isPaused }
             .minByOrNull { it.estimatedWaitMinutes }
-            ?: return Result.failure(IllegalStateException("لا توجد أماكن متاحة للحجز السريع في ${city.displayName} حالياً"))
+            ?: return Result.failure(IllegalStateException("لا توجد أماكن متاحة للحجز السريع في ${district.displayName} حالياً"))
 
         return bookQueueTicket(
             venueId = fastest.id,
@@ -153,13 +161,11 @@ class DoriRepository(
             )
         )
 
-        // Update linked queue item
         val qItems = dao.getQueueItemsForVenueOnce(booking.venueId)
         qItems.find { it.bookingId == bookingId }?.let { item ->
             dao.updateQueueItem(item.copy(status = QueueItemStatus.DONE.name))
         }
 
-        // Update venue stats and recalculate rating if reviewed
         val venue = dao.getVenueById(booking.venueId)
         if (venue != null) {
             if (rating != null && rating in 1..5) {
@@ -187,7 +193,6 @@ class DoriRepository(
             syncVenueQueueAndBookings(venue.id)
         }
 
-        // Award +10 loyalty points for each completed service
         prefs.addLoyaltyPoints(10)
         return 10
     }
@@ -383,7 +388,6 @@ class DoriRepository(
 
         val alerts = mutableListOf<LiveTurnAlert>()
 
-        // Update serving user booking if any
         if (servingItem?.bookingId != null) {
             val b = dao.getBookingById(servingItem.bookingId)
             if (b != null && b.status == BookingStatus.ACTIVE.name) {
@@ -408,7 +412,6 @@ class DoriRepository(
             }
         }
 
-        // Update waiting user bookings
         waitingList.forEachIndexed { index, item ->
             val bId = item.bookingId ?: return@forEachIndexed
             val b = dao.getBookingById(bId) ?: return@forEachIndexed

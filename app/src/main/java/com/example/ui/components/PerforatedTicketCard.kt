@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.testTag
@@ -50,7 +52,7 @@ import androidx.compose.ui.unit.dp
 import com.example.data.local.BookingEntity
 import com.example.data.model.TicketStage
 import com.example.ui.theme.AmberGold
-import com.example.ui.theme.EmeraldPrimary
+import com.example.ui.theme.IndigoAccentLight
 import com.example.ui.theme.StatusApproaching
 import com.example.ui.theme.StatusOpen
 import com.example.ui.theme.StatusUrgent
@@ -61,14 +63,14 @@ import com.example.util.QrCodeGenerator
 fun QrCodeCanvas(
     payload: String,
     modifier: Modifier = Modifier,
-    darkColor: Color = Color(0xFF0A1212),
+    darkColor: Color = Color(0xFF070B14),
     lightColor: Color = Color.White
 ) {
     val matrix = remember(payload) { QrCodeGenerator.generateMatrix(payload) }
     Canvas(
         modifier = modifier
-            .background(lightColor, RoundedCornerShape(12.dp))
-            .padding(8.dp)
+            .background(lightColor, RoundedCornerShape(14.dp))
+            .padding(10.dp)
     ) {
         val count = matrix.size
         val cellSize = size.minDimension / count.toFloat()
@@ -89,7 +91,7 @@ fun QrCodeCanvas(
 }
 
 fun perforatedTicketShape(cutoutRatio: Float = 0.56f) = GenericShape { size, _ ->
-    val corner = 44f
+    val corner = 46f
     val notchR = 26f
     val notchY = size.height * cutoutRatio
 
@@ -151,7 +153,7 @@ fun PerforatedTicketCard(
     val stage = TicketStage.entries.find { it.name == booking.stage } ?: TicketStage.MONITORED
     val stageColor by animateColorAsState(
         targetValue = when (stage) {
-            TicketStage.MONITORED -> EmeraldPrimary
+            TicketStage.MONITORED -> IndigoAccentLight
             TicketStage.APPROACHING -> StatusApproaching
             TicketStage.YOUR_TURN -> StatusOpen
         },
@@ -163,16 +165,23 @@ fun PerforatedTicketCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = ticketShape,
-        tonalElevation = 4.dp,
-        shadowElevation = 6.dp,
+        tonalElevation = 6.dp,
+        shadowElevation = 10.dp,
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Upper Ticket Header + QR & ETA
+            // Futuristic Gradient Ticket Top
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(stageColor.copy(alpha = 0.08f))
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                stageColor.copy(alpha = 0.18f),
+                                MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    )
                     .padding(18.dp)
             ) {
                 Row(
@@ -183,12 +192,14 @@ fun PerforatedTicketCard(
                     Column(modifier = Modifier.weight(1f)) {
                         Surface(
                             shape = RoundedCornerShape(50),
-                            color = stageColor.copy(alpha = 0.16f)
+                            color = stageColor.copy(alpha = 0.16f),
+                            border = BorderStroke(1.dp, stageColor.copy(alpha = 0.45f))
                         ) {
                             Text(
                                 text = "${booking.venueCategory} • ${booking.venueCity}",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = stageColor,
+                                fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
@@ -207,7 +218,7 @@ fun PerforatedTicketCard(
                     }
 
                     Surface(
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(16.dp),
                         color = stageColor
                     ) {
                         Column(
@@ -231,42 +242,45 @@ fun PerforatedTicketCard(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 3-Stage Progress Indicator
-                ThreeStageProgressIndicator(currentStage = stage)
+                ThreeStageProgressIndicator(currentStage = stage, activeColor = stageColor)
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // QR + ETA Row
+                // Interactive QR + ETA Pod
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Box(
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        border = BorderStroke(2.dp, stageColor.copy(alpha = 0.5f)),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(18.dp))
                             .clickable { onZoomQr() }
                             .testTag("ticket_qr_button")
                     ) {
-                        QrCodeCanvas(
-                            payload = "DORI|${booking.ticketCode}|${booking.venueId}|${booking.customerPhone}",
-                            modifier = Modifier.size(106.dp)
-                        )
-                        Surface(
-                            shape = CircleShape,
-                            color = EmeraldPrimary,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ZoomIn,
-                                contentDescription = "تكبير رمز QR",
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .padding(4.dp)
-                                    .size(14.dp)
+                        Box {
+                            QrCodeCanvas(
+                                payload = "DORI|${booking.ticketCode}|${booking.venueId}|${booking.customerPhone}",
+                                modifier = Modifier.size(108.dp)
                             )
+                            Surface(
+                                shape = CircleShape,
+                                color = stageColor,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(5.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ZoomIn,
+                                    contentDescription = "تكبير رمز QR",
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .padding(4.dp)
+                                        .size(14.dp)
+                                )
+                            }
                         }
                     }
 
@@ -275,8 +289,9 @@ fun PerforatedTicketCard(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surface
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                            border = BorderStroke(1.dp, stageColor.copy(alpha = 0.35f))
                         ) {
                             Row(
                                 modifier = Modifier
@@ -308,7 +323,7 @@ fun PerforatedTicketCard(
                         }
 
                         Text(
-                            text = "اضغط على رمز QR للتكبير والمسح عند الاستقبال",
+                            text = "اضغط على رمز QR للتكبير والمسح الضوئي",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -316,7 +331,7 @@ fun PerforatedTicketCard(
                 }
             }
 
-            // Perforated Dashed Line
+            // Perforated Tear Divider
             val outlineColor = MaterialTheme.colorScheme.outline
             Canvas(
                 modifier = Modifier
@@ -333,7 +348,7 @@ fun PerforatedTicketCard(
                 )
             }
 
-            // Lower Stub: Customer Auto-filled info & Actions
+            // Bottom Ticket Stub
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -380,7 +395,7 @@ fun PerforatedTicketCard(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "التكلفة المقدرة: ${IntentHelpers.formatDinar(booking.priceDinar)}",
+                        text = "التكلفة: ${IntentHelpers.formatDinar(booking.priceDinar)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -393,7 +408,6 @@ fun PerforatedTicketCard(
                     }
                 }
 
-                // Actions: WhatsApp Share + Complete + Cancel
                 OutlinedButton(
                     onClick = onShareWhatsApp,
                     modifier = Modifier
@@ -415,7 +429,7 @@ fun PerforatedTicketCard(
                 ) {
                     Button(
                         onClick = onCompleteClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier
                             .weight(1f)
                             .testTag("complete_ticket_button")
@@ -451,7 +465,7 @@ fun PerforatedTicketCard(
 }
 
 @Composable
-private fun ThreeStageProgressIndicator(currentStage: TicketStage) {
+private fun ThreeStageProgressIndicator(currentStage: TicketStage, activeColor: Color) {
     val stages = TicketStage.entries
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -463,7 +477,7 @@ private fun ThreeStageProgressIndicator(currentStage: TicketStage) {
             val dotColor = when {
                 isCurrent && stage == TicketStage.YOUR_TURN -> StatusOpen
                 isCurrent && stage == TicketStage.APPROACHING -> AmberGold
-                reached -> EmeraldPrimary
+                reached -> activeColor
                 else -> MaterialTheme.colorScheme.outline
             }
 
@@ -473,7 +487,7 @@ private fun ThreeStageProgressIndicator(currentStage: TicketStage) {
             ) {
                 Box(
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(30.dp)
                         .clip(CircleShape)
                         .background(if (reached) dotColor else MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
@@ -508,7 +522,7 @@ private fun ThreeStageProgressIndicator(currentStage: TicketStage) {
                         .width(24.dp)
                         .height(3.dp)
                         .background(
-                            if (index < currentStage.stepIndex) EmeraldPrimary else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                            if (index < currentStage.stepIndex) activeColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
                             RoundedCornerShape(2.dp)
                         )
                 )

@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -251,6 +252,7 @@ fun MerchantDashboardScreen(
             item {
                 Card(
                     shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     modifier = Modifier.fillMaxWidth()
@@ -489,6 +491,7 @@ private fun MerchantStatCard(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         tonalElevation = 2.dp,
+        border = BorderStroke(1.dp, tint.copy(alpha = 0.28f)),
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(
@@ -518,6 +521,7 @@ private fun QueueWaitingRow(
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth()

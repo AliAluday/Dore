@@ -145,8 +145,6 @@ class DoriRepository(
             )
         )
 
-        prefs.ensureMandatorySaved(cleanName, cleanPhone)
-
         return Result.success(savedBooking)
     }
 
@@ -160,31 +158,6 @@ class DoriRepository(
         return candidates
             .filter { it.isOpen && it.isAcceptingBookings && !it.isPaused }
             .minByOrNull { it.estimatedWaitMinutes }
-    }
-
-    suspend fun bookFastestTurnInDistrict(district: NinevehDistrict): Result<BookingEntity> {
-        val currentUser = prefs.userPreferences.first()
-        if (!currentUser.hasMandatoryInfo) {
-            return Result.failure(IllegalStateException("يرجى تسجيل الاسم ورقم الهاتف الإلزاميين أولاً"))
-        }
-        val fastest = findFastestVenueInDistrict(district)
-            ?: return Result.failure(IllegalStateException("لا توجد أماكن متاحة للحجز السريع في ${district.displayName} حالياً"))
-
-        return bookQueueTicket(
-            venueId = fastest.id,
-            customerName = currentUser.userName,
-            customerPhone = currentUser.userPhone,
-            selectedOption = fastest.customOptions.firstOrNull() ?: "دور سريع",
-            optionalInfo = buildOptionalSummary(currentUser.userAge, currentUser.optionalNote)
-        )
-    }
-
-    private fun buildOptionalSummary(age: String, note: String): String = buildString {
-        if (age.isNotBlank()) append("العمر: ${age.trim()}")
-        if (note.isNotBlank()) {
-            if (isNotEmpty()) append(" • ")
-            append(note.trim())
-        }
     }
 
     suspend fun completeBookingWithOptionalReview(

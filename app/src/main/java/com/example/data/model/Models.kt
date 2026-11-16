@@ -136,11 +136,6 @@ enum class DoctorVisitType(val displayName: String, val priceMultiplier: Double)
     CONSULTATION("استشارة سريعة", 0.75)
 }
 
-enum class DoctorTimePeriod(val displayName: String, val rangeText: String) {
-    MORNING("الفترة الصباحية", "09:00 ص - 01:30 م"),
-    EVENING("الفترة المسائية", "04:00 م - 10:00 م")
-}
-
 enum class DoctorUrgency(val displayName: String) {
     NORMAL("اعتيادي"),
     URGENT("حالة مستعجلة")

@@ -158,4 +158,32 @@ class ExampleRobolectricTest {
         )
         assertEquals(payload, decoded.text)
     }
+
+    @Test
+    fun `same-day qr payload encodes fresh customer details independently`() {
+        val firstGuest = com.example.data.local.BookingEntity(
+            ticketCode = "NIN-2-1",
+            queueNumber = 1,
+            venueId = 2,
+            venueName = "ورشة الحدباء",
+            venueCity = "الموصل - الأيسر",
+            venueCategory = "صيانة",
+            venuePhone = "+9647702223344",
+            customerName = "أحمد محمود",
+            customerPhone = "07701112233",
+            selectedOption = "فحص كمبيوتر",
+            priceDinar = 25000
+        )
+        val secondGuest = firstGuest.copy(
+            ticketCode = "NIN-2-2",
+            queueNumber = 2,
+            customerName = "زينب كريم",
+            customerPhone = "07509998877"
+        )
+        val payload1 = QrCodeGenerator.buildTicketPayload(firstGuest)
+        val payload2 = QrCodeGenerator.buildTicketPayload(secondGuest)
+        assertTrue(payload1.contains("أحمد محمود"))
+        assertTrue(payload2.contains("زينب كريم"))
+        assertFalse(payload2.contains("أحمد محمود"))
+    }
 }

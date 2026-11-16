@@ -143,15 +143,31 @@ fun ExploreScreen(
                                 .padding(18.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "نينوى • ${state.preferences.selectedDistrict.displayName}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MintPrimaryDark,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color.White.copy(alpha = 0.14f)
+                                    ) {
+                                        Text(
+                                            text = "حجز بنفس اليوم",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
                                 Text(
-                                    text = "نينوى • ${state.preferences.selectedDistrict.displayName}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MintPrimaryDark,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "اضغط على أي مكان للحجز المباشر",
+                                    text = "احجز دورك وأنت في مكانك",
                                     style = MaterialTheme.typography.titleLarge,
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold
@@ -435,12 +451,15 @@ fun ExploreScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            if (state.selectedArea != null) {
+                            if (state.selectedArea != null || state.searchQuery.isNotBlank()) {
                                 Button(
-                                    onClick = { onSelectArea(null) },
+                                    onClick = {
+                                        onSelectArea(null)
+                                        onSearchChange("")
+                                    },
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                                 ) {
-                                    Text("عرض جميع مناطق ${state.preferences.selectedDistrict.displayName}")
+                                    Text("عرض جميع مراكز ${state.preferences.selectedDistrict.displayName}")
                                 }
                             }
                         }
@@ -451,7 +470,6 @@ fun ExploreScreen(
                     FuturisticVenueCard(
                         venue = venue,
                         onDirectBook = { onDirectBookVenue(venue) },
-                        onOpenCustomize = { onVenueClick(venue) },
                         onToggleFavorite = { onToggleFavorite(venue) }
                     )
                 }
@@ -521,7 +539,6 @@ private fun NeoStatCard(
 private fun FuturisticVenueCard(
     venue: VenueEntity,
     onDirectBook: () -> Unit,
-    onOpenCustomize: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
     val isAvailable = venue.isOpen && venue.isAcceptingBookings
@@ -532,7 +549,7 @@ private fun FuturisticVenueCard(
     }
 
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -547,7 +564,7 @@ private fun FuturisticVenueCard(
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Concise Header: Name, Area + Status dot, Favorite
+            // Concise Header: Name, Area + Status dot, Same-Day tag, Favorite
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -569,7 +586,8 @@ private fun FuturisticVenueCard(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                     }
                     Spacer(modifier = Modifier.height(2.dp))
@@ -583,18 +601,36 @@ private fun FuturisticVenueCard(
                     )
                 }
 
-                IconButton(
-                    onClick = onToggleFavorite,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .clip(CircleShape)
-                        .testTag("favorite_toggle_${venue.id}")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(
-                        imageVector = if (venue.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "المفضلة",
-                        tint = if (venue.isFavorite) StatusUrgent else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Surface(
+                        shape = CircleShape,
+                        color = StatusOpen.copy(alpha = 0.12f)
+                    ) {
+                        Text(
+                            text = "★ ${venue.rating}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AmberGold,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onToggleFavorite,
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .clip(CircleShape)
+                            .testTag("favorite_toggle_${venue.id}")
+                    ) {
+                        Icon(
+                            imageVector = if (venue.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "المفضلة",
+                            tint = if (venue.isFavorite) StatusUrgent else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
@@ -627,38 +663,22 @@ private fun FuturisticVenueCard(
                 )
             }
 
-            // Direct 1-Tap Booking Button + Compact Customize Button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // Single Sleek Direct Same-Day Booking CTA
+            Button(
+                onClick = onDirectBook,
+                enabled = isAvailable,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("direct_book_venue_${venue.id}")
             ) {
-                Button(
-                    onClick = onDirectBook,
-                    enabled = isAvailable,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(46.dp)
-                        .testTag("direct_book_venue_${venue.id}")
-                ) {
-                    Text(
-                        text = if (isAvailable) "احجز مباشرة (#${venue.nextTicketNumber})" else "الاستقبال متوقف",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                androidx.compose.material3.OutlinedButton(
-                    onClick = onOpenCustomize,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .height(46.dp)
-                        .testTag("customize_venue_${venue.id}")
-                ) {
-                    Text("تخصيص", style = MaterialTheme.typography.labelMedium)
-                }
+                Text(
+                    text = if (isAvailable) "احجز الآن بنفس اليوم (#${venue.nextTicketNumber})" else "الاستقبال متوقف",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }

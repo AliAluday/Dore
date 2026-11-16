@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,7 +26,6 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ConfirmationNumber
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Groups
@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,7 +50,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -69,7 +69,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.data.local.ReviewEntity
 import com.example.data.local.VenueEntity
-import com.example.data.model.DoctorTimePeriod
 import com.example.data.model.DoctorUrgency
 import com.example.data.model.DoctorVisitType
 import com.example.data.model.FieldBookingDuration
@@ -84,8 +83,8 @@ import com.example.util.IntentHelpers
 @Composable
 fun VenueDetailsSheet(
     venue: VenueEntity,
+    bookingSessionId: Long,
     reviews: List<ReviewEntity>,
-    userProfile: UserProfileSettings,
     onDismiss: () -> Unit,
     onConfirmBooking: (
         customerName: String,
@@ -103,36 +102,28 @@ fun VenueDetailsSheet(
     val isClinic = venue.category == ServiceCategory.CLINICS.displayName
     val isLab = venue.category == ServiceCategory.LABS.displayName
 
-    var selectedOption by remember(venue.id) {
+    // Fresh per-booking selections & blank user inputs on every new booking session
+    var selectedOption by remember(venue.id, bookingSessionId) {
         mutableStateOf(venue.customOptions.firstOrNull() ?: "خدمة عامة")
     }
-    var selectedHours by remember(venue.id) {
+    var selectedHours by remember(venue.id, bookingSessionId) {
         mutableDoubleStateOf(FieldBookingDuration.MIN_HOURS)
     }
-    var doctorVisitType by remember(venue.id) { mutableStateOf(DoctorVisitType.NEW_CHECKUP) }
-    var doctorPeriod by remember(venue.id) { mutableStateOf(DoctorTimePeriod.EVENING) }
-    var doctorUrgency by remember(venue.id) { mutableStateOf(DoctorUrgency.NORMAL) }
-    var labFasting by remember(venue.id) { mutableStateOf(false) }
+    var doctorVisitType by remember(venue.id, bookingSessionId) {
+        mutableStateOf(DoctorVisitType.NEW_CHECKUP)
+    }
+    var doctorUrgency by remember(venue.id, bookingSessionId) {
+        mutableStateOf(DoctorUrgency.NORMAL)
+    }
+    var labFasting by remember(venue.id, bookingSessionId) { mutableStateOf(false) }
 
-    // Mandatory fields
-    var customerName by remember(venue.id, userProfile.userName) {
-        mutableStateOf(userProfile.userName)
-    }
-    var customerPhone by remember(venue.id, userProfile.userPhone) {
-        mutableStateOf(userProfile.userPhone)
-    }
-    var editingMandatory by remember(venue.id) { mutableStateOf(!userProfile.hasMandatoryInfo) }
-
-    // Optional fields (collapsed by default to reduce clutter)
-    var showOptionalFields by remember(venue.id) { mutableStateOf(false) }
-    var optionalAge by remember(venue.id, userProfile.userAge) {
-        mutableStateOf(userProfile.userAge)
-    }
-    var optionalNote by remember(venue.id, userProfile.optionalNote) {
-        mutableStateOf(userProfile.optionalNote)
-    }
-    var showReviews by remember(venue.id) { mutableStateOf(false) }
-    var hasAttemptedSubmit by remember(venue.id) { mutableStateOf(false) }
+    var customerName by remember(venue.id, bookingSessionId) { mutableStateOf("") }
+    var customerPhone by remember(venue.id, bookingSessionId) { mutableStateOf("") }
+    var showOptionalFields by remember(venue.id, bookingSessionId) { mutableStateOf(false) }
+    var optionalAge by remember(venue.id, bookingSessionId) { mutableStateOf("") }
+    var optionalNote by remember(venue.id, bookingSessionId) { mutableStateOf("") }
+    var showReviews by remember(venue.id, bookingSessionId) { mutableStateOf(false) }
+    var hasAttemptedSubmit by remember(venue.id, bookingSessionId) { mutableStateOf(false) }
 
     val isNameValid = UserProfileSettings.isValidFullName(customerName)
     val isPhoneValid = UserProfileSettings.isValidPhone(customerPhone)
@@ -152,19 +143,45 @@ fun VenueDetailsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .navigationBarsPadding()
                 .padding(bottom = 22.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Minimal Header + Quick Contact Icons (no verbose descriptions)
+            // Concise Venue Header + Contact Actions
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
+                    Surface(
+                        shape = CircleShape,
+                        color = StatusOpen.copy(alpha = 0.14f),
+                        border = BorderStroke(1.dp, StatusOpen.copy(alpha = 0.35f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Today,
+                                contentDescription = null,
+                                tint = StatusOpen,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "حجز بنفس اليوم • دور مباشر",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = StatusOpen,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = venue.name,
                         style = MaterialTheme.typography.titleLarge,
@@ -178,11 +195,13 @@ fun VenueDetailsSheet(
                     )
                 }
 
+                Spacer(modifier = Modifier.width(8.dp))
+
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilledTonalIconButton(
                         onClick = { IntentHelpers.dialPhone(context, venue.phone) },
                         modifier = Modifier
-                            .size(42.dp)
+                            .size(44.dp)
                             .testTag("venue_detail_call_button")
                     ) {
                         Icon(Icons.Default.Phone, contentDescription = "اتصال", modifier = Modifier.size(18.dp))
@@ -192,7 +211,7 @@ fun VenueDetailsSheet(
                             IntentHelpers.openMapLocation(context, venue.latitude, venue.longitude, venue.name)
                         },
                         modifier = Modifier
-                            .size(42.dp)
+                            .size(44.dp)
                             .testTag("venue_detail_map_button")
                     ) {
                         Icon(Icons.Default.LocationOn, contentDescription = "الموقع", modifier = Modifier.size(18.dp))
@@ -202,7 +221,7 @@ fun VenueDetailsSheet(
                             IntentHelpers.openMessaging(context, venue.whatsapp, "مرحباً، أود الحجز في ${venue.name}")
                         },
                         modifier = Modifier
-                            .size(42.dp)
+                            .size(44.dp)
                             .testTag("venue_detail_message_button")
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "رسالة", modifier = Modifier.size(18.dp))
@@ -210,7 +229,7 @@ fun VenueDetailsSheet(
                 }
             }
 
-            // Compact 3-Metric Queue Summary
+            // 3-Metric Queue Summary: Sequential #1+ Ticket, People Ahead, Queue ETA
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -238,7 +257,7 @@ fun VenueDetailsSheet(
                 )
             }
 
-            // Compact Service Options
+            // Service Options
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -346,7 +365,7 @@ fun VenueDetailsSheet(
                 }
             }
 
-            // Clinics Compact Medical Selection
+            // Clinics Same-Day Visit Type & Urgency (Time-of-day periods removed)
             if (isClinic) {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -373,14 +392,6 @@ fun VenueDetailsSheet(
                             }
                         }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            DoctorTimePeriod.entries.forEach { period ->
-                                FilterChip(
-                                    selected = doctorPeriod == period,
-                                    onClick = { doctorPeriod = period },
-                                    label = { Text(period.displayName, style = MaterialTheme.typography.labelSmall) },
-                                    modifier = Modifier.testTag("doctor_period_${period.name.lowercase()}")
-                                )
-                            }
                             DoctorUrgency.entries.forEach { urgency ->
                                 val isUrgent = urgency == DoctorUrgency.URGENT
                                 FilterChip(
@@ -390,7 +401,8 @@ fun VenueDetailsSheet(
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = if (isUrgent) StatusUrgent else MaterialTheme.colorScheme.primary,
                                         selectedLabelColor = Color.White
-                                    )
+                                    ),
+                                    modifier = Modifier.testTag("doctor_urgency_${urgency.name.lowercase()}")
                                 )
                             }
                         }
@@ -406,123 +418,105 @@ fun VenueDetailsSheet(
                 )
             }
 
-            // MANDATORY USER INFO: Compact summary if saved, expanded form if missing or editing
-            if (!editingMandatory && isNameValid && isPhoneValid) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.fillMaxWidth()
+            // MANDATORY CUSTOMER INFO: Always entered fresh from the beginning on every booking
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                border = BorderStroke(
+                    1.2.dp,
+                    if (hasAttemptedSubmit && (!isNameValid || !isPhoneValid)) StatusUrgent
+                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "بيانات الحجز الجديد",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Surface(shape = CircleShape, color = StatusUrgent.copy(alpha = 0.16f)) {
                             Text(
-                                text = "$customerName • $customerPhone",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold
+                                text = "إلزامي *",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = StatusUrgent,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
                             )
                         }
-                        TextButton(onClick = { editingMandatory = true }) {
-                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("تعديل")
-                        }
                     }
-                }
-            } else {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                    border = BorderStroke(
-                        1.dp,
-                        if (hasAttemptedSubmit && (!isNameValid || !isPhoneValid)) StatusUrgent
-                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text = "معلوماتك للحجز",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Surface(shape = CircleShape, color = StatusUrgent.copy(alpha = 0.16f)) {
-                                Text(
-                                    text = "إلزامي *",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = StatusUrgent,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
 
-                        OutlinedTextField(
-                            value = customerName,
-                            onValueChange = { customerName = it },
-                            label = { Text("الاسم الكامل *") },
-                            placeholder = { Text("مثال: علي حسين الجبوري") },
-                            isError = hasAttemptedSubmit && !isNameValid,
-                            supportingText = if (hasAttemptedSubmit && !isNameValid) {
-                                { Text("الاسم الكامل إلزامي (3 أحرف على الأقل)", color = StatusUrgent) }
-                            } else null,
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("booking_name_input")
-                        )
+                    OutlinedTextField(
+                        value = customerName,
+                        onValueChange = { customerName = it },
+                        label = { Text("الاسم الكامل *") },
+                        placeholder = { Text("أدخل الاسم الثلاثي لهذا الحجز") },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        isError = hasAttemptedSubmit && !isNameValid,
+                        supportingText = if (hasAttemptedSubmit && !isNameValid) {
+                            { Text("الاسم الكامل إلزامي (3 أحرف على الأقل)", color = StatusUrgent) }
+                        } else null,
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("booking_name_input")
+                    )
 
-                        OutlinedTextField(
-                            value = customerPhone,
-                            onValueChange = { customerPhone = it },
-                            label = { Text("رقم الهاتف *") },
-                            placeholder = { Text("0770xxxxxxx") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            isError = hasAttemptedSubmit && !isPhoneValid,
-                            supportingText = if (hasAttemptedSubmit && !isPhoneValid) {
-                                { Text("رقم الهاتف إلزامي (10 إلى 14 رقماً)", color = StatusUrgent) }
-                            } else null,
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("booking_phone_input")
-                        )
-                    }
+                    OutlinedTextField(
+                        value = customerPhone,
+                        onValueChange = { customerPhone = it },
+                        label = { Text("رقم الهاتف *") },
+                        placeholder = { Text("0770xxxxxxx") },
+                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        isError = hasAttemptedSubmit && !isPhoneValid,
+                        supportingText = if (hasAttemptedSubmit && !isPhoneValid) {
+                            { Text("رقم الهاتف إلزامي (10 إلى 14 رقماً)", color = StatusUrgent) }
+                        } else null,
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("booking_phone_input")
+                    )
                 }
             }
 
-            // Collapsible Optional Information Row
-            Row(
+            // Collapsible Optional Information
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { showOptionalFields = !showOptionalFields }
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "معلومات اختيارية (العمر أو ملاحظة)",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Icon(
-                    imageVector = if (showOptionalFields) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "معلومات اختيارية (العمر أو ملاحظة)",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Icon(
+                        imageVector = if (showOptionalFields) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             AnimatedVisibility(visible = showOptionalFields) {
@@ -551,18 +545,15 @@ fun VenueDetailsSheet(
                 }
             }
 
-            // Primary Direct Confirm Button
+            // Primary Confirm & Generate Scannable QR Button
             Button(
                 onClick = {
                     hasAttemptedSubmit = true
-                    if (!isNameValid || !isPhoneValid) {
-                        editingMandatory = true
-                        return@Button
-                    }
+                    if (!isNameValid || !isPhoneValid) return@Button
 
                     val finalOption = when {
                         isField -> "$selectedOption • ${FieldBookingDuration.shortLabel(selectedHours)}"
-                        isClinic -> "$selectedOption • ${doctorVisitType.displayName} (${doctorPeriod.displayName})"
+                        isClinic -> "$selectedOption • ${doctorVisitType.displayName}"
                         isLab && labFasting -> "$selectedOption • صائم"
                         else -> selectedOption
                     }
@@ -610,7 +601,7 @@ fun VenueDetailsSheet(
                 )
             }
 
-            // Optional Collapsed Customer Reviews
+            // Collapsible Customer Reviews
             if (reviews.isNotEmpty()) {
                 Row(
                     modifier = Modifier

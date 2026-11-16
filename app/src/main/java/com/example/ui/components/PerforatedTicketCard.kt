@@ -196,18 +196,35 @@ fun PerforatedTicketCard(
                     verticalAlignment = Alignment.Top
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = stageColor.copy(alpha = 0.16f),
-                            border = BorderStroke(1.dp, stageColor.copy(alpha = 0.45f))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "${booking.venueCategory} • ${booking.venueCity}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = stageColor,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = stageColor.copy(alpha = 0.16f),
+                                border = BorderStroke(1.dp, stageColor.copy(alpha = 0.45f))
+                            ) {
+                                Text(
+                                    text = "${booking.venueCategory} • ${booking.venueCity}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = stageColor,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = StatusOpen.copy(alpha = 0.14f)
+                            ) {
+                                Text(
+                                    text = "نفس اليوم",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = StatusOpen,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
@@ -559,7 +576,8 @@ private fun ThreeStageProgressIndicator(currentStage: TicketStage, activeColor: 
                     text = stage.label,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                    color = if (reached) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (reached) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
                 )
             }
 

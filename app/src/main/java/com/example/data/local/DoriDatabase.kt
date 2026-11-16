@@ -902,7 +902,7 @@ object SeedData {
         ReviewEntity(venueId = 4, authorName = "زيد الدليمي", rating = 5, comment = "ملاعب الغابات ممتازة وتحديد الساعات بالنظام الجديد عملي جداً."),
         ReviewEntity(venueId = 5, authorName = "زينب العبيدي", rating = 5, comment = "نتائج سريعة ودقيقة في المهندسين."),
         ReviewEntity(venueId = 9, authorName = "حيدر الحمداني", rating = 5, comment = "تنظيم ممتاز في الدواسة وخدمة طبية محترمة."),
-        ReviewEntity(venueId = 34, authorName = "أم يوسف", rating = 5, comment = "الدكتورة متعاونة جداً وحجز الفترة الصباحية مريح للأطفال."),
+        ReviewEntity(venueId = 34, authorName = "أم يوسف", rating = 5, comment = "الدكتورة متعاونة جداً وحجز الدور بنفس اليوم مريح للأطفال."),
         ReviewEntity(venueId = 35, authorName = "مها النعيمي", rating = 5, comment = "نتائج ممتازة في حي الجامعة وتنظيم راقي."),
         ReviewEntity(venueId = 36, authorName = "باسل الشمري", rating = 5, comment = "استقبال الحالات المستعجلة سريع والطبيب متمكن."),
         ReviewEntity(venueId = 14, authorName = "كرم التلعفري", rating = 5, comment = "خدمة سريعة ونظام طابور منظم في تلعفر."),

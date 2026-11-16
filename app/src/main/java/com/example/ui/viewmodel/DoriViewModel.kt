@@ -65,6 +65,7 @@ data class DoriUiState(
     val isLiveSimulationRunning: Boolean = false,
     val activeTurnAlert: LiveTurnAlert? = null,
     val selectedVenueForDetails: VenueEntity? = null,
+    val bookingSessionId: Long = 0L,
     val newlyBookedTicket: BookingEntity? = null
 )
 
@@ -81,6 +82,7 @@ private data class FilterState(
     val isLiveSimulationRunning: Boolean = false,
     val activeTurnAlert: LiveTurnAlert? = null,
     val selectedVenueIdForDetails: Int? = null,
+    val bookingSessionId: Long = 0L,
     val newlyBookedTicket: BookingEntity? = null
 )
 
@@ -213,6 +215,7 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
             isLiveSimulationRunning = filters.isLiveSimulationRunning,
             activeTurnAlert = filters.activeTurnAlert,
             selectedVenueForDetails = detailVenue,
+            bookingSessionId = filters.bookingSessionId,
             newlyBookedTicket = filters.newlyBookedTicket
         )
     }.stateIn(
@@ -286,7 +289,12 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openVenueDetails(venueId: Int?) {
-        filterState.update { it.copy(selectedVenueIdForDetails = venueId) }
+        filterState.update {
+            it.copy(
+                selectedVenueIdForDetails = venueId,
+                bookingSessionId = if (venueId != null) it.bookingSessionId + 1L else it.bookingSessionId
+            )
+        }
     }
 
     fun quickBookVenue(venue: VenueEntity) {
@@ -295,40 +303,7 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
                 _toastMessage.emit("هذا المكان متوقف عن استقبال الحجوزات حالياً")
                 return@launch
             }
-            val prefsNow = uiState.value.preferences
-            if (!prefsNow.hasMandatoryInfo) {
-                openVenueDetails(venue.id)
-                _toastMessage.emit("سجّل الاسم ورقم الهاتف لمرة واحدة للحجز المباشر")
-                return@launch
-            }
-            val defaultOption = when (venue.category) {
-                ServiceCategory.FIELDS.displayName ->
-                    "${venue.customOptions.firstOrNull() ?: "ملعب"} • ${com.example.data.model.FieldBookingDuration.shortLabel(com.example.data.model.FieldBookingDuration.MIN_HOURS)}"
-                ServiceCategory.CLINICS.displayName ->
-                    "${venue.customOptions.firstOrNull() ?: "كشف"} • ${com.example.data.model.DoctorVisitType.NEW_CHECKUP.displayName}"
-                else -> venue.customOptions.firstOrNull() ?: "حجز مباشر"
-            }
-            val defaultPrice = if (venue.category == ServiceCategory.FIELDS.displayName) {
-                (venue.priceDinar * com.example.data.model.FieldBookingDuration.MIN_HOURS).toInt()
-            } else {
-                venue.priceDinar
-            }
-            val optionalSummary = buildString {
-                if (prefsNow.userAge.isNotBlank()) append("العمر: ${prefsNow.userAge.trim()}")
-                if (prefsNow.optionalNote.isNotBlank()) {
-                    if (isNotEmpty()) append(" • ")
-                    append(prefsNow.optionalNote.trim())
-                }
-            }
-            bookTicket(
-                venueId = venue.id,
-                customerName = prefsNow.userName,
-                customerPhone = prefsNow.userPhone,
-                selectedOption = defaultOption,
-                notes = "",
-                optionalInfo = optionalSummary,
-                customPriceDinar = defaultPrice
-            )
+            openVenueDetails(venue.id)
         }
     }
 
@@ -371,32 +346,13 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
 
     fun bookFastestTurn() {
         viewModelScope.launch {
-            val prefsNow = uiState.value.preferences
-            val district = prefsNow.selectedDistrict
-            if (!prefsNow.hasMandatoryInfo) {
-                val fastest = repository.findFastestVenueInDistrict(district)
-                if (fastest != null) {
-                    openVenueDetails(fastest.id)
-                    _toastMessage.emit("يرجى تسجيل معلوماتك الإلزامية (الاسم والهاتف) أولاً لإصدار التذكرة")
-                } else {
-                    _toastMessage.emit("لا توجد أماكن متاحة للحجز السريع في ${district.displayName} حالياً")
-                }
-                return@launch
-            }
-            val result = repository.bookFastestTurnInDistrict(district)
-            result.onSuccess { booking ->
-                DoriNotificationHelper.showBookingCreatedNotification(getApplication(), booking)
-                filterState.update {
-                    it.copy(
-                        selectedActiveBookingId = booking.id,
-                        newlyBookedTicket = booking,
-                        currentTab = AppTab.TICKETS,
-                        selectedMerchantVenueId = booking.venueId
-                    )
-                }
-                _toastMessage.emit("⚡ تم إصدار تكت #${booking.queueNumber} لأسرع دور في ${booking.venueName}")
-            }.onFailure { err ->
-                _toastMessage.emit(err.message ?: "لا يوجد دور متاح حالياً")
+            val district = uiState.value.preferences.selectedDistrict
+            val fastest = repository.findFastestVenueInDistrict(district)
+            if (fastest != null) {
+                openVenueDetails(fastest.id)
+                _toastMessage.emit("⚡ أسرع دور متاح في ${fastest.name} — أدخل معلومات الحجز")
+            } else {
+                _toastMessage.emit("لا توجد أماكن متاحة للحجز السريع في ${district.displayName} حالياً")
             }
         }
     }
@@ -431,22 +387,10 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun quickRebook(historyBooking: BookingEntity) {
-        val prefsNow = uiState.value.preferences
-        if (!prefsNow.hasMandatoryInfo) {
-            openVenueDetails(historyBooking.venueId)
-            viewModelScope.launch {
-                _toastMessage.emit("يرجى تسجيل معلوماتك الإلزامية (الاسم والهاتف) لإعادة الحجز")
-            }
-            return
+        openVenueDetails(historyBooking.venueId)
+        viewModelScope.launch {
+            _toastMessage.emit("أدخل معلومات الحجز الجديد لنفس اليوم")
         }
-        bookTicket(
-            venueId = historyBooking.venueId,
-            customerName = prefsNow.userName,
-            customerPhone = prefsNow.userPhone,
-            selectedOption = historyBooking.selectedOption,
-            notes = historyBooking.notes,
-            optionalInfo = historyBooking.optionalInfo
-        )
     }
 
     // Merchant Dashboard actions

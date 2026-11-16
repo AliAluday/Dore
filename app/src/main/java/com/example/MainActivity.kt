@@ -247,8 +247,8 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
                 state.selectedVenueForDetails?.let { venue ->
                     VenueDetailsSheet(
                         venue = venue,
+                        bookingSessionId = state.bookingSessionId,
                         reviews = state.reviewsByVenue[venue.id].orEmpty(),
-                        userProfile = state.preferences,
                         onDismiss = { viewModel.openVenueDetails(null) },
                         onConfirmBooking = { name, phone, option, notes, optionalInfo, calculatedPrice ->
                             viewModel.bookTicket(

@@ -69,17 +69,6 @@ class UserPreferencesDataStore(private val context: Context) {
         }
     }
 
-    suspend fun ensureMandatorySaved(name: String, phone: String) {
-        context.dataStore.edit {
-            if (it[Keys.USER_NAME].isNullOrBlank()) {
-                it[Keys.USER_NAME] = name.trim()
-            }
-            if (it[Keys.USER_PHONE].isNullOrBlank()) {
-                it[Keys.USER_PHONE] = phone.trim()
-            }
-        }
-    }
-
     suspend fun addLoyaltyPoints(delta: Int) {
         context.dataStore.edit {
             val current = it[Keys.LOYALTY_POINTS] ?: 60

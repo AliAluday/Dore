@@ -273,7 +273,7 @@ fun ProfileScreen(
                         }
 
                         Text(
-                            text = "تسجيل الاسم الكامل ورقم الهاتف إلزامي لإصدار التذاكر وحفظها محلياً على جهازك.",
+                            text = "تُدخل بيانات الزبون من البداية عند كل حجز جديد، بينما تُحفظ هنا إعدادات حسابك الشخصي وقضاء نينوى الافتراضي محلياً على جهازك.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

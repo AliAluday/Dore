@@ -185,6 +185,7 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
                                 onSelectArea = viewModel::selectArea,
                                 onSearchChange = viewModel::updateSearchQuery,
                                 onCategorySelect = viewModel::selectCategory,
+                                onSelectSpecialty = viewModel::selectMedicalSpecialty,
                                 onToggleFavoritesOnly = viewModel::toggleFavoritesFilter,
                                 onSortSelect = viewModel::selectSortOption,
                                 onBookFastestTurn = viewModel::bookFastestTurn,
@@ -248,13 +249,14 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
                         reviews = state.reviewsByVenue[venue.id].orEmpty(),
                         userProfile = state.preferences,
                         onDismiss = { viewModel.openVenueDetails(null) },
-                        onConfirmBooking = { name, phone, option, notes ->
+                        onConfirmBooking = { name, phone, option, notes, calculatedPrice ->
                             viewModel.bookTicket(
                                 venueId = venue.id,
                                 customerName = name,
                                 customerPhone = phone,
                                 selectedOption = option,
-                                notes = notes
+                                notes = notes,
+                                customPriceDinar = calculatedPrice
                             )
                         }
                     )

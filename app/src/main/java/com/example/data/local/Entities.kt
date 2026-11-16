@@ -12,6 +12,7 @@ data class VenueEntity(
     val name: String,
     val city: String,
     val category: String,
+    val specialty: String = "",
     val area: String,
     val priceDinar: Int,
     val rating: Double,

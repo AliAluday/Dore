@@ -120,6 +120,60 @@ enum class ServiceCategory(val displayName: String) {
     }
 }
 
+enum class MedicalSpecialty(val displayName: String) {
+    ALL("كل التخصصات"),
+    DENTAL("طب الأسنان"),
+    INTERNAL("باطنية وقلب"),
+    EYES("طب العيون"),
+    PEDIATRICS("طب الأطفال"),
+    DERMATOLOGY("جلدية وليزر"),
+    ORTHOPEDICS("عظام ومفاصل")
+}
+
+enum class DoctorVisitType(val displayName: String, val priceMultiplier: Double) {
+    NEW_CHECKUP("كشف جديد", 1.0),
+    FOLLOW_UP("مراجعة", 0.5),
+    CONSULTATION("استشارة سريعة", 0.75)
+}
+
+enum class DoctorTimePeriod(val displayName: String, val rangeText: String) {
+    MORNING("الفترة الصباحية", "09:00 ص - 01:30 م"),
+    EVENING("الفترة المسائية", "04:00 م - 10:00 م")
+}
+
+enum class DoctorUrgency(val displayName: String) {
+    NORMAL("اعتيادي"),
+    URGENT("حالة مستعجلة")
+}
+
+object FieldBookingDuration {
+    const val MIN_HOURS = 1.5
+    const val MAX_HOURS = 3.0
+    const val STEP_HOURS = 0.5
+    val validSteps = listOf(1.5, 2.0, 2.5, 3.0)
+
+    fun clamp(hours: Double): Double {
+        val snapped = kotlin.math.round(hours * 2.0) / 2.0
+        return snapped.coerceIn(MIN_HOURS, MAX_HOURS)
+    }
+
+    fun formatArabic(hours: Double): String = when (clamp(hours)) {
+        1.5 -> "ساعة ونصف (1.5 ساعة)"
+        2.0 -> "ساعتان (2.0 ساعة)"
+        2.5 -> "ساعتان ونصف (2.5 ساعة)"
+        3.0 -> "3 ساعات (الحد الأقصى)"
+        else -> "$hours ساعة"
+    }
+
+    fun shortLabel(hours: Double): String = when (clamp(hours)) {
+        1.5 -> "1.5 ساعة"
+        2.0 -> "ساعتان"
+        2.5 -> "2.5 ساعة"
+        3.0 -> "3 ساعات"
+        else -> "$hours س"
+    }
+}
+
 enum class SortOption(val displayName: String) {
     HIGHEST_RATED("الأعلى تقييمًا"),
     SHORTEST_WAIT("الأقل انتظارًا"),

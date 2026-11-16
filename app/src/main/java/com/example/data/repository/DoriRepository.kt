@@ -11,6 +11,7 @@ import com.example.data.model.BookingStatus
 import com.example.data.model.LiveTurnAlert
 import com.example.data.model.NinevehDistrict
 import com.example.data.model.QueueItemStatus
+import com.example.data.model.ServiceCategory
 import com.example.data.model.TicketStage
 import com.example.data.model.UserProfileSettings
 import kotlinx.coroutines.flow.Flow
@@ -29,7 +30,9 @@ class DoriRepository(
     suspend fun ensureSeeded() {
         val currentVenues = dao.observeAllVenues().first()
         val validDistrictNames = NinevehDistrict.selectableDistricts.map { it.displayName }.toSet()
-        val needsReseed = currentVenues.isEmpty() || currentVenues.any { it.city !in validDistrictNames }
+        val needsReseed = currentVenues.isEmpty() ||
+            currentVenues.any { it.city !in validDistrictNames } ||
+            currentVenues.any { it.category == ServiceCategory.CLINICS.displayName && it.specialty.isBlank() }
         if (needsReseed) {
             val venues = SeedData.initialVenues()
             dao.insertVenues(venues)
@@ -54,7 +57,8 @@ class DoriRepository(
         customerName: String,
         customerPhone: String,
         selectedOption: String,
-        notes: String = ""
+        notes: String = "",
+        customPriceDinar: Int? = null
     ): Result<BookingEntity> {
         val venue = dao.getVenueById(venueId)
             ?: return Result.failure(IllegalStateException("المكان غير موجود"))
@@ -87,7 +91,7 @@ class DoriRepository(
             customerPhone = customerPhone.ifBlank { "07700000000" },
             selectedOption = selectedOption.ifBlank { venue.customOptions.firstOrNull() ?: "خدمة قياسية" },
             notes = notes,
-            priceDinar = venue.priceDinar,
+            priceDinar = customPriceDinar ?: venue.priceDinar,
             status = BookingStatus.ACTIVE.name,
             stage = stage.name,
             peopleAhead = peopleAhead,

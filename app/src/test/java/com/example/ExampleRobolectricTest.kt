@@ -3,7 +3,9 @@ package com.example
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.local.SeedData
+import com.example.data.model.FieldBookingDuration
 import com.example.data.model.LoyaltyTier
+import com.example.data.model.MedicalSpecialty
 import com.example.data.model.NinevehDistrict
 import com.example.data.model.ServiceCategory
 import com.example.util.QrCodeGenerator
@@ -34,6 +36,32 @@ class ExampleRobolectricTest {
         assertEquals(NinevehDistrict.selectableDistricts.map { it.displayName }.toSet(), districts)
         assertEquals(ServiceCategory.fiveCategories.map { it.displayName }.toSet(), categories)
         assertTrue(NinevehDistrict.selectableDistricts.all { it.areas.isNotEmpty() })
+    }
+
+    @Test
+    fun `field booking duration strictly enforces 1_5h min to 3_0h max in 0_5h steps`() {
+        assertEquals(1.5, FieldBookingDuration.MIN_HOURS, 0.001)
+        assertEquals(3.0, FieldBookingDuration.MAX_HOURS, 0.001)
+        assertEquals(0.5, FieldBookingDuration.STEP_HOURS, 0.001)
+        assertEquals(listOf(1.5, 2.0, 2.5, 3.0), FieldBookingDuration.validSteps)
+        assertEquals(1.5, FieldBookingDuration.clamp(1.0), 0.001)
+        assertEquals(3.0, FieldBookingDuration.clamp(4.0), 0.001)
+        assertEquals(2.5, FieldBookingDuration.clamp(2.5), 0.001)
+    }
+
+    @Test
+    fun `clinics cover all medical specialties`() {
+        val clinicSpecialties = SeedData.initialVenues()
+            .filter { it.category == ServiceCategory.CLINICS.displayName }
+            .map { it.specialty }
+            .toSet()
+
+        val expected = MedicalSpecialty.entries
+            .filter { it != MedicalSpecialty.ALL }
+            .map { it.displayName }
+            .toSet()
+
+        assertEquals(expected, clinicSpecialties)
     }
 
     @Test

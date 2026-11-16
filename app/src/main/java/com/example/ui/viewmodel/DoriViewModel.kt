@@ -11,6 +11,7 @@ import com.example.data.local.UserPreferencesDataStore
 import com.example.data.local.VenueEntity
 import com.example.data.model.BookingStatus
 import com.example.data.model.LiveTurnAlert
+import com.example.data.model.MedicalSpecialty
 import com.example.data.model.NinevehDistrict
 import com.example.data.model.ServiceCategory
 import com.example.data.model.SortOption
@@ -46,6 +47,7 @@ data class DoriUiState(
     val availableAreas: List<String> = emptyList(),
     val searchQuery: String = "",
     val selectedCategory: ServiceCategory = ServiceCategory.ALL,
+    val selectedSpecialty: MedicalSpecialty = MedicalSpecialty.ALL,
     val showFavoritesOnly: Boolean = false,
     val sortOption: SortOption = SortOption.HIGHEST_RATED,
     val allVenues: List<VenueEntity> = emptyList(),
@@ -71,6 +73,7 @@ private data class FilterState(
     val selectedArea: String? = null,
     val searchQuery: String = "",
     val selectedCategory: ServiceCategory = ServiceCategory.ALL,
+    val selectedSpecialty: MedicalSpecialty = MedicalSpecialty.ALL,
     val showFavoritesOnly: Boolean = false,
     val sortOption: SortOption = SortOption.HIGHEST_RATED,
     val selectedActiveBookingId: Long? = null,
@@ -142,6 +145,9 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
             .filter { venue ->
                 val matchesCategory = filters.selectedCategory == ServiceCategory.ALL ||
                     venue.category == filters.selectedCategory.displayName
+                val matchesSpecialty = filters.selectedCategory != ServiceCategory.CLINICS ||
+                    filters.selectedSpecialty == MedicalSpecialty.ALL ||
+                    venue.specialty == filters.selectedSpecialty.displayName
                 val matchesArea = activeArea == null ||
                     venue.area.contains(activeArea, ignoreCase = true) ||
                     venue.description.contains(activeArea, ignoreCase = true)
@@ -152,8 +158,9 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
                     venue.area.contains(q, ignoreCase = true) ||
                     venue.city.contains(q, ignoreCase = true) ||
                     venue.category.contains(q, ignoreCase = true) ||
+                    venue.specialty.contains(q, ignoreCase = true) ||
                     venue.description.contains(q, ignoreCase = true)
-                matchesCategory && matchesArea && matchesFav && matchesSearch
+                matchesCategory && matchesSpecialty && matchesArea && matchesFav && matchesSearch
             }
             .let { list ->
                 when (filters.sortOption) {
@@ -188,6 +195,7 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
             availableAreas = availableAreas,
             searchQuery = filters.searchQuery,
             selectedCategory = filters.selectedCategory,
+            selectedSpecialty = filters.selectedSpecialty,
             showFavoritesOnly = filters.showFavoritesOnly,
             sortOption = filters.sortOption,
             allVenues = venues,
@@ -251,7 +259,16 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectCategory(category: ServiceCategory) {
-        filterState.update { it.copy(selectedCategory = category) }
+        filterState.update {
+            it.copy(
+                selectedCategory = category,
+                selectedSpecialty = if (category == ServiceCategory.CLINICS) it.selectedSpecialty else MedicalSpecialty.ALL
+            )
+        }
+    }
+
+    fun selectMedicalSpecialty(specialty: MedicalSpecialty) {
+        filterState.update { it.copy(selectedSpecialty = specialty) }
     }
 
     fun toggleFavoritesFilter() {
@@ -277,7 +294,8 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
         customerName: String,
         customerPhone: String,
         selectedOption: String,
-        notes: String = ""
+        notes: String = "",
+        customPriceDinar: Int? = null
     ) {
         viewModelScope.launch {
             val result = repository.bookQueueTicket(
@@ -285,7 +303,8 @@ class DoriViewModel(application: Application) : AndroidViewModel(application) {
                 customerName = customerName,
                 customerPhone = customerPhone,
                 selectedOption = selectedOption,
-                notes = notes
+                notes = notes,
+                customPriceDinar = customPriceDinar
             )
             result.onSuccess { booking ->
                 DoriNotificationHelper.showBookingCreatedNotification(getApplication(), booking)

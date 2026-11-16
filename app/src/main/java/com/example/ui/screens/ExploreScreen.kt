@@ -66,6 +66,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.local.VenueEntity
+import com.example.data.model.MedicalSpecialty
 import com.example.data.model.NinevehDistrict
 import com.example.data.model.ServiceCategory
 import com.example.data.model.SortOption
@@ -85,6 +86,7 @@ fun ExploreScreen(
     onSelectArea: (String?) -> Unit,
     onSearchChange: (String) -> Unit,
     onCategorySelect: (ServiceCategory) -> Unit,
+    onSelectSpecialty: (MedicalSpecialty) -> Unit,
     onToggleFavoritesOnly: () -> Unit,
     onSortSelect: (SortOption) -> Unit,
     onBookFastestTurn: () -> Unit,
@@ -382,6 +384,36 @@ fun ExploreScreen(
                 }
             }
 
+            // Medical Specialties Sub-Filter when Clinics category is selected
+            if (state.selectedCategory == ServiceCategory.CLINICS) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "التخصص الطبي:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.secondary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(MedicalSpecialty.entries) { specialty ->
+                                FilterChip(
+                                    selected = state.selectedSpecialty == specialty,
+                                    onClick = { onSelectSpecialty(specialty) },
+                                    label = { Text(specialty.displayName, style = MaterialTheme.typography.labelMedium) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                                        selectedLabelColor = Color.White
+                                    ),
+                                    modifier = Modifier.testTag("specialty_chip_${specialty.name.lowercase()}")
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Sort Row
             item {
                 LazyRow(
@@ -606,6 +638,15 @@ private fun FuturisticVenueCard(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
+                    if (venue.specialty.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "التخصص: ${venue.specialty}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.secondary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.LocationOn,
@@ -685,7 +726,11 @@ private fun FuturisticVenueCard(
                     }
 
                     Text(
-                        text = IntentHelpers.formatDinar(venue.priceDinar),
+                        text = if (venue.category == ServiceCategory.FIELDS.displayName) {
+                            "${IntentHelpers.formatDinar(venue.priceDinar)} / ساعة"
+                        } else {
+                            IntentHelpers.formatDinar(venue.priceDinar)
+                        },
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold

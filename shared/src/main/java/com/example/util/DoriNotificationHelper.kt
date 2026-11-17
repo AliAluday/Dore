@@ -112,6 +112,15 @@ object DoriNotificationHelper {
             builder.setContentIntent(pendingIntent)
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+
         runCatching {
             NotificationManagerCompat.from(context).notify(notificationId, builder.build())
         }

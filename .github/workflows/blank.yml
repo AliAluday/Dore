@@ -11,7 +11,7 @@ permissions:
 jobs:
   build-apks:
     name: Build Dori User & Control APKs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
@@ -71,16 +71,52 @@ jobs:
             "$SDKMANAGER" --sdk_root="$SDK_DIR" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
           fi
 
-      - name: Build Both User & Control Debug APKs
+          if [ -d "$SDK_DIR/platforms/android-36.0" ] && [ ! -e "$SDK_DIR/platforms/android-36" ]; then
+            ln -s "$SDK_DIR/platforms/android-36.0" "$SDK_DIR/platforms/android-36"
+          fi
+
+      - name: Build User Debug APK (:app)
+        shell: bash
         env:
-          GRADLE_OPTS: "-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
+          GRADLE_OPTS: "-Xmx512m -Dfile.encoding=UTF-8"
         run: |
-          ./gradlew :app:assembleDebug :controlapp:assembleDebug \
+          set -o pipefail
+          ./gradlew :app:assembleDebug \
             --no-daemon \
+            --no-parallel \
             --no-configuration-cache \
             --max-workers=2 \
-            -Dorg.gradle.jvmargs="-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8" \
-            --stacktrace
+            -Dorg.gradle.jvmargs="-Xmx2048m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
+            --stacktrace 2>&1 | tee gradle-build.log
+
+      - name: Build Control Debug APK (:controlapp)
+        shell: bash
+        env:
+          GRADLE_OPTS: "-Xmx512m -Dfile.encoding=UTF-8"
+        run: |
+          set -o pipefail
+          ./gradlew :controlapp:assembleDebug \
+            --no-daemon \
+            --no-parallel \
+            --no-configuration-cache \
+            --max-workers=2 \
+            -Dorg.gradle.jvmargs="-Xmx2048m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
+            --stacktrace 2>&1 | tee -a gradle-build.log
+
+      - name: Print Gradle failure details
+        if: failure()
+        shell: bash
+        run: |
+          echo "## Gradle Build Failure Log" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f gradle-build.log ]; then
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            grep -E "FAILURE:|What went wrong:|Execution failed|Caused by:|ERROR:|e:" gradle-build.log | head -n 40 >> "$GITHUB_STEP_SUMMARY" || true
+            echo "--- LAST 60 LINES ---" >> "$GITHUB_STEP_SUMMARY"
+            tail -n 60 gradle-build.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "gradle-build.log not found." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Package User and Control APKs
         shell: bash

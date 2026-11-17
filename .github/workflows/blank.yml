@@ -33,16 +33,12 @@ jobs:
         with:
           cache-provider: 'basic'
 
-      - name: Prepare wrapper, signing keystore, env, and SDK licenses
+      - name: Prepare wrapper, keystore, and SDK environment
         shell: bash
         run: |
           set -euo pipefail
           rm -f local.properties
           chmod +x gradlew
-
-          if [ ! -f .env ] && [ -f .env.example ]; then
-            cp .env.example .env
-          fi
 
           if [ ! -f debug.keystore ]; then
             if [ -f debug.keystore.base64 ]; then
@@ -63,16 +59,18 @@ jobs:
           mkdir -p "$HOME/.android"
           touch "$HOME/.android/repositories.cfg"
 
+          if [ -d "$SDK_DIR/platforms/android-36.0" ] && [ ! -e "$SDK_DIR/platforms/android-36" ]; then
+            ln -s "$SDK_DIR/platforms/android-36.0" "$SDK_DIR/platforms/android-36"
+          fi
+
           SDKMANAGER="$(command -v sdkmanager || find "$SDK_DIR/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1 || true)"
           if [ -n "$SDKMANAGER" ] && [ -x "$SDKMANAGER" ]; then
             set +o pipefail
             yes | "$SDKMANAGER" --sdk_root="$SDK_DIR" --licenses >/dev/null 2>&1 || true
+            if [ ! -d "$SDK_DIR/platforms/android-36" ]; then
+              yes | "$SDKMANAGER" --sdk_root="$SDK_DIR" "platform-tools" "platforms;android-36" "build-tools;36.0.0" || true
+            fi
             set -o pipefail
-            "$SDKMANAGER" --sdk_root="$SDK_DIR" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-          fi
-
-          if [ -d "$SDK_DIR/platforms/android-36.0" ] && [ ! -e "$SDK_DIR/platforms/android-36" ]; then
-            ln -s "$SDK_DIR/platforms/android-36.0" "$SDK_DIR/platforms/android-36"
           fi
 
       - name: Build User Debug APK (:app)

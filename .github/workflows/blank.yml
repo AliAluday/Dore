@@ -25,14 +25,30 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Set up Android SDK 36.1
+        uses: android-actions/setup-android@v4
+        with:
+          packages: |
+            platform-tools
+            platforms;android-36.1
+            platforms;android-36
+            build-tools;36.0.0
+
       - name: Set up Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.3.1'
 
-      - name: Prepare Android signing & SDK licenses
+      - name: Prepare signing keystore, env, and SDK licenses
         shell: bash
         run: |
+          set -euo pipefail
+          rm -f local.properties
+
+          if [ ! -f .env ] && [ -f .env.example ]; then
+            cp .env.example .env
+          fi
+
           if [ ! -f debug.keystore ]; then
             if [ -f debug.keystore.base64 ]; then
               base64 -d debug.keystore.base64 > debug.keystore
@@ -42,19 +58,42 @@ jobs:
                 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
             fi
           fi
-          if [ -n "${ANDROID_HOME:-}" ] && [ -x "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" ]; then
-            yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+
+          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          export ANDROID_HOME="$SDK_DIR"
+          export ANDROID_SDK_ROOT="$SDK_DIR"
+          echo "ANDROID_HOME=$SDK_DIR" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"
+
+          mkdir -p "$HOME/.android"
+          touch "$HOME/.android/repositories.cfg"
+
+          SDKMANAGER="$(command -v sdkmanager || find "$SDK_DIR/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1 || true)"
+          if [ -n "$SDKMANAGER" ] && [ -x "$SDKMANAGER" ]; then
+            set +o pipefail
+            yes | "$SDKMANAGER" --sdk_root="$SDK_DIR" --licenses >/dev/null 2>&1 || true
+            set -o pipefail
           fi
 
       - name: Build Both User & Control Debug APKs
-        run: gradle :app:assembleDebug :controlapp:assembleDebug --no-daemon --stacktrace
+        env:
+          GRADLE_OPTS: "-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
+        run: |
+          gradle :app:assembleDebug :controlapp:assembleDebug \
+            --no-daemon \
+            --no-configuration-cache \
+            --max-workers=2 \
+            -Dorg.gradle.jvmargs="-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8" \
+            --stacktrace
 
       - name: Package User and Control APKs
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p dist-apk
           cp app/build/outputs/apk/debug/app-debug.apk dist-apk/Dori-User-Android.apk
           cp controlapp/build/outputs/apk/debug/controlapp-debug.apk dist-apk/Dori-Control-Android.apk
+          ls -lh dist-apk/
 
       - name: Upload Both APK Artifacts
         uses: actions/upload-artifact@v7

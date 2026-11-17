@@ -1,0 +1,187 @@
+{
+  "entities": {
+    "CloudConfig": {
+      "title": "CloudConfig",
+      "description": "Shared user profile, loyalty points, and control panel feature flags synchronized between Dori User and Control apps.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "selectedDistrict": { "type": "string", "description": "Selected Nineveh district display name." },
+        "isDarkMode": { "type": "boolean", "description": "Dark mode preference." },
+        "userName": { "type": "string", "description": "Saved customer full name." },
+        "userPhone": { "type": "string", "description": "Saved customer phone." },
+        "userAge": { "type": "string", "description": "Saved optional age." },
+        "optionalNote": { "type": "string", "description": "Saved optional note." },
+        "loyaltyPoints": { "type": "integer", "description": "Accumulated loyalty points." },
+        "muteSound": { "type": "boolean", "description": "Mute alert sound preference." },
+        "muteVibration": { "type": "boolean", "description": "Mute vibration preference." },
+        "allowNewBookings": { "type": "boolean", "description": "Control switch allowing new bookings." },
+        "enableFastestTurn": { "type": "boolean", "description": "Control switch showing Fastest Turn button." },
+        "enableQrCode": { "type": "boolean", "description": "Control switch enabling scannable QR codes." },
+        "enableWhatsAppShare": { "type": "boolean", "description": "Control switch enabling WhatsApp sharing." },
+        "enableReviews": { "type": "boolean", "description": "Control switch enabling ratings and reviews." },
+        "enableLoyalty": { "type": "boolean", "description": "Control switch enabling loyalty points." },
+        "enableOptionalFields": { "type": "boolean", "description": "Control switch enabling optional booking fields." },
+        "enableLiveAlerts": { "type": "boolean", "description": "Control switch enabling live alerts and notifications." },
+        "pointsPerBooking": { "type": "integer", "description": "Loyalty points awarded per completed booking." },
+        "disabledCategories": { "type": "array", "description": "List of category display names hidden by control app." },
+        "broadcastMessage": { "type": "string", "description": "Global announcement banner shown in User app." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation (FieldValue.serverTimestamp())." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update (FieldValue.serverTimestamp())." }
+      },
+      "required": [
+        "userId", "selectedDistrict", "isDarkMode", "userName", "userPhone", "userAge", "optionalNote",
+        "loyaltyPoints", "muteSound", "muteVibration", "allowNewBookings", "enableFastestTurn",
+        "enableQrCode", "enableWhatsAppShare", "enableReviews", "enableLoyalty", "enableOptionalFields",
+        "enableLiveAlerts", "pointsPerBooking", "disabledCategories", "broadcastMessage", "createdAt", "updatedAt"
+      ]
+    },
+    "CloudVenue": {
+      "title": "CloudVenue",
+      "description": "Service center/venue state synced across User and Control apps.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "venueId": { "type": "integer", "description": "Numeric venue identifier." },
+        "name": { "type": "string" },
+        "city": { "type": "string" },
+        "category": { "type": "string" },
+        "specialty": { "type": "string" },
+        "area": { "type": "string" },
+        "priceDinar": { "type": "integer" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "integer" },
+        "workingHours": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "description": { "type": "string" },
+        "customOptionsCsv": { "type": "string" },
+        "open": { "type": "boolean" },
+        "paused": { "type": "boolean" },
+        "acceptingBookings": { "type": "boolean" },
+        "currentServingNumber": { "type": "integer" },
+        "nextTicketNumber": { "type": "integer" },
+        "servedTodayCount": { "type": "integer" },
+        "avgMinutesPerPerson": { "type": "integer" },
+        "favorite": { "type": "boolean" },
+        "waitingCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." }
+      },
+      "required": [
+        "userId", "venueId", "name", "city", "category", "specialty", "area", "priceDinar",
+        "rating", "reviewCount", "workingHours", "phone", "whatsapp", "latitude", "longitude",
+        "description", "customOptionsCsv", "open", "paused", "acceptingBookings",
+        "currentServingNumber", "nextTicketNumber", "servedTodayCount", "avgMinutesPerPerson",
+        "favorite", "waitingCount", "createdAt", "updatedAt"
+      ]
+    },
+    "CloudBooking": {
+      "title": "CloudBooking",
+      "description": "Same-day ticket booking synced across User and Control apps.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "bookingId": { "type": "integer" },
+        "ticketCode": { "type": "string" },
+        "queueNumber": { "type": "integer" },
+        "venueId": { "type": "integer" },
+        "venueName": { "type": "string" },
+        "venueCity": { "type": "string" },
+        "venueCategory": { "type": "string" },
+        "venuePhone": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "selectedOption": { "type": "string" },
+        "notes": { "type": "string" },
+        "optionalInfo": { "type": "string" },
+        "priceDinar": { "type": "integer" },
+        "status": { "type": "string", "enum": ["ACTIVE", "COMPLETED", "CANCELLED"] },
+        "stage": { "type": "string", "enum": ["MONITORED", "APPROACHING", "YOUR_TURN"] },
+        "peopleAhead": { "type": "integer" },
+        "estimatedMinutes": { "type": "integer" },
+        "createdAtMillis": { "type": "integer" },
+        "completedAtMillis": { "type": "integer" },
+        "userRating": { "type": "integer" },
+        "userReview": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." }
+      },
+      "required": [
+        "userId", "bookingId", "ticketCode", "queueNumber", "venueId", "venueName",
+        "venueCity", "venueCategory", "venuePhone", "customerName", "customerPhone",
+        "selectedOption", "notes", "optionalInfo", "priceDinar", "status", "stage",
+        "peopleAhead", "estimatedMinutes", "createdAtMillis", "createdAt", "updatedAt"
+      ]
+    },
+    "CloudQueueItem": {
+      "title": "CloudQueueItem",
+      "description": "Venue queue ticket entry managed by Control app and reflected in User app.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "queueItemId": { "type": "integer" },
+        "venueId": { "type": "integer" },
+        "ticketNumber": { "type": "integer" },
+        "ticketCode": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "selectedOption": { "type": "string" },
+        "status": { "type": "string", "enum": ["WAITING", "SERVING", "DONE", "SKIPPED", "NO_SHOW"] },
+        "bookingId": { "type": "integer" },
+        "createdAtMillis": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." }
+      },
+      "required": [
+        "userId", "queueItemId", "venueId", "ticketNumber", "ticketCode",
+        "customerName", "customerPhone", "selectedOption", "status",
+        "createdAtMillis", "createdAt", "updatedAt"
+      ]
+    },
+    "CloudReview": {
+      "title": "CloudReview",
+      "description": "Customer rating and comment for a venue.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "reviewId": { "type": "integer" },
+        "venueId": { "type": "integer" },
+        "authorName": { "type": "string" },
+        "rating": { "type": "integer" },
+        "comment": { "type": "string" },
+        "createdAtMillis": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." }
+      },
+      "required": [
+        "userId", "reviewId", "venueId", "authorName", "rating", "comment",
+        "createdAtMillis", "createdAt", "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/config/{configId}": {
+      "schema": { "$ref": "#/entities/CloudConfig" },
+      "description": "Stores shared user preferences and Control App feature toggles under config/settings."
+    },
+    "/users/{userId}/venues/{venueDocId}": {
+      "schema": { "$ref": "#/entities/CloudVenue" },
+      "description": "Stores venues and live queue counters."
+    },
+    "/users/{userId}/bookings/{bookingDocId}": {
+      "schema": { "$ref": "#/entities/CloudBooking" },
+      "description": "Stores active and completed ticket bookings."
+    },
+    "/users/{userId}/queue_items/{queueDocId}": {
+      "schema": { "$ref": "#/entities/CloudQueueItem" },
+      "description": "Stores ordered venue queue entries."
+    },
+    "/users/{userId}/reviews/{reviewDocId}": {
+      "schema": { "$ref": "#/entities/CloudReview" },
+      "description": "Stores verified venue reviews."
+    }
+  }
+}

@@ -186,4 +186,112 @@ class ExampleRobolectricTest {
         assertTrue(payload2.contains("زينب كريم"))
         assertFalse(payload2.contains("أحمد محمود"))
     }
+
+    @Test
+    fun `user app control config defaults enable all core user edition features`() {
+        val config = com.example.data.model.UserAppControlConfig()
+        assertTrue(config.allowNewBookings)
+        assertTrue(config.enableFastestTurn)
+        assertTrue(config.enableQrCode)
+        assertTrue(config.enableWhatsAppShare)
+        assertTrue(config.enableReviews)
+        assertTrue(config.enableLoyalty)
+        assertTrue(config.enableOptionalFields)
+        assertTrue(config.enableLiveAlerts)
+        assertEquals(10, config.pointsPerBooking)
+        assertTrue(config.disabledCategories.isEmpty())
+        assertEquals("", config.broadcastMessage)
+        assertTrue(ServiceCategory.fiveCategories.all { it.displayName !in config.disabledCategories })
+    }
+
+    @Test
+    fun `control panel commands enforce booking lockouts, custom venues, loyalty points, and queue reset`() =
+        kotlinx.coroutines.runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val db = androidx.room.Room.inMemoryDatabaseBuilder(
+                context,
+                com.example.data.local.DoriDatabase::class.java
+            ).allowMainThreadQueries().build()
+            try {
+                val prefs = com.example.data.local.UserPreferencesDataStore(context)
+                val repo = com.example.data.repository.DoriRepository(db.doriDao(), prefs)
+                repo.ensureSeeded()
+                repo.resetControlConfig()
+
+                // 1. Booking allowed by default, optional info preserved
+                val firstResult = repo.bookQueueTicket(
+                    venueId = 3,
+                    customerName = "علي حسين الجبوري",
+                    customerPhone = "07701234567",
+                    selectedOption = "تنظيف بشرة",
+                    optionalInfo = "حساسية خفيفة"
+                )
+                assertTrue(firstResult.isSuccess)
+                val created = firstResult.getOrThrow()
+                assertEquals("حساسية خفيفة", created.optionalInfo)
+                assertEquals(1, created.queueNumber)
+
+                // 2. Disable bookings and verify rejection
+                repo.updateControlConfig { it.copy(allowNewBookings = false) }
+                val blockedResult = repo.bookQueueTicket(
+                    venueId = 3,
+                    customerName = "مصطفى طارق",
+                    customerPhone = "07709998877",
+                    selectedOption = "تنظيف بشرة"
+                )
+                assertTrue(blockedResult.isFailure)
+
+                // 3. Re-enable bookings, disable optional fields, custom loyalty points = 25
+                repo.updateControlConfig {
+                    it.copy(
+                        allowNewBookings = true,
+                        enableOptionalFields = false,
+                        enableLoyalty = true,
+                        pointsPerBooking = 25
+                    )
+                }
+                val secondResult = repo.bookQueueTicket(
+                    venueId = 5,
+                    customerName = "سارة العبيدي",
+                    customerPhone = "07701112233",
+                    selectedOption = "تحليل دم شامل",
+                    optionalInfo = "يجب إخفاؤه"
+                )
+                assertTrue(secondResult.isSuccess)
+                assertEquals("", secondResult.getOrThrow().optionalInfo)
+
+                val earned = repo.completeBookingWithOptionalReview(
+                    bookingId = secondResult.getOrThrow().id,
+                    rating = 5,
+                    comment = "ممتاز"
+                )
+                assertEquals(25, earned)
+
+                // 4. Add custom venue & verify deletion
+                val addedVenue = repo.addCustomVenue(
+                    name = "عيادة النور التجريبية",
+                    district = NinevehDistrict.MOSUL_LEFT,
+                    area = "حي الزهور",
+                    category = ServiceCategory.CLINICS,
+                    specialty = MedicalSpecialty.DENTAL.displayName,
+                    priceDinar = 15000,
+                    avgMinutes = 6,
+                    phone = "07701234567"
+                )
+                assertTrue(addedVenue.isSuccess)
+                val customId = addedVenue.getOrThrow().id
+                assertTrue(db.doriDao().getVenueById(customId) != null)
+                repo.deleteVenue(customId)
+                assertTrue(db.doriDao().getVenueById(customId) == null)
+
+                // 5. Reset all queues to #1
+                repo.resetAllQueuesToOne()
+                val resetVenue = db.doriDao().getVenueById(1)!!
+                assertEquals(1, resetVenue.nextTicketNumber)
+                assertEquals(0, resetVenue.currentServingNumber)
+                assertEquals(0, resetVenue.waitingCount)
+            } finally {
+                db.close()
+            }
+        }
 }

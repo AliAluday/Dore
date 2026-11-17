@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.local.BookingEntity
 import com.example.data.model.TicketStage
+import com.example.data.model.UserAppControlConfig
 import com.example.ui.theme.AmberGold
 import com.example.ui.theme.IndigoAccentLight
 import com.example.ui.theme.StatusApproaching
@@ -151,6 +152,7 @@ fun perforatedTicketShape(cutoutRatio: Float = 0.56f) = GenericShape { size, _ -
 @Composable
 fun PerforatedTicketCard(
     booking: BookingEntity,
+    controlConfig: UserAppControlConfig = UserAppControlConfig(),
     onZoomQr: () -> Unit,
     onShareWhatsApp: () -> Unit,
     onCompleteClick: () -> Unit,
@@ -281,34 +283,36 @@ fun PerforatedTicketCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        border = BorderStroke(2.dp, stageColor.copy(alpha = 0.5f)),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(18.dp))
-                            .clickable { onZoomQr() }
-                            .testTag("ticket_qr_button")
-                    ) {
-                        Box {
-                            QrCodeCanvas(
-                                payload = QrCodeGenerator.buildTicketPayload(booking),
-                                modifier = Modifier.size(116.dp)
-                            )
-                            Surface(
-                                shape = CircleShape,
-                                color = stageColor,
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(5.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ZoomIn,
-                                    contentDescription = "تكبير رمز QR",
-                                    tint = Color.White,
-                                    modifier = Modifier
-                                        .padding(4.dp)
-                                        .size(14.dp)
+                    if (controlConfig.enableQrCode) {
+                        Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            border = BorderStroke(2.dp, stageColor.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(18.dp))
+                                .clickable { onZoomQr() }
+                                .testTag("ticket_qr_button")
+                        ) {
+                            Box {
+                                QrCodeCanvas(
+                                    payload = QrCodeGenerator.buildTicketPayload(booking),
+                                    modifier = Modifier.size(116.dp)
                                 )
+                                Surface(
+                                    shape = CircleShape,
+                                    color = stageColor,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(5.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ZoomIn,
+                                        contentDescription = "تكبير رمز QR",
+                                        tint = Color.White,
+                                        modifier = Modifier
+                                            .padding(4.dp)
+                                            .size(14.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -378,11 +382,13 @@ fun PerforatedTicketCard(
                             }
                         }
 
-                        Text(
-                            text = "اضغط على رمز QR للتكبير والمسح الضوئي",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (controlConfig.enableQrCode) {
+                            Text(
+                                text = "اضغط على رمز QR للتكبير والمسح الضوئي",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -491,7 +497,14 @@ fun PerforatedTicketCard(
                             modifier = Modifier.size(17.dp)
                         )
                         Spacer(modifier = Modifier.width(5.dp))
-                        Text("إتمام (+10)", maxLines = 1)
+                        Text(
+                            text = if (controlConfig.enableLoyalty && controlConfig.pointsPerBooking > 0) {
+                                "إتمام (+${controlConfig.pointsPerBooking})"
+                            } else {
+                                "إتمام الخدمة"
+                            },
+                            maxLines = 1
+                        )
                     }
 
                     OutlinedButton(
@@ -508,17 +521,19 @@ fun PerforatedTicketCard(
                         Text("إلغاء", maxLines = 1)
                     }
 
-                    FilledTonalIconButton(
-                        onClick = onShareWhatsApp,
-                        modifier = Modifier
-                            .size(46.dp)
-                            .testTag("share_whatsapp_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "مشاركة عبر واتساب",
-                            modifier = Modifier.size(18.dp)
-                        )
+                    if (controlConfig.enableWhatsAppShare) {
+                        FilledTonalIconButton(
+                            onClick = onShareWhatsApp,
+                            modifier = Modifier
+                                .size(46.dp)
+                                .testTag("share_whatsapp_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "مشاركة عبر واتساب",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }

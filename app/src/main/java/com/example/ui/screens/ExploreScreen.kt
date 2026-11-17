@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -95,8 +96,15 @@ fun ExploreScreen(
     onToggleFavorite: (VenueEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val ctrl = state.preferences.controlConfig
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var areaMenuExpanded by remember { mutableStateOf(false) }
+
+    val visibleCategories = remember(ctrl.disabledCategories) {
+        ServiceCategory.entries.filter {
+            it == ServiceCategory.ALL || it.displayName !in ctrl.disabledCategories
+        }
+    }
 
     Box(
         modifier = modifier.fillMaxSize(),
@@ -109,6 +117,47 @@ fun ExploreScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(11.dp)
         ) {
+            // Optional Admin Broadcast / Maintenance Banner
+            if (ctrl.broadcastMessage.isNotBlank() || !ctrl.allowNewBookings) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (!ctrl.allowNewBookings) StatusUrgent.copy(alpha = 0.14f)
+                        else AmberGold.copy(alpha = 0.16f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (!ctrl.allowNewBookings) StatusUrgent.copy(alpha = 0.45f)
+                            else AmberGold.copy(alpha = 0.45f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("explore_control_banner")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Campaign,
+                                contentDescription = null,
+                                tint = if (!ctrl.allowNewBookings) StatusUrgent else AmberGold,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = if (!ctrl.allowNewBookings) {
+                                    "الحجوزات متوقفة مؤقتاً من لوحة التحكم"
+                                } else {
+                                    ctrl.broadcastMessage
+                                },
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
             // Sleek Compact Hero & Instant Metrics Strip (replaces bulky banner + 3 separate boxes)
             item {
                 Card(
@@ -179,41 +228,44 @@ fun ExploreScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(8.dp))
+                            if (ctrl.enableFastestTurn) {
+                                Spacer(modifier = Modifier.width(8.dp))
 
-                            Button(
-                                onClick = onBookFastestTurn,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MintPrimaryDark,
-                                    contentColor = Color(0xFF04221B)
-                                ),
-                                shape = RoundedCornerShape(14.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                                modifier = Modifier.testTag("fastest_turn_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Bolt,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "أسرع دور",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Button(
+                                    onClick = onBookFastestTurn,
+                                    enabled = ctrl.allowNewBookings,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MintPrimaryDark,
+                                        contentColor = Color(0xFF04221B)
+                                    ),
+                                    shape = RoundedCornerShape(14.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                    modifier = Modifier.testTag("fastest_turn_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Bolt,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "أسرع دور",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // Categories Row
+            // Categories Row (respects Control Panel enabled categories)
             item {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
-                    items(ServiceCategory.entries) { category ->
+                    items(visibleCategories) { category ->
                         val selected = state.selectedCategory == category
                         FilterChip(
                             selected = selected,
@@ -450,6 +502,7 @@ fun ExploreScreen(
                 items(state.filteredVenues, key = { it.id }) { venue ->
                     FuturisticVenueCard(
                         venue = venue,
+                        bookingsAllowed = ctrl.allowNewBookings,
                         onDirectBook = { onDirectBookVenue(venue) },
                         onToggleFavorite = { onToggleFavorite(venue) }
                     )
@@ -462,12 +515,13 @@ fun ExploreScreen(
 @Composable
 private fun FuturisticVenueCard(
     venue: VenueEntity,
+    bookingsAllowed: Boolean,
     onDirectBook: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
-    val isAvailable = venue.isOpen && venue.isAcceptingBookings
+    val isAvailable = bookingsAllowed && venue.isOpen && venue.isAcceptingBookings
     val statusColor = when {
-        !venue.isAcceptingBookings -> StatusUrgent
+        !bookingsAllowed || !venue.isOpen || !venue.isAcceptingBookings -> StatusUrgent
         venue.isPaused -> StatusPaused
         else -> StatusOpen
     }

@@ -24,4 +24,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "Dori"
 
+include(":shared")
 include(":app")
+include(":controlapp")

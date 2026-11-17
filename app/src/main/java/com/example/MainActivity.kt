@@ -1,6 +1,7 @@
 package com.example
 
 import android.Manifest
+import android.app.Application
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -30,11 +31,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.outlined.ConfirmationNumber
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -49,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -64,20 +64,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.credentials.CredentialManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.remote.GoogleAuthHelper
+import com.example.ui.components.GoogleAuthScreen
 import com.example.ui.components.InstantTicketPassDialog
 import com.example.ui.components.LiveOverlayAlertBanner
 import com.example.ui.components.TopStickyHeader
 import com.example.ui.components.VenueDetailsSheet
 import com.example.ui.screens.ExploreScreen
-import com.example.ui.screens.MerchantDashboardScreen
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.TicketsScreen
 import com.example.ui.theme.DoriTheme
 import com.example.ui.viewmodel.AppTab
+import com.example.ui.viewmodel.DoriAppMode
 import com.example.ui.viewmodel.DoriViewModel
+import com.example.ui.viewmodel.DoriViewModelFactory
 import com.example.util.DoriNotificationHelper
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -86,17 +93,61 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         DoriNotificationHelper.ensureChannel(this)
+        val firestore = FirebaseFirestore.getInstance(getString(R.string.firestore_database_id))
+        val webClientId = getString(R.string.default_web_client_id)
+
         setContent {
-            val viewModel: DoriViewModel = viewModel()
-            DoriAppRoot(viewModel = viewModel)
+            val authUser by GoogleAuthHelper.authStateFlow().collectAsStateWithLifecycle(
+                initialValue = Firebase.auth.currentUser
+            )
+            val app = applicationContext as Application
+
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                DoriTheme(darkTheme = true) {
+                    val user = authUser
+                    if (user == null) {
+                        GoogleAuthScreen(
+                            appTitle = "دوري",
+                            appSubtitle = "احجز دورك الذكي في عيادات ومراكز نينوى وتابعه لحظياً",
+                            isControlEdition = false,
+                            webClientId = webClientId,
+                            onAuthSuccess = {}
+                        )
+                    } else {
+                        key(user.uid) {
+                            val factory = remember(user.uid) {
+                                DoriViewModelFactory(
+                                    application = app,
+                                    appMode = DoriAppMode.USER_APP,
+                                    firestore = firestore
+                                )
+                            }
+                            val viewModel: DoriViewModel = viewModel(
+                                key = "user_${user.uid}",
+                                factory = factory
+                            )
+                            DoriAppRoot(
+                                viewModel = viewModel,
+                                signedInName = user.displayName,
+                                signedInEmail = user.email
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-fun DoriAppRoot(viewModel: DoriViewModel) {
+fun DoriAppRoot(
+    viewModel: DoriViewModel,
+    signedInName: String? = null,
+    signedInEmail: String? = null
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val credentialManager = remember(context) { CredentialManager.create(context) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -150,157 +201,152 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
         viewModel.selectTab(AppTab.EXPLORE)
     }
 
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-        DoriTheme(darkTheme = state.preferences.isDarkMode) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                    snackbarHost = {
-                        SnackbarHost(
-                            hostState = snackbarHostState,
-                            modifier = Modifier.padding(bottom = 86.dp)
+    DoriTheme(darkTheme = state.preferences.isDarkMode) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                snackbarHost = {
+                    SnackbarHost(
+                        hostState = snackbarHostState,
+                        modifier = Modifier.padding(bottom = 86.dp)
+                    )
+                },
+                topBar = {
+                    TopStickyHeader(
+                        selectedDistrict = state.preferences.selectedDistrict,
+                        isDarkMode = state.preferences.isDarkMode,
+                        activeBookingCount = state.activeBookings.size,
+                        isSimulationRunning = state.isLiveSimulationRunning,
+                        searchQuery = state.searchQuery,
+                        isSearchExpanded = isSearchExpanded,
+                        onToggleSearch = {
+                            if (state.currentTab != AppTab.EXPLORE) {
+                                viewModel.selectTab(AppTab.EXPLORE)
+                                isSearchExpanded = true
+                            } else {
+                                isSearchExpanded = !isSearchExpanded
+                                if (!isSearchExpanded && state.searchQuery.isNotEmpty()) {
+                                    viewModel.updateSearchQuery("")
+                                }
+                            }
+                        },
+                        onSearchChange = { query ->
+                            if (state.currentTab != AppTab.EXPLORE) {
+                                viewModel.selectTab(AppTab.EXPLORE)
+                            }
+                            viewModel.updateSearchQuery(query)
+                        },
+                        onSelectDistrict = viewModel::selectDistrict,
+                        onToggleDarkMode = viewModel::toggleDarkMode,
+                        onOpenTickets = { viewModel.selectTab(AppTab.TICKETS) }
+                    )
+                }
+            ) { innerPadding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                ) {
+                    when (state.currentTab) {
+                        AppTab.EXPLORE -> ExploreScreen(
+                            state = state,
+                            onSelectArea = viewModel::selectArea,
+                            onClearSearch = {
+                                viewModel.updateSearchQuery("")
+                                isSearchExpanded = false
+                            },
+                            onCategorySelect = viewModel::selectCategory,
+                            onSelectSpecialty = viewModel::selectMedicalSpecialty,
+                            onToggleFavoritesOnly = viewModel::toggleFavoritesFilter,
+                            onSortSelect = viewModel::selectSortOption,
+                            onBookFastestTurn = viewModel::bookFastestTurn,
+                            onDirectBookVenue = viewModel::quickBookVenue,
+                            onToggleFavorite = viewModel::toggleVenueFavorite
                         )
-                    },
-                    topBar = {
-                        TopStickyHeader(
-                            selectedDistrict = state.preferences.selectedDistrict,
-                            isDarkMode = state.preferences.isDarkMode,
-                            activeBookingCount = state.activeBookings.size,
-                            isSimulationRunning = state.isLiveSimulationRunning,
-                            searchQuery = state.searchQuery,
-                            isSearchExpanded = isSearchExpanded,
-                            onToggleSearch = {
-                                if (state.currentTab != AppTab.EXPLORE) {
-                                    viewModel.selectTab(AppTab.EXPLORE)
-                                    isSearchExpanded = true
-                                } else {
-                                    isSearchExpanded = !isSearchExpanded
-                                    if (!isSearchExpanded && state.searchQuery.isNotEmpty()) {
-                                        viewModel.updateSearchQuery("")
-                                    }
-                                }
+
+                        AppTab.TICKETS -> TicketsScreen(
+                            state = state,
+                            hasNotificationPermission = hasNotificationPermission,
+                            onRequestNotificationPermission = requestNotificationPermission,
+                            onSelectActiveBooking = viewModel::selectActiveBooking,
+                            onCompleteBooking = viewModel::completeBooking,
+                            onCancelBooking = viewModel::cancelBooking,
+                            onQuickRebook = viewModel::quickRebook,
+                            onSubmitHistoryReview = viewModel::submitHistoryReview,
+                            onExploreClick = { viewModel.selectTab(AppTab.EXPLORE) }
+                        )
+
+                        else -> ProfileScreen(
+                            state = state,
+                            hasNotificationPermission = hasNotificationPermission,
+                            signedInName = signedInName,
+                            signedInEmail = signedInEmail,
+                            onSignOut = {
+                                viewModel.stopCloudSyncListeners()
+                                GoogleAuthHelper.signOut(credentialManager, scope)
                             },
-                            onSearchChange = { query ->
-                                if (state.currentTab != AppTab.EXPLORE) {
-                                    viewModel.selectTab(AppTab.EXPLORE)
-                                }
-                                viewModel.updateSearchQuery(query)
-                            },
+                            onRequestNotificationPermission = requestNotificationPermission,
                             onSelectDistrict = viewModel::selectDistrict,
                             onToggleDarkMode = viewModel::toggleDarkMode,
-                            onOpenTickets = { viewModel.selectTab(AppTab.TICKETS) }
+                            onSetMuteSound = viewModel::setMuteSound,
+                            onSetMuteVibration = viewModel::setMuteVibration
                         )
                     }
-                ) { innerPadding ->
-                    Box(
+
+                    // Pure User Edition Floating Pill Bottom Navigation Dock (3 tabs only)
+                    UserFloatingBottomDock(
+                        currentTab = state.currentTab,
+                        activeTicketsCount = state.activeBookings.size,
+                        onSelectTab = viewModel::selectTab,
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                    ) {
-                        when (state.currentTab) {
-                            AppTab.EXPLORE -> ExploreScreen(
-                                state = state,
-                                onSelectArea = viewModel::selectArea,
-                                onClearSearch = {
-                                    viewModel.updateSearchQuery("")
-                                    isSearchExpanded = false
-                                },
-                                onCategorySelect = viewModel::selectCategory,
-                                onSelectSpecialty = viewModel::selectMedicalSpecialty,
-                                onToggleFavoritesOnly = viewModel::toggleFavoritesFilter,
-                                onSortSelect = viewModel::selectSortOption,
-                                onBookFastestTurn = viewModel::bookFastestTurn,
-                                onDirectBookVenue = viewModel::quickBookVenue,
-                                onToggleFavorite = viewModel::toggleVenueFavorite
-                            )
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(horizontal = 14.dp, vertical = 12.dp)
+                    )
+                }
+            }
 
-                            AppTab.TICKETS -> TicketsScreen(
-                                state = state,
-                                hasNotificationPermission = hasNotificationPermission,
-                                onRequestNotificationPermission = requestNotificationPermission,
-                                onSelectActiveBooking = viewModel::selectActiveBooking,
-                                onCompleteBooking = viewModel::completeBooking,
-                                onCancelBooking = viewModel::cancelBooking,
-                                onQuickRebook = viewModel::quickRebook,
-                                onSubmitHistoryReview = viewModel::submitHistoryReview,
-                                onExploreClick = { viewModel.selectTab(AppTab.EXPLORE) }
-                            )
-
-                            AppTab.MERCHANT -> MerchantDashboardScreen(
-                                state = state,
-                                onSelectVenue = viewModel::selectMerchantVenue,
-                                onCallNext = viewModel::callNextCustomer,
-                                onSkipCurrent = viewModel::skipCurrentCustomer,
-                                onCallCustomerByName = viewModel::callCustomerByName,
-                                onMarkNoShow = viewModel::markCustomerNoShow,
-                                onTogglePauseQueue = viewModel::togglePauseQueue,
-                                onToggleAcceptingBookings = viewModel::toggleAcceptingBookings,
-                                onAddWalkIn = viewModel::addWalkIn,
-                                onToggleLiveSimulation = viewModel::toggleLiveSimulation
-                            )
-
-                            AppTab.PROFILE -> ProfileScreen(
-                                state = state,
-                                hasNotificationPermission = hasNotificationPermission,
-                                onRequestNotificationPermission = requestNotificationPermission,
-                                onSelectDistrict = viewModel::selectDistrict,
-                                onToggleDarkMode = viewModel::toggleDarkMode,
-                                onSetMuteSound = viewModel::setMuteSound,
-                                onSetMuteVibration = viewModel::setMuteVibration
-                            )
-                        }
-
-                        // Modern Floating Pill Bottom Navigation Dock
-                        FloatingBottomDock(
-                            currentTab = state.currentTab,
-                            activeTicketsCount = state.activeBookings.size,
-                            onSelectTab = viewModel::selectTab,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .navigationBarsPadding()
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
+            // Venue Details Bottom Sheet
+            state.selectedVenueForDetails?.let { venue ->
+                VenueDetailsSheet(
+                    venue = venue,
+                    bookingSessionId = state.bookingSessionId,
+                    controlConfig = state.preferences.controlConfig,
+                    reviews = state.reviewsByVenue[venue.id].orEmpty(),
+                    onDismiss = { viewModel.openVenueDetails(null) },
+                    onConfirmBooking = { name, phone, option, notes, optionalInfo, calculatedPrice ->
+                        viewModel.bookTicket(
+                            venueId = venue.id,
+                            customerName = name,
+                            customerPhone = phone,
+                            selectedOption = option,
+                            notes = notes,
+                            optionalInfo = optionalInfo,
+                            customPriceDinar = calculatedPrice
                         )
                     }
-                }
+                )
+            }
 
-                // Venue Details Bottom Sheet
-                state.selectedVenueForDetails?.let { venue ->
-                    VenueDetailsSheet(
-                        venue = venue,
-                        bookingSessionId = state.bookingSessionId,
-                        reviews = state.reviewsByVenue[venue.id].orEmpty(),
-                        onDismiss = { viewModel.openVenueDetails(null) },
-                        onConfirmBooking = { name, phone, option, notes, optionalInfo, calculatedPrice ->
-                            viewModel.bookTicket(
-                                venueId = venue.id,
-                                customerName = name,
-                                customerPhone = phone,
-                                selectedOption = option,
-                                notes = notes,
-                                optionalInfo = optionalInfo,
-                                customPriceDinar = calculatedPrice
-                            )
-                        }
-                    )
-                }
+            // Instant Ticket + Scannable QR Pass Modal right upon booking
+            state.newlyBookedTicket?.let { booked ->
+                InstantTicketPassDialog(
+                    booking = booked,
+                    controlConfig = state.preferences.controlConfig,
+                    hasNotificationPermission = hasNotificationPermission,
+                    onRequestNotificationPermission = requestNotificationPermission,
+                    onViewInTickets = {
+                        viewModel.dismissNewlyBookedTicket()
+                        viewModel.selectActiveBooking(booked.id)
+                        viewModel.selectTab(AppTab.TICKETS)
+                    },
+                    onDismiss = viewModel::dismissNewlyBookedTicket
+                )
+            }
 
-                // Instant Ticket + Scannable QR Pass Modal right upon booking
-                state.newlyBookedTicket?.let { booked ->
-                    InstantTicketPassDialog(
-                        booking = booked,
-                        hasNotificationPermission = hasNotificationPermission,
-                        onRequestNotificationPermission = requestNotificationPermission,
-                        onViewInTickets = {
-                            viewModel.dismissNewlyBookedTicket()
-                            viewModel.selectActiveBooking(booked.id)
-                            viewModel.selectTab(AppTab.TICKETS)
-                        },
-                        onDismiss = viewModel::dismissNewlyBookedTicket
-                    )
-                }
-
-                // Floating Overlay Alert Banner on Live Queue Updates
+            // Floating Overlay Alert Banner on Live Queue Updates
+            if (state.preferences.controlConfig.enableLiveAlerts) {
                 LiveOverlayAlertBanner(
                     alert = state.activeTurnAlert,
                     onOpenTicket = { bookingId ->
@@ -317,7 +363,7 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
 }
 
 @Composable
-private fun FloatingBottomDock(
+private fun UserFloatingBottomDock(
     currentTab: AppTab,
     activeTicketsCount: Int,
     onSelectTab: (AppTab) -> Unit,
@@ -340,13 +386,13 @@ private fun FloatingBottomDock(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AppTab.entries.forEach { tab ->
+            AppTab.userTabs.forEach { tab ->
                 val selected = currentTab == tab
                 val icon = when (tab) {
                     AppTab.EXPLORE -> if (selected) Icons.Filled.Explore else Icons.Outlined.Explore
                     AppTab.TICKETS -> if (selected) Icons.Filled.ConfirmationNumber else Icons.Outlined.ConfirmationNumber
-                    AppTab.MERCHANT -> if (selected) Icons.Filled.Storefront else Icons.Outlined.Storefront
                     AppTab.PROFILE -> if (selected) Icons.Filled.Person else Icons.Outlined.Person
+                    else -> Icons.Outlined.Explore
                 }
                 val bgColor by animateColorAsState(
                     targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,

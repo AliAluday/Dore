@@ -225,11 +225,18 @@ fun TicketsScreen(
                         item {
                             PerforatedTicketCard(
                                 booking = selectedBooking,
+                                controlConfig = state.preferences.controlConfig,
                                 onZoomQr = { zoomedBooking = selectedBooking },
                                 onShareWhatsApp = {
                                     IntentHelpers.shareTicketViaWhatsApp(context, selectedBooking)
                                 },
-                                onCompleteClick = { completingBooking = selectedBooking },
+                                onCompleteClick = {
+                                    if (state.preferences.controlConfig.enableReviews) {
+                                        completingBooking = selectedBooking
+                                    } else {
+                                        onCompleteBooking(selectedBooking.id, null, null)
+                                    }
+                                },
                                 onCancelClick = { cancellingBooking = selectedBooking }
                             )
                         }
@@ -274,6 +281,7 @@ fun TicketsScreen(
                         items(state.historyBookings, key = { it.id }) { booking ->
                             HistoryBookingCard(
                                 booking = booking,
+                                reviewsEnabled = state.preferences.controlConfig.enableReviews,
                                 onQuickRebook = { onQuickRebook(booking) },
                                 onRateClick = { reviewingHistoryBooking = booking }
                             )
@@ -330,10 +338,15 @@ fun TicketsScreen(
 
     // Complete & Rate Dialog
     completingBooking?.let { b ->
+        val ctrl = state.preferences.controlConfig
         RatingDialog(
             title = "إتمام الخدمة وتقييم ${b.venueName}",
-            subtitle = "ستحصل فوراً على +10 نقاط ولاء عند إتمام الخدمة.",
-            confirmLabel = "إتمام (+10 نقاط)",
+            subtitle = if (ctrl.enableLoyalty) {
+                "ستحصل فوراً على +${ctrl.pointsPerBooking} نقطة ولاء عند إتمام الخدمة."
+            } else {
+                "شارك تقييمك السريع بعد إتمام الخدمة."
+            },
+            confirmLabel = if (ctrl.enableLoyalty) "إتمام (+${ctrl.pointsPerBooking} نقطة)" else "إتمام الخدمة",
             onDismiss = { completingBooking = null },
             onConfirm = { stars, comment ->
                 onCompleteBooking(b.id, stars, comment)
@@ -387,6 +400,7 @@ fun TicketsScreen(
 @Composable
 private fun HistoryBookingCard(
     booking: BookingEntity,
+    reviewsEnabled: Boolean,
     onQuickRebook: () -> Unit,
     onRateClick: () -> Unit
 ) {
@@ -438,9 +452,10 @@ private fun HistoryBookingCard(
                 }
             }
 
-            if (booking.userRating != null) {
+            val rating = booking.userRating
+            if (reviewsEnabled && rating != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    repeat(booking.userRating) {
+                    repeat(rating) {
                         Icon(
                             imageVector = Icons.Default.Star,
                             contentDescription = null,
@@ -473,7 +488,7 @@ private fun HistoryBookingCard(
                     Text("حجز جديد لنفس المكان")
                 }
 
-                if (isCompleted && booking.userRating == null) {
+                if (reviewsEnabled && isCompleted && booking.userRating == null) {
                     OutlinedButton(
                         onClick = onRateClick,
                         modifier = Modifier.weight(0.8f)

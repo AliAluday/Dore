@@ -73,6 +73,7 @@ import com.example.data.model.DoctorUrgency
 import com.example.data.model.DoctorVisitType
 import com.example.data.model.FieldBookingDuration
 import com.example.data.model.ServiceCategory
+import com.example.data.model.UserAppControlConfig
 import com.example.data.model.UserProfileSettings
 import com.example.ui.theme.AmberGold
 import com.example.ui.theme.StatusOpen
@@ -84,6 +85,7 @@ import com.example.util.IntentHelpers
 fun VenueDetailsSheet(
     venue: VenueEntity,
     bookingSessionId: Long,
+    controlConfig: UserAppControlConfig,
     reviews: List<ReviewEntity>,
     onDismiss: () -> Unit,
     onConfirmBooking: (
@@ -491,61 +493,63 @@ fun VenueDetailsSheet(
                 }
             }
 
-            // Collapsible Optional Information
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showOptionalFields = !showOptionalFields }
-            ) {
-                Row(
+            // Collapsible Optional Information (controlled by Control Panel)
+            if (controlConfig.enableOptionalFields) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .clickable { showOptionalFields = !showOptionalFields }
                 ) {
-                    Text(
-                        text = "معلومات اختيارية (العمر أو ملاحظة)",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Icon(
-                        imageVector = if (showOptionalFields) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "معلومات اختيارية (العمر أو ملاحظة)",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Icon(
+                            imageVector = if (showOptionalFields) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                AnimatedVisibility(visible = showOptionalFields) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = optionalAge,
+                            onValueChange = { optionalAge = it },
+                            label = { Text("العمر (اختياري)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("booking_optional_age_input")
+                        )
+                        OutlinedTextField(
+                            value = optionalNote,
+                            onValueChange = { optionalNote = it },
+                            label = { Text("ملاحظة إضافية (اختياري)") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("booking_optional_note_input")
+                        )
+                    }
                 }
             }
 
-            AnimatedVisibility(visible = showOptionalFields) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = optionalAge,
-                        onValueChange = { optionalAge = it },
-                        label = { Text("العمر (اختياري)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("booking_optional_age_input")
-                    )
-                    OutlinedTextField(
-                        value = optionalNote,
-                        onValueChange = { optionalNote = it },
-                        label = { Text("ملاحظة إضافية (اختياري)") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("booking_optional_note_input")
-                    )
-                }
-            }
-
-            // Primary Confirm & Generate Scannable QR Button
+            // Primary Confirm Button
             Button(
                 onClick = {
                     hasAttemptedSubmit = true
@@ -564,7 +568,7 @@ fun VenueDetailsSheet(
                             append("المدة: ${FieldBookingDuration.formatArabic(selectedHours)}")
                         }
                     }
-                    val combinedOptional = buildString {
+                    val combinedOptional = if (!controlConfig.enableOptionalFields) "" else buildString {
                         if (optionalAge.isNotBlank()) append("العمر: ${optionalAge.trim()}")
                         if (optionalNote.isNotBlank()) {
                             if (isNotEmpty()) append(" • ")
@@ -580,7 +584,7 @@ fun VenueDetailsSheet(
                         calculatedPrice
                     )
                 },
-                enabled = venue.isOpen && venue.isAcceptingBookings,
+                enabled = controlConfig.allowNewBookings && venue.isOpen && venue.isAcceptingBookings,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
@@ -589,20 +593,24 @@ fun VenueDetailsSheet(
                     .testTag("confirm_venue_booking_button")
             ) {
                 Text(
-                    text = if (!venue.isAcceptingBookings) {
+                    text = if (!controlConfig.allowNewBookings) {
+                        "الحجز متوقف من لوحة التحكم"
+                    } else if (!venue.isOpen || !venue.isAcceptingBookings) {
                         "الاستقبال متوقف مؤقتاً"
                     } else if (isField) {
                         "تأكيد #${venue.nextTicketNumber} • ${FieldBookingDuration.shortLabel(selectedHours)} (${IntentHelpers.formatDinar(calculatedPrice)})"
-                    } else {
+                    } else if (controlConfig.enableQrCode) {
                         "تأكيد الحجز #${venue.nextTicketNumber} وإصدار QR"
+                    } else {
+                        "تأكيد الحجز #${venue.nextTicketNumber}"
                     },
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            // Collapsible Customer Reviews
-            if (reviews.isNotEmpty()) {
+            // Collapsible Customer Reviews (controlled by Control Panel)
+            if (controlConfig.enableReviews && reviews.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Dori User & Control Android APKs
 
 on:
   push:
@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  build-apk:
-    name: Build Dori Android APK
+  build-apks:
+    name: Build Dori User & Control APKs
     runs-on: ubuntu-latest
 
     steps:
@@ -46,19 +46,20 @@ jobs:
             yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
           fi
 
-      - name: Build Debug APK
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+      - name: Build Both User & Control Debug APKs
+        run: gradle :app:assembleDebug :controlapp:assembleDebug --no-daemon --stacktrace
 
-      - name: Rename APK for easy phone install
+      - name: Package User and Control APKs
         shell: bash
         run: |
           mkdir -p dist-apk
-          cp app/build/outputs/apk/debug/app-debug.apk dist-apk/Dori-Nineveh-Android.apk
+          cp app/build/outputs/apk/debug/app-debug.apk dist-apk/Dori-User-Android.apk
+          cp controlapp/build/outputs/apk/debug/controlapp-debug.apk dist-apk/Dori-Control-Android.apk
 
-      - name: Upload APK Artifact
+      - name: Upload Both APK Artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: Dori-Nineveh-Android-APK
-          path: dist-apk/Dori-Nineveh-Android.apk
+          name: Dori-Dual-Android-APKs
+          path: dist-apk/*.apk
           if-no-files-found: error
           retention-days: 30

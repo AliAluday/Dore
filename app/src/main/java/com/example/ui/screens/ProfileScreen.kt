@@ -23,6 +23,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationCity
@@ -31,6 +33,7 @@ import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -39,6 +42,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -57,19 +61,25 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.model.LoyaltyTier
 import com.example.data.model.NinevehDistrict
 import com.example.ui.theme.AmberGold
 import com.example.ui.theme.DiamondBlue
+import com.example.ui.theme.EmeraldPrimary
 import com.example.ui.theme.MintPrimaryDark
+import com.example.ui.theme.StatusUrgent
 import com.example.ui.viewmodel.DoriUiState
 
 @Composable
 fun ProfileScreen(
     state: DoriUiState,
     hasNotificationPermission: Boolean,
+    signedInName: String?,
+    signedInEmail: String?,
+    onSignOut: () -> Unit,
     onRequestNotificationPermission: () -> Unit,
     onSelectDistrict: (NinevehDistrict) -> Unit,
     onToggleDarkMode: () -> Unit,
@@ -99,8 +109,68 @@ fun ProfileScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Futuristic Loyalty Card
+            // Google Cloud Sync Account & Sign-Out Card
             item {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.35f)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudDone,
+                                contentDescription = null,
+                                tint = EmeraldPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = signedInName?.takeIf { it.isNotBlank() } ?: "حساب Google المتزامن",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = signedInEmail?.takeIf { it.isNotBlank() } ?: "المزامنة السحابية مفعّلة مع دوري تحكم",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = onSignOut,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.testTag("profile_sign_out_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Logout,
+                                contentDescription = "تسجيل الخروج",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("خروج", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+            }
+
+            // Futuristic Loyalty Card (controlled remotely by Control Edition)
+            if (prefs.controlConfig.enableLoyalty) {
+                item {
                 Card(
                     shape = RoundedCornerShape(24.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 5.dp),
@@ -161,7 +231,7 @@ fun ProfileScreen(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "+10 نقاط عند إتمام كل خدمة في نينوى",
+                                        text = "+${prefs.controlConfig.pointsPerBooking} نقطة عند إتمام كل خدمة في نينوى",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = Color.White.copy(alpha = 0.85f)
                                     )
@@ -213,6 +283,7 @@ fun ProfileScreen(
                             }
                         }
                     }
+                }
                 }
             }
 

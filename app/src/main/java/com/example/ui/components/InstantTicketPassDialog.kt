@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.data.local.BookingEntity
+import com.example.data.model.UserAppControlConfig
 import com.example.ui.theme.MintPrimaryDark
 import com.example.ui.theme.StatusOpen
 import com.example.util.IntentHelpers
@@ -51,6 +52,7 @@ import com.example.util.IntentHelpers
 @Composable
 fun InstantTicketPassDialog(
     booking: BookingEntity,
+    controlConfig: UserAppControlConfig = UserAppControlConfig(),
     hasNotificationPermission: Boolean,
     onRequestNotificationPermission: () -> Unit,
     onViewInTickets: () -> Unit,
@@ -215,17 +217,19 @@ fun InstantTicketPassDialog(
                         }
                     }
 
-                    // Large Crisp Scannable QR Pass
-                    Surface(
-                        shape = RoundedCornerShape(22.dp),
-                        color = Color.White,
-                        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)),
-                        shadowElevation = 4.dp
-                    ) {
-                        QrCodeCanvas(
-                            payload = com.example.util.QrCodeGenerator.buildTicketPayload(booking),
-                            modifier = Modifier.size(196.dp)
-                        )
+                    // Large Crisp Scannable QR Pass (if enabled by Control Panel)
+                    if (controlConfig.enableQrCode) {
+                        Surface(
+                            shape = RoundedCornerShape(22.dp),
+                            color = Color.White,
+                            border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)),
+                            shadowElevation = 4.dp
+                        ) {
+                            QrCodeCanvas(
+                                payload = com.example.util.QrCodeGenerator.buildTicketPayload(booking),
+                                modifier = Modifier.size(196.dp)
+                            )
+                        }
                     }
 
                     Row(
@@ -331,13 +335,15 @@ fun InstantTicketPassDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        OutlinedButton(
-                            onClick = { IntentHelpers.shareTicketViaWhatsApp(context, booking) },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("واتساب")
+                        if (controlConfig.enableWhatsAppShare) {
+                            OutlinedButton(
+                                onClick = { IntentHelpers.shareTicketViaWhatsApp(context, booking) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("واتساب")
+                            }
                         }
                         Button(
                             onClick = onViewInTickets,

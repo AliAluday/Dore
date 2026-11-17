@@ -1,0 +1,317 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidConfig(data, userId) {
+      return data.userId == userId &&
+        data.selectedDistrict is string && data.selectedDistrict.size() <= 80 &&
+        data.isDarkMode is bool &&
+        data.userName is string && data.userName.size() <= 100 &&
+        data.userPhone is string && data.userPhone.size() <= 30 &&
+        data.userAge is string && data.userAge.size() <= 20 &&
+        data.optionalNote is string && data.optionalNote.size() <= 300 &&
+        data.loyaltyPoints is int && data.loyaltyPoints >= 0 && data.loyaltyPoints <= 100000 &&
+        data.muteSound is bool &&
+        data.muteVibration is bool &&
+        data.allowNewBookings is bool &&
+        data.enableFastestTurn is bool &&
+        data.enableQrCode is bool &&
+        data.enableWhatsAppShare is bool &&
+        data.enableReviews is bool &&
+        data.enableLoyalty is bool &&
+        data.enableOptionalFields is bool &&
+        data.enableLiveAlerts is bool &&
+        data.pointsPerBooking is int && data.pointsPerBooking >= 0 && data.pointsPerBooking <= 100 &&
+        data.disabledCategories is list && data.disabledCategories.size() <= 10 &&
+        (data.disabledCategories.size() == 0 || data.disabledCategories[0] is string) &&
+        data.broadcastMessage is string && data.broadcastMessage.size() <= 300;
+    }
+
+    function isValidVenue(data, userId) {
+      return data.userId == userId &&
+        data.venueId is int && data.venueId > 0 &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+        data.city is string && data.city.size() >= 1 && data.city.size() <= 80 &&
+        data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+        data.specialty is string && data.specialty.size() <= 80 &&
+        data.area is string && data.area.size() >= 1 && data.area.size() <= 80 &&
+        data.priceDinar is int && data.priceDinar >= 0 && data.priceDinar <= 500000 &&
+        data.rating is number && data.rating >= 0 && data.rating <= 5 &&
+        data.reviewCount is int && data.reviewCount >= 0 && data.reviewCount <= 100000 &&
+        data.workingHours is string && data.workingHours.size() <= 80 &&
+        data.phone is string && data.phone.size() <= 30 &&
+        data.whatsapp is string && data.whatsapp.size() <= 30 &&
+        data.latitude is number &&
+        data.longitude is number &&
+        data.description is string && data.description.size() <= 500 &&
+        data.customOptionsCsv is string && data.customOptionsCsv.size() <= 500 &&
+        data.open is bool &&
+        data.paused is bool &&
+        data.acceptingBookings is bool &&
+        data.currentServingNumber is int && data.currentServingNumber >= 0 && data.currentServingNumber <= 10000 &&
+        data.nextTicketNumber is int && data.nextTicketNumber >= 1 && data.nextTicketNumber <= 10001 &&
+        data.servedTodayCount is int && data.servedTodayCount >= 0 && data.servedTodayCount <= 10000 &&
+        data.avgMinutesPerPerson is int && data.avgMinutesPerPerson >= 1 && data.avgMinutesPerPerson <= 180 &&
+        data.favorite is bool &&
+        data.waitingCount is int && data.waitingCount >= 0 && data.waitingCount <= 10000;
+    }
+
+    function isValidBooking(data, userId) {
+      return data.userId == userId &&
+        data.bookingId is int && data.bookingId > 0 &&
+        data.ticketCode is string && data.ticketCode.size() >= 1 && data.ticketCode.size() <= 40 &&
+        data.queueNumber is int && data.queueNumber >= 1 && data.queueNumber <= 10000 &&
+        data.venueId is int && data.venueId > 0 &&
+        data.venueName is string && data.venueName.size() >= 1 && data.venueName.size() <= 120 &&
+        data.venueCity is string && data.venueCity.size() <= 120 &&
+        data.venueCategory is string && data.venueCategory.size() <= 40 &&
+        data.venuePhone is string && data.venuePhone.size() <= 30 &&
+        data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 120 &&
+        data.customerPhone is string && data.customerPhone.size() >= 1 && data.customerPhone.size() <= 30 &&
+        data.selectedOption is string && data.selectedOption.size() <= 120 &&
+        data.notes is string && data.notes.size() <= 300 &&
+        data.optionalInfo is string && data.optionalInfo.size() <= 300 &&
+        data.priceDinar is int && data.priceDinar >= 0 && data.priceDinar <= 500000 &&
+        data.status in ['ACTIVE', 'COMPLETED', 'CANCELLED'] &&
+        data.stage in ['MONITORED', 'APPROACHING', 'YOUR_TURN'] &&
+        data.peopleAhead is int && data.peopleAhead >= 0 && data.peopleAhead <= 10000 &&
+        data.estimatedMinutes is int && data.estimatedMinutes >= 0 && data.estimatedMinutes <= 10000 &&
+        data.createdAtMillis is int && data.createdAtMillis >= 0 &&
+        (!('completedAtMillis' in data) || data.completedAtMillis == null || (data.completedAtMillis is int && data.completedAtMillis >= 0)) &&
+        (!('userRating' in data) || data.userRating == null || (data.userRating is int && data.userRating >= 1 && data.userRating <= 5)) &&
+        (!('userReview' in data) || data.userReview == null || (data.userReview is string && data.userReview.size() <= 400));
+    }
+
+    function isValidQueueItem(data, userId) {
+      return data.userId == userId &&
+        data.queueItemId is int && data.queueItemId > 0 &&
+        data.venueId is int && data.venueId > 0 &&
+        data.ticketNumber is int && data.ticketNumber >= 1 && data.ticketNumber <= 10000 &&
+        data.ticketCode is string && data.ticketCode.size() >= 1 && data.ticketCode.size() <= 40 &&
+        data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 120 &&
+        data.customerPhone is string && data.customerPhone.size() <= 30 &&
+        data.selectedOption is string && data.selectedOption.size() <= 120 &&
+        data.status in ['WAITING', 'SERVING', 'DONE', 'SKIPPED', 'NO_SHOW'] &&
+        (!('bookingId' in data) || data.bookingId == null || (data.bookingId is int && data.bookingId > 0)) &&
+        data.createdAtMillis is int && data.createdAtMillis >= 0;
+    }
+
+    function isValidReview(data, userId) {
+      return data.userId == userId &&
+        data.reviewId is int && data.reviewId > 0 &&
+        data.venueId is int && data.venueId > 0 &&
+        data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 120 &&
+        data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+        data.comment is string && data.comment.size() <= 400 &&
+        data.createdAtMillis is int && data.createdAtMillis >= 0;
+    }
+
+    match /users/{userId} {
+      allow read, write: if false;
+
+      match /config/{configId} {
+        allow list: if isOwner(userId);
+        allow get, delete: if isOwner(userId) && isValidId(configId);
+        allow create: if isOwner(userId) &&
+          isValidId(configId) &&
+          configId == 'settings' &&
+          incoming().keys().hasAll([
+            'userId', 'selectedDistrict', 'isDarkMode', 'userName', 'userPhone', 'userAge',
+            'optionalNote', 'loyaltyPoints', 'muteSound', 'muteVibration', 'allowNewBookings',
+            'enableFastestTurn', 'enableQrCode', 'enableWhatsAppShare', 'enableReviews',
+            'enableLoyalty', 'enableOptionalFields', 'enableLiveAlerts', 'pointsPerBooking',
+            'disabledCategories', 'broadcastMessage', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().keys().hasOnly([
+            'userId', 'selectedDistrict', 'isDarkMode', 'userName', 'userPhone', 'userAge',
+            'optionalNote', 'loyaltyPoints', 'muteSound', 'muteVibration', 'allowNewBookings',
+            'enableFastestTurn', 'enableQrCode', 'enableWhatsAppShare', 'enableReviews',
+            'enableLoyalty', 'enableOptionalFields', 'enableLiveAlerts', 'pointsPerBooking',
+            'disabledCategories', 'broadcastMessage', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidConfig(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+          isValidId(configId) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidConfig(incoming(), userId) &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'selectedDistrict', 'isDarkMode', 'userName', 'userPhone', 'userAge', 'optionalNote',
+            'loyaltyPoints', 'muteSound', 'muteVibration', 'allowNewBookings', 'enableFastestTurn',
+            'enableQrCode', 'enableWhatsAppShare', 'enableReviews', 'enableLoyalty',
+            'enableOptionalFields', 'enableLiveAlerts', 'pointsPerBooking',
+            'disabledCategories', 'broadcastMessage', 'updatedAt'
+          ]);
+      }
+
+      match /venues/{venueDocId} {
+        allow list: if isOwner(userId);
+        allow get, delete: if isOwner(userId) && isValidId(venueDocId);
+        allow create: if isOwner(userId) &&
+          isValidId(venueDocId) &&
+          incoming().keys().hasAll([
+            'userId', 'venueId', 'name', 'city', 'category', 'specialty', 'area', 'priceDinar',
+            'rating', 'reviewCount', 'workingHours', 'phone', 'whatsapp', 'latitude', 'longitude',
+            'description', 'customOptionsCsv', 'open', 'paused', 'acceptingBookings',
+            'currentServingNumber', 'nextTicketNumber', 'servedTodayCount', 'avgMinutesPerPerson',
+            'favorite', 'waitingCount', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().keys().hasOnly([
+            'userId', 'venueId', 'name', 'city', 'category', 'specialty', 'area', 'priceDinar',
+            'rating', 'reviewCount', 'workingHours', 'phone', 'whatsapp', 'latitude', 'longitude',
+            'description', 'customOptionsCsv', 'open', 'paused', 'acceptingBookings',
+            'currentServingNumber', 'nextTicketNumber', 'servedTodayCount', 'avgMinutesPerPerson',
+            'favorite', 'waitingCount', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidVenue(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+          isValidId(venueDocId) &&
+          incoming().userId == existing().userId &&
+          incoming().venueId == existing().venueId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidVenue(incoming(), userId) &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'city', 'category', 'specialty', 'area', 'priceDinar', 'rating',
+            'reviewCount', 'workingHours', 'phone', 'whatsapp', 'latitude', 'longitude',
+            'description', 'customOptionsCsv', 'open', 'paused', 'acceptingBookings',
+            'currentServingNumber', 'nextTicketNumber', 'servedTodayCount', 'avgMinutesPerPerson',
+            'favorite', 'waitingCount', 'updatedAt'
+          ]);
+      }
+
+      match /bookings/{bookingDocId} {
+        allow list: if isOwner(userId);
+        allow get, delete: if isOwner(userId) && isValidId(bookingDocId);
+        allow create: if isOwner(userId) &&
+          isValidId(bookingDocId) &&
+          incoming().keys().hasAll([
+            'userId', 'bookingId', 'ticketCode', 'queueNumber', 'venueId', 'venueName',
+            'venueCity', 'venueCategory', 'venuePhone', 'customerName', 'customerPhone',
+            'selectedOption', 'notes', 'optionalInfo', 'priceDinar', 'status', 'stage',
+            'peopleAhead', 'estimatedMinutes', 'createdAtMillis', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().keys().hasOnly([
+            'userId', 'bookingId', 'ticketCode', 'queueNumber', 'venueId', 'venueName',
+            'venueCity', 'venueCategory', 'venuePhone', 'customerName', 'customerPhone',
+            'selectedOption', 'notes', 'optionalInfo', 'priceDinar', 'status', 'stage',
+            'peopleAhead', 'estimatedMinutes', 'createdAtMillis', 'completedAtMillis',
+            'userRating', 'userReview', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidBooking(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+          isValidId(bookingDocId) &&
+          incoming().userId == existing().userId &&
+          incoming().bookingId == existing().bookingId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().createdAtMillis == existing().createdAtMillis &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidBooking(incoming(), userId) && (
+            // Action: Live queue update / complete / cancel while booking is ACTIVE
+            (existing().status == 'ACTIVE' &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'status', 'stage', 'peopleAhead', 'estimatedMinutes',
+                'completedAtMillis', 'userRating', 'userReview', 'updatedAt'
+              ])) ||
+            // Action: Rate an already finished history booking without reopening status
+            (existing().status in ['COMPLETED', 'CANCELLED'] &&
+              incoming().status == existing().status &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'userRating', 'userReview', 'updatedAt'
+              ]))
+          );
+      }
+
+      match /queue_items/{queueDocId} {
+        allow list: if isOwner(userId);
+        allow get, delete: if isOwner(userId) && isValidId(queueDocId);
+        allow create: if isOwner(userId) &&
+          isValidId(queueDocId) &&
+          incoming().keys().hasAll([
+            'userId', 'queueItemId', 'venueId', 'ticketNumber', 'ticketCode',
+            'customerName', 'customerPhone', 'selectedOption', 'status',
+            'createdAtMillis', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().keys().hasOnly([
+            'userId', 'queueItemId', 'venueId', 'ticketNumber', 'ticketCode',
+            'customerName', 'customerPhone', 'selectedOption', 'status',
+            'bookingId', 'createdAtMillis', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidQueueItem(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+          isValidId(queueDocId) &&
+          incoming().userId == existing().userId &&
+          incoming().queueItemId == existing().queueItemId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().createdAtMillis == existing().createdAtMillis &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidQueueItem(incoming(), userId) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'bookingId', 'updatedAt']);
+      }
+
+      match /reviews/{reviewDocId} {
+        allow list: if isOwner(userId);
+        allow get, delete: if isOwner(userId) && isValidId(reviewDocId);
+        allow create: if isOwner(userId) &&
+          isValidId(reviewDocId) &&
+          incoming().keys().hasAll([
+            'userId', 'reviewId', 'venueId', 'authorName', 'rating', 'comment',
+            'createdAtMillis', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().keys().hasOnly([
+            'userId', 'reviewId', 'venueId', 'authorName', 'rating', 'comment',
+            'createdAtMillis', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidReview(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+          isValidId(reviewDocId) &&
+          incoming().userId == existing().userId &&
+          incoming().reviewId == existing().reviewId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().createdAtMillis == existing().createdAtMillis &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          isValidReview(incoming(), userId) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['rating', 'comment', 'updatedAt']);
+      }
+    }
+  }
+}

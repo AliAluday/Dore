@@ -2,9 +2,7 @@ name: Build Dori User & Control Android APKs
 
 on:
   push:
-    branches: [ "main", "master" ]
   pull_request:
-    branches: [ "main", "master" ]
   workflow_dispatch:
 
 permissions:
@@ -25,25 +23,22 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Set up Android SDK 36.1
+      - name: Set up Android SDK 36
         uses: android-actions/setup-android@v4
         with:
-          packages: |
-            platform-tools
-            platforms;android-36.1
-            platforms;android-36
-            build-tools;36.0.0
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
 
-      - name: Set up Gradle 9.3.1
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: '9.3.1'
+          cache-provider: 'basic'
 
-      - name: Prepare signing keystore, env, and SDK licenses
+      - name: Prepare wrapper, signing keystore, env, and SDK licenses
         shell: bash
         run: |
           set -euo pipefail
           rm -f local.properties
+          chmod +x gradlew
 
           if [ ! -f .env ] && [ -f .env.example ]; then
             cp .env.example .env
@@ -73,13 +68,14 @@ jobs:
             set +o pipefail
             yes | "$SDKMANAGER" --sdk_root="$SDK_DIR" --licenses >/dev/null 2>&1 || true
             set -o pipefail
+            "$SDKMANAGER" --sdk_root="$SDK_DIR" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
           fi
 
       - name: Build Both User & Control Debug APKs
         env:
           GRADLE_OPTS: "-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
         run: |
-          gradle :app:assembleDebug :controlapp:assembleDebug \
+          ./gradlew :app:assembleDebug :controlapp:assembleDebug \
             --no-daemon \
             --no-configuration-cache \
             --max-workers=2 \

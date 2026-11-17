@@ -1,6 +1,11 @@
 package com.example.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,17 +24,21 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -59,6 +68,10 @@ fun TopStickyHeader(
     isDarkMode: Boolean,
     activeBookingCount: Int,
     isSimulationRunning: Boolean,
+    searchQuery: String,
+    isSearchExpanded: Boolean,
+    onToggleSearch: () -> Unit,
+    onSearchChange: (String) -> Unit,
     onSelectDistrict: (NinevehDistrict) -> Unit,
     onToggleDarkMode: () -> Unit,
     onOpenTickets: () -> Unit,
@@ -91,7 +104,8 @@ fun TopStickyHeader(
                 .fillMaxWidth()
                 .background(headerGradient)
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -101,23 +115,23 @@ fun TopStickyHeader(
                 // Brand Emblem + Nineveh District Picker
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(13.dp),
                         color = accentTint.copy(alpha = 0.16f),
                         border = BorderStroke(1.dp, accentTint.copy(alpha = 0.4f))
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Bolt,
                                 contentDescription = null,
                                 tint = accentTint,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(17.dp)
                             )
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(
@@ -141,10 +155,10 @@ fun TopStickyHeader(
                     Box(modifier = Modifier.weight(1f, fill = false)) {
                         Surface(
                             shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
                             border = BorderStroke(
                                 1.dp,
-                                MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.42f)
                             ),
                             modifier = Modifier
                                 .minimumInteractiveComponentSize()
@@ -153,28 +167,30 @@ fun TopStickyHeader(
                                 .testTag("city_selector_button")
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.LocationOn,
                                     contentDescription = "اختر قضاء في نينوى",
                                     tint = if (isDarkMode) IndigoAccentDark else MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = selectedDistrict.displayName,
-                                    style = MaterialTheme.typography.labelLarge,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
                                 )
                                 Icon(
                                     imageVector = Icons.Default.KeyboardArrowDown,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
@@ -187,20 +203,11 @@ fun TopStickyHeader(
                             NinevehDistrict.entries.forEach { district ->
                                 DropdownMenuItem(
                                     text = {
-                                        Column {
-                                            Text(
-                                                text = district.displayName,
-                                                fontWeight = if (district == selectedDistrict) FontWeight.Bold else FontWeight.Normal,
-                                                color = if (district == selectedDistrict) accentTint else MaterialTheme.colorScheme.onSurface
-                                            )
-                                            if (district.areas.isNotEmpty()) {
-                                                Text(
-                                                    text = "${district.areas.size} منطقة وحي",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
+                                        Text(
+                                            text = district.displayName,
+                                            fontWeight = if (district == selectedDistrict) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (district == selectedDistrict) accentTint else MaterialTheme.colorScheme.onSurface
+                                        )
                                     },
                                     leadingIcon = {
                                         Icon(
@@ -220,10 +227,12 @@ fun TopStickyHeader(
                     }
                 }
 
-                // Active Tickets Pill + Theme Switcher
+                Spacer(modifier = Modifier.width(6.dp))
+
+                // Compact Action Icons: Active Tickets Badge, Small Search Button, Theme Switcher
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     if (activeBookingCount > 0) {
                         Surface(
@@ -236,19 +245,19 @@ fun TopStickyHeader(
                                 .testTag("header_active_tickets_badge")
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.ConfirmationNumber,
                                     contentDescription = "التذاكر النشطة",
                                     tint = Color(0xFF1E1B08),
-                                    modifier = Modifier.size(15.dp)
+                                    modifier = Modifier.size(14.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = "$activeBookingCount",
-                                    style = MaterialTheme.typography.labelLarge,
+                                    style = MaterialTheme.typography.labelMedium,
                                     color = Color(0xFF1E1B08),
                                     fontWeight = FontWeight.Bold
                                 )
@@ -256,24 +265,97 @@ fun TopStickyHeader(
                         }
                     }
 
+                    // Compact Search Icon Button in Top Header
+                    val hasActiveSearch = isSearchExpanded || searchQuery.isNotBlank()
+                    IconButton(
+                        onClick = onToggleSearch,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .minimumInteractiveComponentSize()
+                            .clip(CircleShape)
+                            .background(
+                                if (hasActiveSearch) accentTint.copy(alpha = 0.22f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                            )
+                            .testTag("header_search_button")
+                    ) {
+                        Icon(
+                            imageVector = if (isSearchExpanded) Icons.Default.Close else Icons.Default.Search,
+                            contentDescription = if (isSearchExpanded) "إغلاق البحث" else "بحث",
+                            tint = if (hasActiveSearch) accentTint else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
+
                     IconButton(
                         onClick = onToggleDarkMode,
                         modifier = Modifier
+                            .size(40.dp)
                             .minimumInteractiveComponentSize()
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
                             .testTag("dark_mode_toggle_button")
                     ) {
                         Icon(
                             imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
                             contentDescription = if (isDarkMode) "الوضع النهاري" else "الوضع الليلي",
-                            tint = if (isDarkMode) AmberGold else MaterialTheme.colorScheme.secondary
+                            tint = if (isDarkMode) AmberGold else MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                 }
             }
+
+            // Expandable Compact Search Bar (0dp height when collapsed)
+            AnimatedVisibility(
+                visible = isSearchExpanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchChange,
+                    placeholder = {
+                        Text(
+                            "ابحث باسم المكان، الحي، أو التخصص...",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = accentTint,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { onSearchChange("") }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "مسح البحث",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = accentTint,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("explore_search_input")
+                )
+            }
+
             HorizontalDivider(
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
                 thickness = 0.8.dp
             )
         }

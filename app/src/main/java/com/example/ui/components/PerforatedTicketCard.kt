@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -472,24 +473,10 @@ fun PerforatedTicketCard(
                     }
                 }
 
-                OutlinedButton(
-                    onClick = onShareWhatsApp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("share_whatsapp_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("مشاركة التذكرة عبر واتساب")
-                }
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
                         onClick = onCompleteClick,
@@ -501,26 +488,37 @@ fun PerforatedTicketCard(
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(17.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("إتمام (+10 نقاط)")
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text("إتمام (+10)", maxLines = 1)
                     }
 
                     OutlinedButton(
                         onClick = onCancelClick,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
-                        modifier = Modifier
-                            .weight(0.75f)
-                            .testTag("cancel_ticket_button")
+                        modifier = Modifier.testTag("cancel_ticket_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Cancel,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(17.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("إلغاء")
+                        Text("إلغاء", maxLines = 1)
+                    }
+
+                    FilledTonalIconButton(
+                        onClick = onShareWhatsApp,
+                        modifier = Modifier
+                            .size(46.dp)
+                            .testTag("share_whatsapp_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "مشاركة عبر واتساب",
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,37 +24,40 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocalHospital
-import androidx.compose.material.icons.filled.LocationCity
-import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.SportsSoccer
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -67,11 +71,9 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.local.VenueEntity
 import com.example.data.model.MedicalSpecialty
-import com.example.data.model.NinevehDistrict
 import com.example.data.model.ServiceCategory
 import com.example.data.model.SortOption
 import com.example.ui.theme.AmberGold
-import com.example.ui.theme.IndigoAccentLight
 import com.example.ui.theme.MintPrimaryDark
 import com.example.ui.theme.StatusOpen
 import com.example.ui.theme.StatusPaused
@@ -82,19 +84,20 @@ import com.example.util.IntentHelpers
 @Composable
 fun ExploreScreen(
     state: DoriUiState,
-    onSelectDistrict: (NinevehDistrict) -> Unit,
     onSelectArea: (String?) -> Unit,
-    onSearchChange: (String) -> Unit,
+    onClearSearch: () -> Unit,
     onCategorySelect: (ServiceCategory) -> Unit,
     onSelectSpecialty: (MedicalSpecialty) -> Unit,
     onToggleFavoritesOnly: () -> Unit,
     onSortSelect: (SortOption) -> Unit,
     onBookFastestTurn: () -> Unit,
     onDirectBookVenue: (VenueEntity) -> Unit,
-    onVenueClick: (VenueEntity) -> Unit,
     onToggleFavorite: (VenueEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var sortMenuExpanded by remember { mutableStateOf(false) }
+    var areaMenuExpanded by remember { mutableStateOf(false) }
+
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
@@ -103,76 +106,80 @@ fun ExploreScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 680.dp),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 104.dp),
+            verticalArrangement = Arrangement.spacedBy(11.dp)
         ) {
-            // Compact Nineveh Hero Banner
+            // Sleek Compact Hero & Instant Metrics Strip (replaces bulky banner + 3 separate boxes)
             item {
                 Card(
-                    shape = RoundedCornerShape(24.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 5.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(152.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(Color(0xFF0A1428), Color(0xFF0D282A), Color(0xFF1E1B4B))
+                                )
+                            )
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.img_nineveh_hero),
-                            contentDescription = "معالم نينوى والموصل الرقمية",
+                            contentDescription = null,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.horizontalGradient(
-                                        colors = listOf(
-                                            Color(0xFF070B14).copy(alpha = 0.94f),
-                                            Color(0xFF0B1426).copy(alpha = 0.78f),
-                                            Color(0xFF070B14).copy(alpha = 0.35f)
-                                        )
-                                    )
-                                )
+                                .matchParentSize()
+                                .alpha(0.22f)
                         )
-                        Column(
+                        Row(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(18.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
-                                        text = "نينوى • ${state.preferences.selectedDistrict.displayName}",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MintPrimaryDark,
-                                        fontWeight = FontWeight.Bold
+                                        text = state.preferences.selectedDistrict.displayName,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
                                     )
                                     Surface(
                                         shape = CircleShape,
-                                        color = Color.White.copy(alpha = 0.14f)
+                                        color = MintPrimaryDark.copy(alpha = 0.2f)
                                     ) {
                                         Text(
-                                            text = "حجز بنفس اليوم",
+                                            text = "بنفس اليوم",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = Color.White,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            color = MintPrimaryDark,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                                         )
                                     }
                                 }
                                 Text(
-                                    text = "احجز دورك وأنت في مكانك",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
+                                    text = "${state.openCountInDistrict} مفتوح • أسرع انتظار ${state.fastestWaitMinutes} د • ${state.averageRatingInDistrict} ★",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
+
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             Button(
                                 onClick = onBookFastestTurn,
@@ -181,16 +188,17 @@ fun ExploreScreen(
                                     contentColor = Color(0xFF04221B)
                                 ),
                                 shape = RoundedCornerShape(14.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                                 modifier = Modifier.testTag("fastest_turn_button")
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Bolt,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "⚡ أسرع دور الآن (${state.fastestWaitMinutes} د)",
+                                    text = "أسرع دور",
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -200,144 +208,10 @@ fun ExploreScreen(
                 }
             }
 
-            // Neo-Bento Instant Stats Row
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    NeoStatCard(
-                        title = "أماكن مفتوحة",
-                        value = "${state.openCountInDistrict}",
-                        icon = Icons.Default.Storefront,
-                        accent = StatusOpen,
-                        modifier = Modifier.weight(1f)
-                    )
-                    NeoStatCard(
-                        title = "أسرع انتظار",
-                        value = "${state.fastestWaitMinutes} د",
-                        icon = Icons.Default.AccessTime,
-                        accent = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    NeoStatCard(
-                        title = "متوسط التقييم",
-                        value = "${state.averageRatingInDistrict} ★",
-                        icon = Icons.Default.Star,
-                        accent = AmberGold,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-
-            // Nineveh Districts Strip
+            // Categories Row
             item {
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(NinevehDistrict.entries) { district ->
-                        val selected = state.preferences.selectedDistrict == district
-                        FilterChip(
-                            selected = selected,
-                            onClick = { onSelectDistrict(district) },
-                            label = { Text(district.displayName) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.secondary,
-                                selectedLabelColor = Color.White
-                            ),
-                            modifier = Modifier.testTag("explore_district_chip_${district.name.lowercase()}")
-                        )
-                    }
-                }
-            }
-
-            // Neighborhoods Strip within Selected District
-            if (state.availableAreas.isNotEmpty()) {
-                item {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        item {
-                            FilterChip(
-                                selected = state.selectedArea == null,
-                                onClick = { onSelectArea(null) },
-                                label = { Text("كل المناطق", style = MaterialTheme.typography.labelMedium) }
-                            )
-                        }
-                        items(state.availableAreas) { area ->
-                            FilterChip(
-                                selected = state.selectedArea == area,
-                                onClick = { onSelectArea(area) },
-                                label = { Text(area, style = MaterialTheme.typography.labelMedium) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                ),
-                                modifier = Modifier.testTag("area_chip_$area")
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Search Bar + Favorites Heart Toggle
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = state.searchQuery,
-                        onValueChange = onSearchChange,
-                        placeholder = { Text("ابحث باسم المحل، الحي، أو القضاء...") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Search, contentDescription = "بحث")
-                        },
-                        trailingIcon = {
-                            if (state.searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { onSearchChange("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "مسح البحث")
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(18.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("explore_search_input")
-                    )
-
-                    Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        color = if (state.showFavoritesOnly) StatusUrgent.copy(alpha = 0.16f)
-                        else MaterialTheme.colorScheme.surfaceVariant,
-                        border = BorderStroke(
-                            1.dp,
-                            if (state.showFavoritesOnly) StatusUrgent.copy(alpha = 0.5f)
-                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-                        ),
-                        modifier = Modifier
-                            .size(54.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .clickable { onToggleFavoritesOnly() }
-                            .testTag("favorites_filter_button")
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = if (state.showFavoritesOnly) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                contentDescription = "المفضلة",
-                                tint = if (state.showFavoritesOnly) StatusUrgent else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 5 Categories + All Chips
-            item {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     items(ServiceCategory.entries) { category ->
                         val selected = state.selectedCategory == category
@@ -365,56 +239,162 @@ fun ExploreScreen(
                 }
             }
 
-            // Medical Specialties Sub-Filter when Clinics category is selected
-            if (state.selectedCategory == ServiceCategory.CLINICS) {
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "التخصص الطبي:",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.secondary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(MedicalSpecialty.entries) { specialty ->
-                                FilterChip(
-                                    selected = state.selectedSpecialty == specialty,
-                                    onClick = { onSelectSpecialty(specialty) },
-                                    label = { Text(specialty.displayName, style = MaterialTheme.typography.labelMedium) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.secondary,
-                                        selectedLabelColor = Color.White
-                                    ),
-                                    modifier = Modifier.testTag("specialty_chip_${specialty.name.lowercase()}")
+            // Compact Utility Filter Row: Favorites, Sort Dropdown, Area Dropdown
+            item {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    item {
+                        FilterChip(
+                            selected = state.showFavoritesOnly,
+                            onClick = onToggleFavoritesOnly,
+                            label = { Text("المفضلة") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = if (state.showFavoritesOnly) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    contentDescription = null,
+                                    tint = if (state.showFavoritesOnly) StatusUrgent else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
                                 )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = StatusUrgent.copy(alpha = 0.16f),
+                                selectedLabelColor = StatusUrgent
+                            ),
+                            modifier = Modifier.testTag("favorites_filter_button")
+                        )
+                    }
+
+                    item {
+                        Box {
+                            FilterChip(
+                                selected = state.sortOption != SortOption.HIGHEST_RATED,
+                                onClick = { sortMenuExpanded = true },
+                                label = { Text(state.sortOption.displayName) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.SwapVert,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                },
+                                modifier = Modifier.testTag("sort_dropdown_chip")
+                            )
+
+                            DropdownMenu(
+                                expanded = sortMenuExpanded,
+                                onDismissRequest = { sortMenuExpanded = false }
+                            ) {
+                                SortOption.entries.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = option.displayName,
+                                                fontWeight = if (state.sortOption == option) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (state.sortOption == option) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        },
+                                        onClick = {
+                                            onSortSelect(option)
+                                            sortMenuExpanded = false
+                                        },
+                                        modifier = Modifier.testTag("sort_chip_${option.name.lowercase()}")
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (state.availableAreas.isNotEmpty()) {
+                        item {
+                            Box {
+                                FilterChip(
+                                    selected = state.selectedArea != null,
+                                    onClick = { areaMenuExpanded = true },
+                                    label = { Text(state.selectedArea ?: "كل الأحياء") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Place,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowDown,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    },
+                                    modifier = Modifier.testTag("area_dropdown_chip")
+                                )
+
+                                DropdownMenu(
+                                    expanded = areaMenuExpanded,
+                                    onDismissRequest = { areaMenuExpanded = false },
+                                    modifier = Modifier.heightIn(max = 320.dp)
+                                ) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = "كل الأحياء",
+                                                fontWeight = if (state.selectedArea == null) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            onSelectArea(null)
+                                            areaMenuExpanded = false
+                                        }
+                                    )
+                                    state.availableAreas.forEach { area ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = area,
+                                                    fontWeight = if (state.selectedArea == area) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (state.selectedArea == area) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                )
+                                            },
+                                            onClick = {
+                                                onSelectArea(area)
+                                                areaMenuExpanded = false
+                                            },
+                                            modifier = Modifier.testTag("area_chip_$area")
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // Sort Row
-            item {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    item {
-                        Text(
-                            text = "فرز:",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    items(SortOption.entries) { option ->
-                        FilterChip(
-                            selected = state.sortOption == option,
-                            onClick = { onSortSelect(option) },
-                            label = { Text(option.displayName, style = MaterialTheme.typography.labelMedium) },
-                            modifier = Modifier.testTag("sort_chip_${option.name.lowercase()}")
-                        )
+            // Medical Specialties Sub-Filter only when Clinics is selected
+            if (state.selectedCategory == ServiceCategory.CLINICS) {
+                item {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        items(MedicalSpecialty.entries) { specialty ->
+                            FilterChip(
+                                selected = state.selectedSpecialty == specialty,
+                                onClick = { onSelectSpecialty(specialty) },
+                                label = { Text(specialty.displayName, style = MaterialTheme.typography.labelMedium) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                                    selectedLabelColor = Color.White
+                                ),
+                                modifier = Modifier.testTag("specialty_chip_${specialty.name.lowercase()}")
+                            )
+                        }
                     }
                 }
             }
@@ -424,14 +404,14 @@ fun ExploreScreen(
                 item {
                     Surface(
                         shape = RoundedCornerShape(22.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 18.dp)
                     ) {
                         Column(
-                            modifier = Modifier.padding(26.dp),
+                            modifier = Modifier.padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -439,27 +419,28 @@ fun ExploreScreen(
                                 imageVector = Icons.Default.Search,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(44.dp)
+                                modifier = Modifier.size(40.dp)
                             )
                             Text(
-                                text = "لا توجد مراكز مطابقة لهذا الحي أو البحث",
+                                text = "لا توجد مراكز مطابقة",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "جرّب اختيار \"جميع المناطق\" أو قضاء مجاور في نينوى لعرض المراكز المفتوحة القريبة.",
+                                text = "جرّب تغيير البحث أو إزالة الفلاتر لعرض جميع المراكز المفتوحة.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            if (state.selectedArea != null || state.searchQuery.isNotBlank()) {
+                            if (state.selectedArea != null || state.searchQuery.isNotBlank() || state.showFavoritesOnly) {
                                 Button(
                                     onClick = {
                                         onSelectArea(null)
-                                        onSearchChange("")
+                                        onClearSearch()
+                                        if (state.showFavoritesOnly) onToggleFavoritesOnly()
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                                 ) {
-                                    Text("عرض جميع مراكز ${state.preferences.selectedDistrict.displayName}")
+                                    Text("إعادة ضبط الفلاتر")
                                 }
                             }
                         }
@@ -479,63 +460,6 @@ fun ExploreScreen(
 }
 
 @Composable
-private fun NeoStatCard(
-    title: String,
-    value: String,
-    icon: ImageVector,
-    accent: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        tonalElevation = 3.dp,
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.25f)),
-        color = MaterialTheme.colorScheme.surface
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(accent.copy(alpha = 0.14f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
-                }
-                Box(
-                    modifier = Modifier
-                        .width(18.dp)
-                        .height(3.dp)
-                        .clip(CircleShape)
-                        .background(accent)
-                )
-            }
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
 private fun FuturisticVenueCard(
     venue: VenueEntity,
     onDirectBook: () -> Unit,
@@ -549,9 +473,9 @@ private fun FuturisticVenueCard(
     }
 
     Card(
-        shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.32f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
             .fillMaxWidth()
@@ -564,7 +488,6 @@ private fun FuturisticVenueCard(
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Concise Header: Name, Area + Status dot, Same-Day tag, Favorite
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -603,11 +526,11 @@ private fun FuturisticVenueCard(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Surface(
                         shape = CircleShape,
-                        color = StatusOpen.copy(alpha = 0.12f)
+                        color = AmberGold.copy(alpha = 0.14f)
                     ) {
                         Text(
                             text = "★ ${venue.rating}",
@@ -634,51 +557,52 @@ private fun FuturisticVenueCard(
                 }
             }
 
-            // Minimal 1-Line Queue + ETA + Price Strip
+            // Compact Queue Info + Price + Inline Book Action
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "دور #${venue.nextTicketNumber}  •  قبلك ${venue.queueAheadCount}  •  " +
-                        if (venue.estimatedWaitMinutes <= 0) "فوري" else "${venue.estimatedWaitMinutes} د",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = if (venue.category == ServiceCategory.FIELDS.displayName) {
-                        "${IntentHelpers.formatDinar(venue.priceDinar)}/س"
-                    } else {
-                        IntentHelpers.formatDinar(venue.priceDinar)
-                    },
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "دور #${venue.nextTicketNumber}  •  قبلك ${venue.queueAheadCount}  •  " +
+                            if (venue.estimatedWaitMinutes <= 0) "فوري" else "${venue.estimatedWaitMinutes} د",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = if (venue.category == ServiceCategory.FIELDS.displayName) {
+                            "${IntentHelpers.formatDinar(venue.priceDinar)}/س"
+                        } else {
+                            IntentHelpers.formatDinar(venue.priceDinar)
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
-            // Single Sleek Direct Same-Day Booking CTA
-            Button(
-                onClick = onDirectBook,
-                enabled = isAvailable,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .testTag("direct_book_venue_${venue.id}")
-            ) {
-                Text(
-                    text = if (isAvailable) "احجز الآن بنفس اليوم (#${venue.nextTicketNumber})" else "الاستقبال متوقف",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                Button(
+                    onClick = onDirectBook,
+                    enabled = isAvailable,
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    modifier = Modifier
+                        .height(40.dp)
+                        .testTag("direct_book_venue_${venue.id}")
+                ) {
+                    Text(
+                        text = if (isAvailable) "احجز الآن" else "متوقف",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }

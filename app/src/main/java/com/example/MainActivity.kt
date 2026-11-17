@@ -103,6 +103,7 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
     var hasNotificationPermission by remember {
         mutableStateOf(DoriNotificationHelper.hasNotificationPermission(context))
     }
+    var isSearchExpanded by remember { mutableStateOf(false) }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -167,6 +168,25 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
                             isDarkMode = state.preferences.isDarkMode,
                             activeBookingCount = state.activeBookings.size,
                             isSimulationRunning = state.isLiveSimulationRunning,
+                            searchQuery = state.searchQuery,
+                            isSearchExpanded = isSearchExpanded,
+                            onToggleSearch = {
+                                if (state.currentTab != AppTab.EXPLORE) {
+                                    viewModel.selectTab(AppTab.EXPLORE)
+                                    isSearchExpanded = true
+                                } else {
+                                    isSearchExpanded = !isSearchExpanded
+                                    if (!isSearchExpanded && state.searchQuery.isNotEmpty()) {
+                                        viewModel.updateSearchQuery("")
+                                    }
+                                }
+                            },
+                            onSearchChange = { query ->
+                                if (state.currentTab != AppTab.EXPLORE) {
+                                    viewModel.selectTab(AppTab.EXPLORE)
+                                }
+                                viewModel.updateSearchQuery(query)
+                            },
                             onSelectDistrict = viewModel::selectDistrict,
                             onToggleDarkMode = viewModel::toggleDarkMode,
                             onOpenTickets = { viewModel.selectTab(AppTab.TICKETS) }
@@ -181,16 +201,17 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
                         when (state.currentTab) {
                             AppTab.EXPLORE -> ExploreScreen(
                                 state = state,
-                                onSelectDistrict = viewModel::selectDistrict,
                                 onSelectArea = viewModel::selectArea,
-                                onSearchChange = viewModel::updateSearchQuery,
+                                onClearSearch = {
+                                    viewModel.updateSearchQuery("")
+                                    isSearchExpanded = false
+                                },
                                 onCategorySelect = viewModel::selectCategory,
                                 onSelectSpecialty = viewModel::selectMedicalSpecialty,
                                 onToggleFavoritesOnly = viewModel::toggleFavoritesFilter,
                                 onSortSelect = viewModel::selectSortOption,
                                 onBookFastestTurn = viewModel::bookFastestTurn,
                                 onDirectBookVenue = viewModel::quickBookVenue,
-                                onVenueClick = { viewModel.openVenueDetails(it.id) },
                                 onToggleFavorite = viewModel::toggleVenueFavorite
                             )
 
@@ -223,7 +244,7 @@ fun DoriAppRoot(viewModel: DoriViewModel) {
                                 state = state,
                                 hasNotificationPermission = hasNotificationPermission,
                                 onRequestNotificationPermission = requestNotificationPermission,
-                                onSaveProfile = viewModel::updateProfile,
+                                onSelectDistrict = viewModel::selectDistrict,
                                 onToggleDarkMode = viewModel::toggleDarkMode,
                                 onSetMuteSound = viewModel::setMuteSound,
                                 onSetMuteVibration = viewModel::setMuteVibration

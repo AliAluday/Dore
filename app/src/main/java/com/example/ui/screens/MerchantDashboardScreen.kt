@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,12 +11,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,20 +24,19 @@ import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonOff
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -52,10 +52,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.local.MerchantQueueItemEntity
 import com.example.data.model.QueueItemStatus
@@ -91,6 +93,7 @@ fun MerchantDashboardScreen(
         ?: cityAndAllVenues.firstOrNull()
 
     var showWalkInDialog by remember { mutableStateOf(false) }
+    var venueMenuExpanded by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier.fillMaxSize(),
@@ -114,39 +117,89 @@ fun MerchantDashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 680.dp),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 104.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 104.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Venue Switcher
+            // Compact Venue Selector Dropdown (replaces 35 scrolling chips)
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.45f)),
+                        tonalElevation = 2.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .clickable { venueMenuExpanded = true }
+                            .testTag("merchant_venue_dropdown")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Store,
-                            contentDescription = null,
-                            tint = EmeraldPrimary
-                        )
-                        Text(
-                            text = "التبديل بين المحلات والعيادات",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Store,
+                                    contentDescription = null,
+                                    tint = EmeraldPrimary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = selectedVenue.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${selectedVenue.city} • ${selectedVenue.area}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "تبديل المحل",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+
+                    DropdownMenu(
+                        expanded = venueMenuExpanded,
+                        onDismissRequest = { venueMenuExpanded = false },
+                        modifier = Modifier.heightIn(max = 360.dp)
                     ) {
-                        items(cityAndAllVenues, key = { it.id }) { venue ->
-                            FilterChip(
-                                selected = venue.id == selectedVenue.id,
-                                onClick = { onSelectVenue(venue.id) },
-                                label = { Text("${venue.name} (${venue.city})") },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = EmeraldPrimary,
-                                    selectedLabelColor = Color.White
-                                ),
+                        cityAndAllVenues.forEach { venue ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(
+                                            text = venue.name,
+                                            fontWeight = if (venue.id == selectedVenue.id) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (venue.id == selectedVenue.id) EmeraldPrimary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "${venue.city} • ${venue.area}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    onSelectVenue(venue.id)
+                                    venueMenuExpanded = false
+                                },
                                 modifier = Modifier.testTag("merchant_venue_chip_${venue.id}")
                             )
                         }
@@ -184,23 +237,23 @@ fun MerchantDashboardScreen(
                 }
             }
 
-            // Live Alerts Simulation Card
+            // Compact Live Simulation Toggle Row
             item {
-                Card(
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (state.isLiveSimulationRunning) {
-                            AmberGold.copy(alpha = 0.16f)
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                        }
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (state.isLiveSimulationRunning) AmberGold.copy(alpha = 0.16f)
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(
+                        1.dp,
+                        if (state.isLiveSimulationRunning) AmberGold.copy(alpha = 0.45f)
+                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp),
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -212,38 +265,20 @@ fun MerchantDashboardScreen(
                                 imageVector = Icons.Default.NotificationsActive,
                                 contentDescription = null,
                                 tint = if (state.isLiveSimulationRunning) AmberAccent else EmeraldPrimary,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(22.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "محاكاة تنبيهات حية للطابور",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "تقدّم تلقائي للطابور مع طبقة خارجية وصوت واهتزاز عند حلول الدور",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = onToggleLiveSimulation,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (state.isLiveSimulationRunning) StatusUrgent else EmeraldPrimary
-                            ),
-                            modifier = Modifier.testTag("live_simulation_toggle")
-                        ) {
-                            Icon(
-                                imageVector = if (state.isLiveSimulationRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
+                            Text(
+                                text = "محاكاة التنبيهات الحية",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(if (state.isLiveSimulationRunning) "إيقاف" else "تشغيل")
                         }
+                        Switch(
+                            checked = state.isLiveSimulationRunning,
+                            onCheckedChange = { onToggleLiveSimulation() },
+                            modifier = Modifier.testTag("live_simulation_toggle")
+                        )
                     }
                 }
             }
@@ -266,7 +301,7 @@ fun MerchantDashboardScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "العميل قيد الخدمة الآن",
                                     style = MaterialTheme.typography.labelMedium,
@@ -325,7 +360,6 @@ fun MerchantDashboardScreen(
                             }
                         }
 
-                        // Pause & Accepting Bookings Switches
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -358,7 +392,7 @@ fun MerchantDashboardScreen(
             // Waiting Queue List
             item {
                 Text(
-                    text = "تصفح الطابور بالانتظار (${waitingItems.size})",
+                    text = "بالانتظار (${waitingItems.size})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -375,7 +409,7 @@ fun MerchantDashboardScreen(
                             text = "الطابور فارغ حالياً — أضف عميل حضوري أو احجز تذكرة من الاستكشاف.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(18.dp)
+                            modifier = Modifier.padding(16.dp)
                         )
                     }
                 }
@@ -389,17 +423,16 @@ fun MerchantDashboardScreen(
                 }
             }
 
-            // Recent Finished / No-show
             if (finishedItems.isNotEmpty()) {
                 item {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "سجل حركة المحل اليوم",
+                        text = "المنتهية اليوم",
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                items(finishedItems.take(6), key = { it.id }) { item ->
+                items(finishedItems.take(5), key = { it.id }) { item ->
                     val statusEnum = QueueItemStatus.entries.find { it.name == item.status } ?: QueueItemStatus.DONE
                     Surface(
                         shape = RoundedCornerShape(14.dp),
@@ -409,13 +442,13 @@ fun MerchantDashboardScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                                .padding(horizontal = 14.dp, vertical = 9.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "${item.customerName} (${item.ticketCode})",
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.bodySmall
                             )
                             Text(
                                 text = statusEnum.label,
@@ -467,7 +500,7 @@ fun MerchantDashboardScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)
                 ) {
-                    Text("إضافة للطابور")
+                    Text("إضافة")
                 }
             },
             dismissButton = {
@@ -498,7 +531,7 @@ private fun MerchantStatCard(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(19.dp))
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleLarge,
@@ -527,8 +560,8 @@ private fun QueueWaitingRow(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

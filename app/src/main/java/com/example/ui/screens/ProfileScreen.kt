@@ -4,17 +4,17 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,24 +24,21 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -55,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -68,19 +66,12 @@ import com.example.ui.theme.DiamondBlue
 import com.example.ui.theme.MintPrimaryDark
 import com.example.ui.viewmodel.DoriUiState
 
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
-import com.example.data.model.UserProfileSettings
-import com.example.ui.theme.StatusOpen
-import com.example.ui.theme.StatusUrgent
-
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProfileScreen(
     state: DoriUiState,
     hasNotificationPermission: Boolean,
     onRequestNotificationPermission: () -> Unit,
-    onSaveProfile: (name: String, phone: String, district: NinevehDistrict, age: String, optionalNote: String) -> Unit,
+    onSelectDistrict: (NinevehDistrict) -> Unit,
     onToggleDarkMode: () -> Unit,
     onSetMuteSound: (Boolean) -> Unit,
     onSetMuteVibration: (Boolean) -> Unit,
@@ -95,16 +86,7 @@ fun ProfileScreen(
         ((points - tier.minPoints).toFloat() / span.toFloat()).coerceIn(0f, 1f)
     }
     val animatedProgress by animateFloatAsState(targetValue = rawProgress, label = "loyaltyProgress")
-
-    var nameInput by remember(prefs.userName) { mutableStateOf(prefs.userName) }
-    var phoneInput by remember(prefs.userPhone) { mutableStateOf(prefs.userPhone) }
-    var ageInput by remember(prefs.userAge) { mutableStateOf(prefs.userAge) }
-    var optionalNoteInput by remember(prefs.optionalNote) { mutableStateOf(prefs.optionalNote) }
-    var districtInput by remember(prefs.selectedDistrict) { mutableStateOf(prefs.selectedDistrict) }
-    var hasAttemptedSave by remember { mutableStateOf(false) }
-
-    val isNameValid = UserProfileSettings.isValidFullName(nameInput)
-    val isPhoneValid = UserProfileSettings.isValidPhone(phoneInput)
+    var districtMenuExpanded by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier.fillMaxSize(),
@@ -114,14 +96,14 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 680.dp),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 104.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Futuristic Loyalty Card
             item {
                 Card(
-                    shape = RoundedCornerShape(26.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 5.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Box(
@@ -132,9 +114,9 @@ fun ProfileScreen(
                                     colors = listOf(Color(0xFF0A1428), Color(0xFF064E3B), Color(0xFF312E81))
                                 )
                             )
-                            .padding(20.dp)
+                            .padding(18.dp)
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -170,7 +152,7 @@ fun ProfileScreen(
                                         }
                                     }
 
-                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
 
                                     Text(
                                         text = "$points نقطة ولاء",
@@ -190,7 +172,7 @@ fun ProfileScreen(
                                     contentDescription = "وسام الولاء",
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
-                                        .size(78.dp)
+                                        .size(72.dp)
                                         .clip(CircleShape)
                                 )
                             }
@@ -220,11 +202,11 @@ fun ProfileScreen(
                                     trackColor = Color.White.copy(alpha = 0.2f),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(10.dp)
+                                        .height(9.dp)
                                         .clip(RoundedCornerShape(50))
                                 )
                                 Text(
-                                    text = "الميزة الحالية: ${tier.perkDescription}",
+                                    text = "الميزة: ${tier.perkDescription}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color.White.copy(alpha = 0.92f)
                                 )
@@ -234,7 +216,7 @@ fun ProfileScreen(
                 }
             }
 
-            // Local Nineveh District & Profile Form
+            // Clean Compact Preferences & Android Notifications Card
             item {
                 Card(
                     shape = RoundedCornerShape(22.dp),
@@ -247,181 +229,83 @@ fun ProfileScreen(
                         modifier = Modifier.padding(18.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "بياناتك الشخصية وقضاء نينوى",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = if (prefs.hasMandatoryInfo) StatusOpen.copy(alpha = 0.14f)
-                                else StatusUrgent.copy(alpha = 0.14f)
-                            ) {
-                                Text(
-                                    text = if (prefs.hasMandatoryInfo) "مكتملة ✓" else "مطلوب التسجيل *",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (prefs.hasMandatoryInfo) StatusOpen else StatusUrgent,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-
                         Text(
-                            text = "تُدخل بيانات الزبون من البداية عند كل حجز جديد، بينما تُحفظ هنا إعدادات حسابك الشخصي وقضاء نينوى الافتراضي محلياً على جهازك.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Text(
-                            text = "١. المعلومات الإلزامية (* مطلوب)",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        OutlinedTextField(
-                            value = nameInput,
-                            onValueChange = { nameInput = it },
-                            label = { Text("الاسم الكامل *") },
-                            placeholder = { Text("مثال: علي حسين الجبوري") },
-                            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                            isError = hasAttemptedSave && !isNameValid,
-                            supportingText = if (hasAttemptedSave && !isNameValid) {
-                                { Text("الاسم الكامل إلزامي (3 أحرف على الأقل)", color = StatusUrgent) }
-                            } else null,
-                            singleLine = true,
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("profile_name_input")
-                        )
-
-                        OutlinedTextField(
-                            value = phoneInput,
-                            onValueChange = { phoneInput = it },
-                            label = { Text("رقم الهاتف *") },
-                            placeholder = { Text("0770xxxxxxx") },
-                            leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            isError = hasAttemptedSave && !isPhoneValid,
-                            supportingText = if (hasAttemptedSave && !isPhoneValid) {
-                                { Text("رقم الهاتف إلزامي (10 إلى 14 رقماً)", color = StatusUrgent) }
-                            } else null,
-                            singleLine = true,
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("profile_phone_input")
-                        )
-
-                        Text(
-                            text = "٢. المعلومات الاختيارية (اختياري)",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
-                        OutlinedTextField(
-                            value = ageInput,
-                            onValueChange = { ageInput = it },
-                            label = { Text("العمر (اختياري)") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("profile_age_input")
-                        )
-
-                        OutlinedTextField(
-                            value = optionalNoteInput,
-                            onValueChange = { optionalNoteInput = it },
-                            label = { Text("ملاحظات أو تفاصيل اختيارية دائمة") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("profile_optional_note_input")
-                        )
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.LocationCity,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "القضاء الافتراضي في نينوى",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            NinevehDistrict.entries.forEach { district ->
-                                FilterChip(
-                                    selected = districtInput == district,
-                                    onClick = { districtInput = district },
-                                    label = { Text(district.displayName) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = {
-                                hasAttemptedSave = true
-                                if (isNameValid && isPhoneValid) {
-                                    onSaveProfile(nameInput, phoneInput, districtInput, ageInput, optionalNoteInput)
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .testTag("save_profile_button")
-                        ) {
-                            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("حفظ المعلومات محلياً")
-                        }
-                    }
-                }
-            }
-
-            // Android Alert & Theme Settings
-            item {
-                Card(
-                    shape = RoundedCornerShape(22.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(
-                            text = "تجهيزات الأندرويد والتنبيهات",
+                            text = "الإعدادات والمنطقة",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
+
+                        // Compact Nineveh District Dropdown Row
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable { districtMenuExpanded = true }
+                                    .testTag("profile_district_dropdown")
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.LocationCity,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                text = "القضاء الافتراضي في نينوى",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                text = prefs.selectedDistrict.displayName,
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = districtMenuExpanded,
+                                onDismissRequest = { districtMenuExpanded = false },
+                                modifier = Modifier.heightIn(max = 340.dp)
+                            ) {
+                                NinevehDistrict.entries.forEach { district ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = district.displayName,
+                                                fontWeight = if (prefs.selectedDistrict == district) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (prefs.selectedDistrict == district) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        },
+                                        onClick = {
+                                            onSelectDistrict(district)
+                                            districtMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -441,16 +325,12 @@ fun ProfileScreen(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
-                                        text = "إذن إشعارات النظام",
+                                        text = "إشعارات الدور",
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        text = if (hasNotificationPermission) {
-                                            "مفعّل — ستصلك إشعارات فورية للتذاكر والدور"
-                                        } else {
-                                            "غير مفعّل — اضغط لتفعيل إشعارات الأندرويد"
-                                        },
+                                        text = if (hasNotificationPermission) "مفعّلة للتنبيه الفوري" else "اضغط لتفعيل الإشعارات",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -482,7 +362,7 @@ fun ProfileScreen(
                         SettingToggleRow(
                             icon = Icons.Default.DarkMode,
                             title = "الوضع الليلي",
-                            subtitle = "تبديل مظهر التطبيق بين النهاري والليلي",
+                            subtitle = "تبديل مظهر التطبيق",
                             checked = prefs.isDarkMode,
                             onCheckedChange = { onToggleDarkMode() },
                             tag = "profile_dark_mode_switch"
@@ -490,8 +370,8 @@ fun ProfileScreen(
 
                         SettingToggleRow(
                             icon = Icons.Default.NotificationsOff,
-                            title = "كتم صوت التنبيه",
-                            subtitle = "إيقاف نغمة التنبيه عند اقتراب أو حلول الدور",
+                            title = "كتم الصوت",
+                            subtitle = "إيقاف نغمة تنبيه الدور",
                             checked = prefs.muteSound,
                             onCheckedChange = onSetMuteSound,
                             tag = "profile_mute_sound_switch"
@@ -500,7 +380,7 @@ fun ProfileScreen(
                         SettingToggleRow(
                             icon = Icons.Default.Vibration,
                             title = "كتم الاهتزاز",
-                            subtitle = "إيقاف الاهتزاز عند تحديث حالة التذكرة",
+                            subtitle = "إيقاف الاهتزاز عند التحديث",
                             checked = prefs.muteVibration,
                             onCheckedChange = onSetMuteVibration,
                             tag = "profile_mute_vibration_switch"
@@ -514,7 +394,7 @@ fun ProfileScreen(
 
 @Composable
 private fun SettingToggleRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     subtitle: String,
     checked: Boolean,

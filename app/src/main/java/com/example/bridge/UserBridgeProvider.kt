@@ -1,0 +1,243 @@
+package com.example.bridge
+
+import android.content.ContentProvider
+import android.content.ContentValues
+import android.content.UriMatcher
+import android.database.Cursor
+import android.database.MatrixCursor
+import android.net.Uri
+import com.example.bridge.DoriBridgeContract.BookingCols
+import com.example.bridge.DoriBridgeContract.SupportCols
+import com.example.data.local.DoriDatabase
+import com.example.data.local.SupportTicketEntity
+import com.example.data.model.BookingApprovalStatus
+import com.example.data.model.SupportTicketStatus
+import com.example.util.DoriNotificationHelper
+import kotlinx.coroutines.runBlocking
+
+class UserBridgeProvider : ContentProvider() {
+
+    private val matcher = UriMatcher(UriMatcher.NO_MATCH).apply {
+        addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_SUPPORT_TICKETS, CODE_SUPPORT)
+        addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_BOOKINGS, CODE_BOOKINGS)
+        addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_BOOKING_DECISIONS, CODE_DECISIONS)
+    }
+
+    override fun onCreate(): Boolean = true
+
+    override fun query(
+        uri: Uri,
+        projection: Array<out String>?,
+        selection: String?,
+        selectionArgs: Array<out String>?,
+        sortOrder: String?
+    ): Cursor? {
+        val ctx = context ?: return null
+        val dao = DoriDatabase.getInstance(ctx).doriDao()
+
+        return when (matcher.match(uri)) {
+            CODE_SUPPORT -> {
+                val cols = arrayOf(
+                    SupportCols.EXTERNAL_ID,
+                    SupportCols.SENDER_NAME,
+                    SupportCols.SENDER_PHONE,
+                    SupportCols.CATEGORY,
+                    SupportCols.SUBJECT,
+                    SupportCols.MESSAGE,
+                    SupportCols.STATUS,
+                    SupportCols.ADMIN_REPLY,
+                    SupportCols.REPLIED_BY_ADMIN,
+                    SupportCols.SYNCED_TO_CONTROL,
+                    SupportCols.CREATED_AT,
+                    SupportCols.UPDATED_AT
+                )
+                MatrixCursor(cols).apply {
+                    val tickets = runBlocking { dao.getAllSupportTicketsOnce() }
+                    tickets.forEach { t ->
+                        addRow(
+                            arrayOf<Any?>(
+                                t.externalId,
+                                t.senderName,
+                                t.senderPhone,
+                                t.category,
+                                t.subject,
+                                t.message,
+                                t.status,
+                                t.adminReply,
+                                t.repliedByAdmin,
+                                if (t.syncedToControl) 1 else 0,
+                                t.createdAt,
+                                t.updatedAt
+                            )
+                        )
+                    }
+                }
+            }
+
+            CODE_BOOKINGS -> {
+                val cols = arrayOf(
+                    BookingCols.TICKET_CODE,
+                    BookingCols.QUEUE_NUMBER,
+                    BookingCols.VENUE_ID,
+                    BookingCols.VENUE_NAME,
+                    BookingCols.VENUE_CITY,
+                    BookingCols.VENUE_CATEGORY,
+                    BookingCols.VENUE_PHONE,
+                    BookingCols.CUSTOMER_NAME,
+                    BookingCols.CUSTOMER_PHONE,
+                    BookingCols.SELECTED_OPTION,
+                    BookingCols.NOTES,
+                    BookingCols.OPTIONAL_INFO,
+                    BookingCols.PRICE_DINAR,
+                    BookingCols.STATUS,
+                    BookingCols.STAGE,
+                    BookingCols.APPROVAL_STATUS,
+                    BookingCols.HANDLED_BY_PROVIDER,
+                    BookingCols.APPROVAL_NOTE,
+                    BookingCols.PEOPLE_AHEAD,
+                    BookingCols.ESTIMATED_MINUTES,
+                    BookingCols.CREATED_AT
+                )
+                MatrixCursor(cols).apply {
+                    val bookings = runBlocking { dao.getActiveBookingsOnce() }
+                    bookings.forEach { b ->
+                        addRow(
+                            arrayOf<Any?>(
+                                b.ticketCode,
+                                b.queueNumber,
+                                b.venueId,
+                                b.venueName,
+                                b.venueCity,
+                                b.venueCategory,
+                                b.venuePhone,
+                                b.customerName,
+                                b.customerPhone,
+                                b.selectedOption,
+                                b.notes,
+                                b.optionalInfo,
+                                b.priceDinar,
+                                b.status,
+                                b.stage,
+                                b.approvalStatus,
+                                b.handledByProvider,
+                                b.approvalNote,
+                                b.peopleAhead,
+                                b.estimatedMinutes,
+                                b.createdAt
+                            )
+                        )
+                    }
+                }
+            }
+
+            else -> null
+        }
+    }
+
+    override fun insert(uri: Uri, values: ContentValues?): Uri? {
+        val ctx = context ?: return null
+        val v = values ?: return null
+        val dao = DoriDatabase.getInstance(ctx).doriDao()
+
+        return when (matcher.match(uri)) {
+            CODE_SUPPORT -> {
+                val externalId = v.getAsString(SupportCols.EXTERNAL_ID)?.takeIf { it.isNotBlank() }
+                    ?: return null
+                val adminReply = v.getAsString(SupportCols.ADMIN_REPLY).orEmpty()
+                val repliedBy = v.getAsString(SupportCols.REPLIED_BY_ADMIN).orEmpty()
+                val incomingStatus = v.getAsString(SupportCols.STATUS).orEmpty()
+                    .ifBlank { SupportTicketStatus.REPLIED.name }
+                val updatedAt = v.getAsLong(SupportCols.UPDATED_AT) ?: System.currentTimeMillis()
+
+                runBlocking {
+                    val existing = dao.getSupportTicketByExternalId(externalId)
+                    if (existing != null) {
+                        dao.updateSupportTicket(
+                            existing.copy(
+                                status = incomingStatus,
+                                adminReply = adminReply.ifBlank { existing.adminReply },
+                                repliedByAdmin = repliedBy.ifBlank { existing.repliedByAdmin },
+                                syncedToControl = true,
+                                updatedAt = updatedAt
+                            )
+                        )
+                    } else {
+                        dao.insertSupportTicket(
+                            SupportTicketEntity(
+                                externalId = externalId,
+                                senderName = v.getAsString(SupportCols.SENDER_NAME).orEmpty(),
+                                senderPhone = v.getAsString(SupportCols.SENDER_PHONE).orEmpty(),
+                                category = v.getAsString(SupportCols.CATEGORY).orEmpty(),
+                                subject = v.getAsString(SupportCols.SUBJECT).orEmpty(),
+                                message = v.getAsString(SupportCols.MESSAGE).orEmpty(),
+                                status = incomingStatus,
+                                adminReply = adminReply,
+                                repliedByAdmin = repliedBy,
+                                syncedToControl = true,
+                                createdAt = v.getAsLong(SupportCols.CREATED_AT) ?: System.currentTimeMillis(),
+                                updatedAt = updatedAt
+                            )
+                        )
+                    }
+                }
+                if (adminReply.isNotBlank()) {
+                    DoriNotificationHelper.showSupportMessageNotification(
+                        context = ctx,
+                        title = "💬 رد جديد من الدعم الفني",
+                        body = if (repliedBy.isNotBlank()) "$repliedBy: $adminReply" else adminReply,
+                        idSeed = kotlin.math.abs(externalId.hashCode() % 3000) + 3100
+                    )
+                }
+                Uri.withAppendedPath(DoriBridgeContract.USER_SUPPORT_URI, externalId)
+            }
+
+            CODE_DECISIONS -> {
+                val ticketCode = v.getAsString(BookingCols.TICKET_CODE)?.takeIf { it.isNotBlank() }
+                    ?: return null
+                val approvalStatus = v.getAsString(BookingCols.APPROVAL_STATUS).orEmpty()
+                    .ifBlank { BookingApprovalStatus.PENDING.name }
+                val handledBy = v.getAsString(BookingCols.HANDLED_BY_PROVIDER).orEmpty()
+                val note = v.getAsString(BookingCols.APPROVAL_NOTE).orEmpty()
+
+                val found = runBlocking {
+                    val b = dao.getBookingByTicketCode(ticketCode)
+                    if (b != null) {
+                        dao.updateBooking(
+                            b.copy(
+                                approvalStatus = approvalStatus,
+                                handledByProvider = handledBy,
+                                approvalNote = note
+                            )
+                        )
+                        true
+                    } else {
+                        false
+                    }
+                }
+                if (found) {
+                    DoriNotificationHelper.showTicketDecisionNotification(
+                        context = ctx,
+                        ticketCode = ticketCode,
+                        accepted = approvalStatus == BookingApprovalStatus.ACCEPTED.name,
+                        providerName = handledBy.ifBlank { "مقدم الخدمة" }
+                    )
+                    Uri.withAppendedPath(DoriBridgeContract.USER_DECISIONS_URI, ticketCode)
+                } else {
+                    null
+                }
+            }
+
+            else -> null
+        }
+    }
+
+    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int = 0
+    override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?): Int = 0
+    override fun getType(uri: Uri): String? = null
+
+    private companion object {
+        const val CODE_SUPPORT = 1
+        const val CODE_BOOKINGS = 2
+        const val CODE_DECISIONS = 3
+    }
+}

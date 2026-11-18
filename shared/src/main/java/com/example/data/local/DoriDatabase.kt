@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.example.data.model.MedicalSpecialty
 import com.example.data.model.NinevehDistrict
+import com.example.data.model.ProviderRole
 import com.example.data.model.QueueItemStatus
 import com.example.data.model.ServiceCategory
 
@@ -14,9 +15,12 @@ import com.example.data.model.ServiceCategory
         VenueEntity::class,
         ReviewEntity::class,
         BookingEntity::class,
-        MerchantQueueItemEntity::class
+        MerchantQueueItemEntity::class,
+        SupportTicketEntity::class,
+        AdminAccountEntity::class,
+        ServiceProviderEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class DoriDatabase : RoomDatabase() {
@@ -952,4 +956,96 @@ object SeedData {
         }
         return items
     }
+
+    fun initialAdmins(): List<AdminAccountEntity> = listOf(
+        AdminAccountEntity(
+            id = 1L,
+            name = "أحمد الموصلي",
+            roleTitle = "مدير النظام العام",
+            phone = "07701002000",
+            isActive = true,
+            isSuperAdmin = true,
+            canManageFeatures = true,
+            canManageVenues = true,
+            canManageQueues = true,
+            canReplySupport = true,
+            canManageProviders = true,
+            canManageAdmins = true,
+            canRunCommands = true
+        ),
+        AdminAccountEntity(
+            id = 2L,
+            name = "سارة الجبوري",
+            roleTitle = "مشرفة الدعم والطوابير",
+            phone = "07702003000",
+            isActive = true,
+            isSuperAdmin = false,
+            canManageFeatures = false,
+            canManageVenues = true,
+            canManageQueues = true,
+            canReplySupport = true,
+            canManageProviders = true,
+            canManageAdmins = false,
+            canRunCommands = false
+        )
+    )
+
+    fun initialProviders(): List<ServiceProviderEntity> = listOf(
+        ServiceProviderEntity(
+            id = 1L,
+            name = "د. سرمد العبيدي",
+            providerRole = ProviderRole.DOCTOR.name,
+            customTitle = "طبيب أسنان",
+            phone = "+9647701112233",
+            venueId = 1,
+            venueName = "عيادة الحدباء التخصصية للأسنان",
+            canAcceptTickets = true,
+            canCallNext = true,
+            canPauseVenue = true,
+            isActive = true,
+            acceptedCount = 12
+        ),
+        ServiceProviderEntity(
+            id = 2L,
+            name = "كابتن زيد الدليمي",
+            providerRole = ProviderRole.FIELD_OWNER.name,
+            customTitle = "صاحب ملعب",
+            phone = "+9647724445566",
+            venueId = 4,
+            venueName = "مجمع ملاعب دجلة والغابات",
+            canAcceptTickets = true,
+            canCallNext = true,
+            canPauseVenue = true,
+            isActive = true,
+            acceptedCount = 9
+        ),
+        ServiceProviderEntity(
+            id = 3L,
+            name = "المهندس عمر الطائي",
+            providerRole = ProviderRole.WORKSHOP_OWNER.name,
+            customTitle = "صاحب ورشة صيانة",
+            phone = "+9647712223344",
+            venueId = 2,
+            venueName = "مركز الثقافية لصيانة السيارات",
+            canAcceptTickets = true,
+            canCallNext = true,
+            canPauseVenue = false,
+            isActive = true,
+            acceptedCount = 7
+        ),
+        ServiceProviderEntity(
+            id = 4L,
+            name = "د. هدى الحديدي",
+            providerRole = ProviderRole.DOCTOR.name,
+            customTitle = "طبيبة أطفال",
+            phone = "+9647708881122",
+            venueId = 34,
+            venueName = "عيادة د. هدى الحديدي لطب الأطفال",
+            canAcceptTickets = true,
+            canCallNext = true,
+            canPauseVenue = true,
+            isActive = true,
+            acceptedCount = 15
+        )
+    )
 }

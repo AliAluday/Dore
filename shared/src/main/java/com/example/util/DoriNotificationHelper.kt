@@ -76,6 +76,44 @@ object DoriNotificationHelper {
         )
     }
 
+    fun showSupportMessageNotification(
+        context: Context,
+        title: String,
+        body: String,
+        idSeed: Int = 3001
+    ) {
+        if (!hasNotificationPermission(context)) return
+        ensureChannel(context)
+        postNotification(
+            context = context,
+            notificationId = idSeed,
+            title = title,
+            body = body
+        )
+    }
+
+    fun showTicketDecisionNotification(
+        context: Context,
+        ticketCode: String,
+        accepted: Boolean,
+        providerName: String
+    ) {
+        if (!hasNotificationPermission(context)) return
+        ensureChannel(context)
+        val title = if (accepted) "✅ تم قبول تذكرتك ($ticketCode)" else "⚠️ اعتذار عن التذكرة ($ticketCode)"
+        val body = if (accepted) {
+            "قبل $providerName طلبك الآن — تذكرتك مؤكدة في الطابور."
+        } else {
+            "تعذر قبول التذكرة من $providerName — راجع تطبيق دوري."
+        }
+        postNotification(
+            context = context,
+            notificationId = ticketCode.hashCode().let { kotlin.math.abs(it % 4000) + 4000 },
+            title = title,
+            body = body
+        )
+    }
+
     private fun postNotification(
         context: Context,
         notificationId: Int,

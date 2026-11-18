@@ -24,13 +24,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -57,12 +59,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.LiveOverlayAlertBanner
 import com.example.ui.components.TopStickyHeader
 import com.example.ui.screens.ControlPanelScreen
 import com.example.ui.screens.MerchantDashboardScreen
+import com.example.ui.screens.SupportInboxScreen
+import com.example.ui.screens.TeamAndProvidersScreen
 import com.example.ui.theme.DoriTheme
 import com.example.ui.viewmodel.AppTab
 import com.example.ui.viewmodel.DoriAppMode
@@ -142,6 +147,8 @@ private fun ControlAppRoot(
                         onSelectDistrict = viewModel::selectDistrict,
                         onToggleDarkMode = viewModel::toggleDarkMode,
                         onOpenTickets = { viewModel.selectTab(AppTab.CONTROL_QUEUES) },
+                        supportBadgeCount = state.supportAlertCount,
+                        onOpenSupport = { viewModel.selectTab(AppTab.CONTROL_SUPPORT) },
                         brandTitle = "دوري تحكم",
                         showSearchAction = false,
                         showTicketsBadge = false
@@ -157,6 +164,10 @@ private fun ControlAppRoot(
                         AppTab.CONTROL_QUEUES -> MerchantDashboardScreen(
                             state = state,
                             onSelectVenue = viewModel::selectMerchantVenue,
+                            onSelectProvider = viewModel::setActiveProvider,
+                            onAcceptTicket = viewModel::acceptBookingTicket,
+                            onRejectTicket = viewModel::rejectBookingTicket,
+                            onSyncBridge = { viewModel.syncLocalBridge(silent = false) },
                             onCallNext = viewModel::callNextCustomer,
                             onSkipCurrent = viewModel::skipCurrentCustomer,
                             onCallCustomerByName = viewModel::callCustomerByName,
@@ -165,6 +176,29 @@ private fun ControlAppRoot(
                             onToggleAcceptingBookings = viewModel::toggleAcceptingBookings,
                             onAddWalkIn = viewModel::addWalkIn,
                             onToggleLiveSimulation = viewModel::toggleLiveSimulation
+                        )
+
+                        AppTab.CONTROL_TEAM -> TeamAndProvidersScreen(
+                            state = state,
+                            onSelectActiveAdmin = viewModel::setActiveAdmin,
+                            onAddAdmin = viewModel::addAdminAccount,
+                            onUpdateAdmin = viewModel::updateAdminAccount,
+                            onDeleteAdmin = viewModel::deleteAdminAccount,
+                            onSelectActiveProvider = viewModel::setActiveProvider,
+                            onAddProvider = viewModel::addServiceProvider,
+                            onUpdateProvider = viewModel::updateServiceProvider,
+                            onDeleteProvider = viewModel::deleteServiceProvider,
+                            onOpenProviderWorkspace = { providerId ->
+                                viewModel.setActiveProvider(providerId)
+                                viewModel.selectTab(AppTab.CONTROL_QUEUES)
+                            }
+                        )
+
+                        AppTab.CONTROL_SUPPORT -> SupportInboxScreen(
+                            state = state,
+                            onSyncBridge = { viewModel.syncLocalBridge(silent = false) },
+                            onReplyTicket = viewModel::replyToSupportTicket,
+                            onUpdateStatus = viewModel::updateSupportTicketStatus
                         )
 
                         else -> ControlPanelScreen(
@@ -185,18 +219,20 @@ private fun ControlAppRoot(
                             onResetAllQueues = viewModel::resetAllQueuesToOne,
                             onAdjustLoyaltyPoints = viewModel::adjustLoyaltyPoints,
                             onResetLoyaltyPoints = viewModel::resetLoyaltyPoints,
-                            onFactoryReset = viewModel::factoryResetAllData
+                            onFactoryReset = viewModel::factoryResetAllData,
+                            onSyncBridge = { viewModel.syncLocalBridge(silent = false) }
                         )
                     }
 
                     ControlFloatingBottomDock(
                         currentTab = state.currentTab,
                         activeTicketsCount = state.activeBookings.size,
+                        supportAlertCount = state.supportAlertCount,
                         onSelectTab = viewModel::selectTab,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
-                            .padding(horizontal = 14.dp, vertical = 12.dp)
+                            .padding(horizontal = 12.dp, vertical = 12.dp)
                     )
                 }
             }
@@ -220,12 +256,13 @@ private fun ControlAppRoot(
 private fun ControlFloatingBottomDock(
     currentTab: AppTab,
     activeTicketsCount: Int,
+    supportAlertCount: Int,
     onSelectTab: (AppTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier
-            .widthIn(max = 560.dp)
+            .widthIn(max = 580.dp)
             .fillMaxWidth(),
         shape = RoundedCornerShape(30.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
@@ -236,7 +273,7 @@ private fun ControlFloatingBottomDock(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(horizontal = 6.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -246,7 +283,8 @@ private fun ControlFloatingBottomDock(
                     AppTab.CONTROL_FEATURES -> if (selected) Icons.Filled.Tune else Icons.Outlined.Tune
                     AppTab.CONTROL_VENUES -> if (selected) Icons.Filled.Storefront else Icons.Outlined.Storefront
                     AppTab.CONTROL_QUEUES -> if (selected) Icons.Filled.Group else Icons.Outlined.Group
-                    AppTab.CONTROL_COMMANDS -> if (selected) Icons.Filled.Bolt else Icons.Outlined.Bolt
+                    AppTab.CONTROL_TEAM -> if (selected) Icons.Filled.AdminPanelSettings else Icons.Outlined.AdminPanelSettings
+                    AppTab.CONTROL_SUPPORT -> if (selected) Icons.Filled.SupportAgent else Icons.Outlined.SupportAgent
                     else -> Icons.Outlined.Tune
                 }
                 val bgColor by animateColorAsState(
@@ -258,6 +296,12 @@ private fun ControlFloatingBottomDock(
                     label = "ctrlDockFg"
                 )
 
+                val badgeCount = when (tab) {
+                    AppTab.CONTROL_QUEUES -> activeTicketsCount
+                    AppTab.CONTROL_SUPPORT -> supportAlertCount
+                    else -> 0
+                }
+
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -265,7 +309,7 @@ private fun ControlFloatingBottomDock(
                         .clip(CircleShape)
                         .background(bgColor)
                         .clickable { onSelectTab(tab) }
-                        .padding(vertical = 8.dp, horizontal = 4.dp)
+                        .padding(vertical = 8.dp, horizontal = 2.dp)
                         .testTag("nav_tab_${tab.name.lowercase()}"),
                     contentAlignment = Alignment.Center
                 ) {
@@ -273,21 +317,22 @@ private fun ControlFloatingBottomDock(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        if (tab == AppTab.CONTROL_QUEUES && activeTicketsCount > 0) {
+                        if (badgeCount > 0) {
                             BadgedBox(
-                                badge = { Badge { Text("$activeTicketsCount") } }
+                                badge = { Badge { Text("$badgeCount") } }
                             ) {
-                                Icon(icon, contentDescription = tab.label, tint = fgColor, modifier = Modifier.size(20.dp))
+                                Icon(icon, contentDescription = tab.label, tint = fgColor, modifier = Modifier.size(19.dp))
                             }
                         } else {
-                            Icon(icon, contentDescription = tab.label, tint = fgColor, modifier = Modifier.size(20.dp))
+                            Icon(icon, contentDescription = tab.label, tint = fgColor, modifier = Modifier.size(19.dp))
                         }
                         Text(
                             text = tab.label,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                             color = fgColor,
                             maxLines = 1,
+                            softWrap = false,
                             overflow = TextOverflow.Ellipsis
                         )
                     }

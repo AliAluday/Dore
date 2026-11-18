@@ -294,4 +294,119 @@ class ExampleRobolectricTest {
                 db.close()
             }
         }
+
+    @Test
+    fun `support tickets, admin permissions, and provider ticket acceptance workflow work end-to-end`() =
+        kotlinx.coroutines.runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val db = androidx.room.Room.inMemoryDatabaseBuilder(
+                context,
+                com.example.data.local.DoriDatabase::class.java
+            ).allowMainThreadQueries().build()
+            try {
+                val prefs = com.example.data.local.UserPreferencesDataStore(context)
+                val repo = com.example.data.repository.DoriRepository(db.doriDao(), prefs)
+                repo.ensureSeeded()
+
+                // 1. Seeded Admins & Permission Checks
+                val seededAdmins = db.doriDao().getAllAdminsOnce()
+                assertTrue(seededAdmins.size >= 2)
+                val superAdmin = seededAdmins.first { it.isSuperAdmin }
+                assertTrue(
+                    com.example.data.model.AdminPermissionType.entries.all {
+                        superAdmin.hasPermission(it)
+                    }
+                )
+                // Super Admin cannot be deleted
+                assertTrue(repo.deleteAdminAccount(superAdmin.id).isFailure)
+
+                // Add restricted Admin & verify granular permissions
+                val addedAdmin = repo.addAdminAccount(
+                    name = "حسين العزاوي",
+                    roleTitle = "موظف دعم",
+                    phone = "07705556677",
+                    canManageFeatures = false,
+                    canManageVenues = false,
+                    canManageQueues = false,
+                    canReplySupport = true,
+                    canManageProviders = false,
+                    canManageAdmins = false,
+                    canRunCommands = false
+                ).getOrThrow()
+                assertTrue(addedAdmin.hasPermission(com.example.data.model.AdminPermissionType.REPLY_SUPPORT))
+                assertFalse(addedAdmin.hasPermission(com.example.data.model.AdminPermissionType.MANAGE_ADMINS))
+                assertFalse(addedAdmin.hasPermission(com.example.data.model.AdminPermissionType.RUN_COMMANDS))
+                assertTrue(repo.deleteAdminAccount(addedAdmin.id).isSuccess)
+
+                // 2. Support Ticket Creation, Delivery & Admin Reply
+                val ticket = repo.createSupportTicket(
+                    senderName = "محمد خالد",
+                    senderPhone = "07701234567",
+                    category = com.example.data.model.SupportCategory.BOOKING_ISSUE,
+                    subject = "استفسار عن الحجز",
+                    message = "تأخرت التذكرة قليلاً في تحديث الدور"
+                ).getOrThrow()
+                assertEquals(com.example.data.model.SupportTicketStatus.SENT.name, ticket.status)
+                repo.markSupportTicketDelivered(ticket.id)
+                assertEquals(
+                    com.example.data.model.SupportTicketStatus.DELIVERED.name,
+                    db.doriDao().getSupportTicketById(ticket.id)!!.status
+                )
+                val replied = repo.replyToSupportTicket(
+                    ticketId = ticket.id,
+                    replyText = "تم فحص الطابور وتحديث دورك فوراً",
+                    adminName = "أحمد الموصلي"
+                ).getOrThrow()
+                assertEquals(com.example.data.model.SupportTicketStatus.REPLIED.name, replied.status)
+                assertEquals("تم فحص الطابور وتحديث دورك فوراً", replied.adminReply)
+
+                // 3. Service Providers & Ticket Acceptance / Rejection
+                val seededProviders = db.doriDao().getAllProvidersOnce()
+                assertTrue(seededProviders.size >= 4)
+                val doctor = repo.addServiceProvider(
+                    name = "د. علياء النعيمي",
+                    role = com.example.data.model.ProviderRole.DOCTOR,
+                    customTitle = "طبيب اختصاص",
+                    phone = "07708889900",
+                    venueId = 1,
+                    canAcceptTickets = true,
+                    canCallNext = true,
+                    canPauseVenue = false
+                ).getOrThrow()
+                assertEquals("طبيب اختصاص", doctor.customTitle)
+
+                val booking1 = repo.bookQueueTicket(
+                    venueId = 1,
+                    customerName = "عمر سعد",
+                    customerPhone = "07701112233",
+                    selectedOption = "فحص وتشخيص"
+                ).getOrThrow()
+                assertEquals(com.example.data.model.BookingApprovalStatus.PENDING.name, booking1.approvalStatus)
+
+                val accepted = repo.acceptBookingTicket(
+                    bookingId = booking1.id,
+                    actorName = "${doctor.name} (${doctor.customTitle})",
+                    note = "حياك الله بعيادتنا",
+                    providerId = doctor.id
+                )!!
+                assertEquals(com.example.data.model.BookingApprovalStatus.ACCEPTED.name, accepted.approvalStatus)
+                assertEquals(1, db.doriDao().getProviderById(doctor.id)!!.acceptedCount)
+
+                val booking2 = repo.bookQueueTicket(
+                    venueId = 1,
+                    customerName = "ياسر نوري",
+                    customerPhone = "07704445566",
+                    selectedOption = "متابعة"
+                ).getOrThrow()
+                val rejected = repo.rejectBookingTicket(
+                    bookingId = booking2.id,
+                    actorName = "${doctor.name} (${doctor.customTitle})",
+                    note = "الجدول ممتلئ اليوم"
+                )!!
+                assertEquals(com.example.data.model.BookingApprovalStatus.REJECTED.name, rejected.approvalStatus)
+                assertEquals(com.example.data.model.BookingStatus.CANCELLED.name, rejected.status)
+            } finally {
+                db.close()
+            }
+        }
 }

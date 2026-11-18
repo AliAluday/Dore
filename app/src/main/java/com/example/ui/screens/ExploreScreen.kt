@@ -36,7 +36,9 @@ import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.SportsSoccer
+import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -94,6 +96,7 @@ fun ExploreScreen(
     onBookFastestTurn: () -> Unit,
     onDirectBookVenue: (VenueEntity) -> Unit,
     onToggleFavorite: (VenueEntity) -> Unit,
+    onOpenSupport: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val ctrl = state.preferences.controlConfig
@@ -500,12 +503,65 @@ fun ExploreScreen(
                 }
             } else {
                 items(state.filteredVenues, key = { it.id }) { venue ->
+                    val linkedProvider = state.providers.firstOrNull { it.venueId == venue.id && it.isActive }
                     FuturisticVenueCard(
                         venue = venue,
+                        providerLabel = linkedProvider?.let { "${it.name} (${it.customTitle})" },
                         bookingsAllowed = ctrl.allowNewBookings,
                         onDirectBook = { onDirectBookVenue(venue) },
                         onToggleFavorite = { onToggleFavorite(venue) }
                     )
+                }
+
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .clickable { onOpenSupport() }
+                            .testTag("explore_support_footer_card")
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SupportAgent,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary
+                                )
+                                Column {
+                                    Text(
+                                        text = "تحتاج مساعدة أو لديك استفسار؟",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "اضغط هنا للتواصل المباشر مع الدعم الفني",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "الدعم الفني ←",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -515,6 +571,7 @@ fun ExploreScreen(
 @Composable
 private fun FuturisticVenueCard(
     venue: VenueEntity,
+    providerLabel: String? = null,
     bookingsAllowed: Boolean,
     onDirectBook: () -> Unit,
     onToggleFavorite: () -> Unit
@@ -576,6 +633,28 @@ private fun FuturisticVenueCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (!providerLabel.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.VerifiedUser,
+                                contentDescription = null,
+                                tint = StatusOpen,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = providerLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = StatusOpen,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
 
                 Row(

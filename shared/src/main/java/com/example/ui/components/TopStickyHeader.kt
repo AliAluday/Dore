@@ -31,6 +31,9 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SupportAgent
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -78,6 +81,8 @@ fun TopStickyHeader(
     brandTitle: String = "دوري",
     showSearchAction: Boolean = true,
     showTicketsBadge: Boolean = true,
+    supportBadgeCount: Int = 0,
+    onOpenSupport: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var districtMenuExpanded by remember { mutableStateOf(false) }
@@ -286,6 +291,36 @@ fun TopStickyHeader(
                                 tint = if (hasActiveSearch) accentTint else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(19.dp)
                             )
+                        }
+                    }
+
+                    if (onOpenSupport != null) {
+                        IconButton(
+                            onClick = onOpenSupport,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .minimumInteractiveComponentSize()
+                                .clip(CircleShape)
+                                .background(accentTint.copy(alpha = 0.16f))
+                                .testTag("header_support_button")
+                        ) {
+                            if (supportBadgeCount > 0) {
+                                BadgedBox(badge = { Badge { Text("$supportBadgeCount") } }) {
+                                    Icon(
+                                        imageVector = Icons.Default.SupportAgent,
+                                        contentDescription = "الدعم الفني",
+                                        tint = accentTint,
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.SupportAgent,
+                                    contentDescription = "الدعم الفني",
+                                    tint = accentTint,
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
                         }
                     }
 

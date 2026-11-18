@@ -5,24 +5,34 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.bridge.DoriLocalBridgeClient
+import com.example.data.local.AdminAccountEntity
 import com.example.data.local.BookingEntity
 import com.example.data.local.DoriDatabase
 import com.example.data.local.MerchantQueueItemEntity
 import com.example.data.local.ReviewEntity
+import com.example.data.local.ServiceProviderEntity
+import com.example.data.local.SupportTicketEntity
 import com.example.data.local.UserPreferencesDataStore
 import com.example.data.local.VenueEntity
+import com.example.data.model.AdminPermissionType
+import com.example.data.model.BookingApprovalStatus
 import com.example.data.model.BookingStatus
 import com.example.data.model.LiveTurnAlert
 import com.example.data.model.MedicalSpecialty
 import com.example.data.model.NinevehDistrict
+import com.example.data.model.ProviderRole
 import com.example.data.model.ServiceCategory
 import com.example.data.model.SortOption
+import com.example.data.model.SupportCategory
+import com.example.data.model.SupportTicketStatus
 import com.example.data.model.TicketStage
 import com.example.data.model.UserAppControlConfig
 import com.example.data.model.UserProfileSettings
 import com.example.data.repository.DoriRepository
 import com.example.util.AlertNotifier
 import com.example.util.DoriNotificationHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -35,6 +45,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class DoriAppMode {
     USER_APP,
@@ -48,11 +59,12 @@ enum class AppTab(val label: String) {
     CONTROL_FEATURES("المميزات"),
     CONTROL_VENUES("المراكز"),
     CONTROL_QUEUES("الطوابير"),
-    CONTROL_COMMANDS("الأوامر");
+    CONTROL_TEAM("الطاقم"),
+    CONTROL_SUPPORT("الدعم");
 
     companion object {
         val userTabs = listOf(EXPLORE, TICKETS, PROFILE)
-        val controlTabs = listOf(CONTROL_FEATURES, CONTROL_VENUES, CONTROL_QUEUES, CONTROL_COMMANDS)
+        val controlTabs = listOf(CONTROL_FEATURES, CONTROL_VENUES, CONTROL_QUEUES, CONTROL_TEAM, CONTROL_SUPPORT)
     }
 }
 
@@ -75,10 +87,17 @@ data class DoriUiState(
     val averageRatingInDistrict: Double = 0.0,
     val reviewsByVenue: Map<Int, List<ReviewEntity>> = emptyMap(),
     val activeBookings: List<BookingEntity> = emptyList(),
+    val pendingApprovalBookings: List<BookingEntity> = emptyList(),
     val selectedActiveBookingId: Long? = null,
     val historyBookings: List<BookingEntity> = emptyList(),
     val selectedMerchantVenueId: Int = 1,
     val queueItemsByVenue: Map<Int, List<MerchantQueueItemEntity>> = emptyMap(),
+    val supportTickets: List<SupportTicketEntity> = emptyList(),
+    val supportAlertCount: Int = 0,
+    val admins: List<AdminAccountEntity> = emptyList(),
+    val activeAdmin: AdminAccountEntity? = null,
+    val providers: List<ServiceProviderEntity> = emptyList(),
+    val activeProvider: ServiceProviderEntity? = null,
     val isLiveSimulationRunning: Boolean = false,
     val activeTurnAlert: LiveTurnAlert? = null,
     val selectedVenueForDetails: VenueEntity? = null,
@@ -127,6 +146,7 @@ class DoriViewModel(
     init {
         viewModelScope.launch {
             repository.ensureSeeded()
+            syncLocalBridgeInternal(silent = true)
         }
     }
 
@@ -141,7 +161,10 @@ class DoriViewModel(
         repository.venues,
         repository.reviews,
         repository.bookings,
-        repository.queueItems
+        repository.queueItems,
+        repository.supportTickets,
+        repository.admins,
+        repository.providers
     ) { values ->
         val filters = values[0] as FilterState
         val userPrefs = values[1] as UserProfileSettings
@@ -153,6 +176,12 @@ class DoriViewModel(
         val bookings = values[4] as List<BookingEntity>
         @Suppress("UNCHECKED_CAST")
         val queueItems = values[5] as List<MerchantQueueItemEntity>
+        @Suppress("UNCHECKED_CAST")
+        val supportTickets = values[6] as List<SupportTicketEntity>
+        @Suppress("UNCHECKED_CAST")
+        val admins = values[7] as List<AdminAccountEntity>
+        @Suppress("UNCHECKED_CAST")
+        val providers = values[8] as List<ServiceProviderEntity>
 
         val district = userPrefs.selectedDistrict
         val districtVenues = if (district == NinevehDistrict.ALL_NINEVEH) {
@@ -208,6 +237,7 @@ class DoriViewModel(
             }
 
         val activeList = bookings.filter { it.status == BookingStatus.ACTIVE.name }
+        val pendingApprovals = activeList.filter { it.approvalStatus == BookingApprovalStatus.PENDING.name }
         val historyList = bookings.filter { it.status != BookingStatus.ACTIVE.name }
         val effectiveBookingId = if (activeList.any { it.id == filters.selectedActiveBookingId }) {
             filters.selectedActiveBookingId
@@ -215,10 +245,26 @@ class DoriViewModel(
             activeList.firstOrNull()?.id
         }
 
-        val effectiveMerchantId = if (venues.any { it.id == filters.selectedMerchantVenueId }) {
+        val activeAdmin = admins.find { it.id == userPrefs.activeAdminId }
+            ?: admins.firstOrNull()
+        val activeProvider = providers.find { it.id == userPrefs.activeProviderId && it.isActive }
+
+        val effectiveMerchantId = if (activeProvider != null && venues.any { it.id == activeProvider.venueId }) {
+            activeProvider.venueId
+        } else if (venues.any { it.id == filters.selectedMerchantVenueId }) {
             filters.selectedMerchantVenueId
         } else {
             districtVenues.firstOrNull()?.id ?: venues.firstOrNull()?.id ?: 1
+        }
+
+        val supportBadgeCount = if (appMode == DoriAppMode.CONTROL_APP) {
+            supportTickets.count {
+                it.status == SupportTicketStatus.SENT.name ||
+                    it.status == SupportTicketStatus.DELIVERED.name ||
+                    it.status == SupportTicketStatus.IN_REVIEW.name
+            }
+        } else {
+            supportTickets.count { it.status == SupportTicketStatus.REPLIED.name }
         }
 
         val detailVenue = filters.selectedVenueIdForDetails?.let { id -> venues.find { it.id == id } }
@@ -242,10 +288,17 @@ class DoriViewModel(
             averageRatingInDistrict = avgRating,
             reviewsByVenue = reviews.groupBy { it.venueId },
             activeBookings = activeList,
+            pendingApprovalBookings = pendingApprovals,
             selectedActiveBookingId = effectiveBookingId,
             historyBookings = historyList,
             selectedMerchantVenueId = effectiveMerchantId,
             queueItemsByVenue = queueItems.groupBy { it.venueId },
+            supportTickets = supportTickets,
+            supportAlertCount = supportBadgeCount,
+            admins = admins,
+            activeAdmin = activeAdmin,
+            providers = providers,
+            activeProvider = activeProvider,
             isLiveSimulationRunning = filters.isLiveSimulationRunning,
             activeTurnAlert = filters.activeTurnAlert,
             selectedVenueForDetails = detailVenue,
@@ -258,8 +311,71 @@ class DoriViewModel(
         initialValue = DoriUiState(appMode = appMode, currentTab = initialTab)
     )
 
+    private suspend fun requireAdminPermission(permission: AdminPermissionType): Boolean {
+        if (appMode != DoriAppMode.CONTROL_APP) return true
+        val admin = uiState.value.activeAdmin ?: return true
+        if (admin.hasPermission(permission)) return true
+        _toastMessage.emit("حساب (${admin.name}) لا يملك صلاحية: ${permission.label}")
+        return false
+    }
+
     fun selectTab(tab: AppTab) {
         filterState.update { it.copy(currentTab = tab) }
+        if (tab == AppTab.TICKETS || tab == AppTab.CONTROL_SUPPORT || tab == AppTab.CONTROL_QUEUES) {
+            viewModelScope.launch { syncLocalBridgeInternal(silent = true) }
+        }
+    }
+
+    fun syncLocalBridge(silent: Boolean = false) {
+        viewModelScope.launch {
+            syncLocalBridgeInternal(silent = silent)
+        }
+    }
+
+    private suspend fun syncLocalBridgeInternal(silent: Boolean) {
+        val ctx = getApplication<Application>()
+        val isCtrl = appMode == DoriAppMode.CONTROL_APP
+        val changedCount = withContext(Dispatchers.IO) {
+            var count = 0
+            val remoteTickets = DoriLocalBridgeClient.pullSupportTicketsFromPeer(ctx, isCtrl)
+            count += repository.mergePulledSupportTickets(remoteTickets, isCtrl)
+
+            if (isCtrl) {
+                val unsynced = repository.getAllSupportTicketsSnapshot()
+                unsynced.filter { it.adminReply.isNotBlank() }.forEach { replied ->
+                    DoriLocalBridgeClient.pushSupportReplyToUser(ctx, replied)
+                }
+                val remoteBookings = DoriLocalBridgeClient.pullBookingsFromUser(ctx)
+                count += repository.mergePulledBookingsForControl(remoteBookings)
+            } else {
+                val localTickets = repository.getAllSupportTicketsSnapshot()
+                localTickets.filter { !it.syncedToControl }.forEach { pending ->
+                    if (DoriLocalBridgeClient.pushSupportTicketToControl(ctx, pending)) {
+                        repository.markSupportTicketDelivered(pending.id)
+                        count++
+                    }
+                }
+                val decisions = DoriLocalBridgeClient.pullBookingDecisionsFromControl(ctx)
+                decisions.forEach { d ->
+                    if (repository.applyBookingApprovalDecisionLocal(
+                            d.ticketCode,
+                            d.approvalStatus,
+                            d.handledByProvider,
+                            d.approvalNote
+                        )
+                    ) {
+                        count++
+                    }
+                }
+            }
+            count
+        }
+        if (!silent) {
+            _toastMessage.emit(
+                if (changedCount > 0) "تمت المزامنة بنجاح ($changedCount تحديث جديد)"
+                else "البيانات محدّثة بالفعل"
+            )
+        }
     }
 
     fun selectDistrict(district: NinevehDistrict) {
@@ -368,6 +484,9 @@ class DoriViewModel(
                 if (uiState.value.preferences.controlConfig.enableLiveAlerts) {
                     DoriNotificationHelper.showBookingCreatedNotification(getApplication(), booking)
                 }
+                withContext(Dispatchers.IO) {
+                    DoriLocalBridgeClient.pushBookingToControl(getApplication(), booking)
+                }
                 filterState.update {
                     it.copy(
                         selectedVenueIdForDetails = null,
@@ -442,13 +561,274 @@ class DoriViewModel(
         }
     }
 
-    // Merchant Dashboard actions
+    // ==================== Support Center Commands ====================
+
+    fun sendSupportMessage(
+        senderName: String,
+        senderPhone: String,
+        category: SupportCategory,
+        subject: String,
+        message: String
+    ) {
+        viewModelScope.launch {
+            val result = repository.createSupportTicket(
+                senderName = senderName,
+                senderPhone = senderPhone,
+                category = category,
+                subject = subject,
+                message = message
+            )
+            result.onSuccess { ticket ->
+                val pushed = withContext(Dispatchers.IO) {
+                    DoriLocalBridgeClient.pushSupportTicketToControl(getApplication(), ticket)
+                }
+                if (pushed) {
+                    repository.markSupportTicketDelivered(ticket.id)
+                    _toastMessage.emit("تم إرسال رسالتك إلى تطبيق دوري تحكم بنجاح ✓")
+                } else {
+                    _toastMessage.emit("تم حفظ الرسالة محلياً — ستصل فور فتح دوري تحكم")
+                }
+            }.onFailure { err ->
+                _toastMessage.emit(err.message ?: "تعذر إرسال رسالة الدعم")
+            }
+        }
+    }
+
+    fun replyToSupportTicket(ticketId: Long, replyText: String) {
+        viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.REPLY_SUPPORT)) return@launch
+            val admin = uiState.value.activeAdmin
+            val adminLabel = if (admin != null) "${admin.name} (${admin.roleTitle})" else "إدارة الدعم الفني"
+            repository.replyToSupportTicket(ticketId, replyText, adminLabel)
+                .onSuccess { updated ->
+                    val pushed = withContext(Dispatchers.IO) {
+                        DoriLocalBridgeClient.pushSupportReplyToUser(getApplication(), updated)
+                    }
+                    _toastMessage.emit(
+                        if (pushed) "تم إرسال الرد وإشعار نسخة المستخدم ✓"
+                        else "تم حفظ الرد وسيظهر للمستخدم عند المزامنة"
+                    )
+                }
+                .onFailure { err ->
+                    _toastMessage.emit(err.message ?: "تعذر إرسال الرد")
+                }
+        }
+    }
+
+    fun updateSupportTicketStatus(ticketId: Long, status: SupportTicketStatus) {
+        viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.REPLY_SUPPORT)) return@launch
+            val updated = repository.updateSupportTicketStatus(ticketId, status) ?: return@launch
+            withContext(Dispatchers.IO) {
+                DoriLocalBridgeClient.pushSupportReplyToUser(getApplication(), updated)
+            }
+            _toastMessage.emit("تم تحديث حالة التذكرة إلى: ${status.label}")
+        }
+    }
+
+    // ==================== Admin Management Commands ====================
+
+    fun setActiveAdmin(adminId: Long) {
+        viewModelScope.launch {
+            repository.setActiveAdmin(adminId)
+            val target = uiState.value.admins.find { it.id == adminId }
+            if (target != null) {
+                _toastMessage.emit("تم التبديل إلى حساب الأدمن: ${target.name}")
+            }
+        }
+    }
+
+    fun addAdminAccount(
+        name: String,
+        roleTitle: String,
+        phone: String,
+        canManageFeatures: Boolean,
+        canManageVenues: Boolean,
+        canManageQueues: Boolean,
+        canReplySupport: Boolean,
+        canManageProviders: Boolean,
+        canManageAdmins: Boolean,
+        canRunCommands: Boolean
+    ) {
+        viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_ADMINS)) return@launch
+            repository.addAdminAccount(
+                name = name,
+                roleTitle = roleTitle,
+                phone = phone,
+                canManageFeatures = canManageFeatures,
+                canManageVenues = canManageVenues,
+                canManageQueues = canManageQueues,
+                canReplySupport = canReplySupport,
+                canManageProviders = canManageProviders,
+                canManageAdmins = canManageAdmins,
+                canRunCommands = canRunCommands
+            ).onSuccess { created ->
+                _toastMessage.emit("تمت إضافة الأدمن \"${created.name}\" بنجاح")
+            }.onFailure { err ->
+                _toastMessage.emit(err.message ?: "تعذر إضافة الأدمن")
+            }
+        }
+    }
+
+    fun updateAdminAccount(updated: AdminAccountEntity) {
+        viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_ADMINS)) return@launch
+            if (updated.isSuperAdmin) {
+                _toastMessage.emit("صلاحيات المدير العام الأساسي ثابتة ولا يمكن تعطيلها")
+                return@launch
+            }
+            repository.updateAdminAccount(updated)
+        }
+    }
+
+    fun deleteAdminAccount(adminId: Long) {
+        viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_ADMINS)) return@launch
+            repository.deleteAdminAccount(adminId)
+                .onSuccess { _toastMessage.emit("تم حذف حساب الأدمن") }
+                .onFailure { err -> _toastMessage.emit(err.message ?: "تعذر حذف الحساب") }
+        }
+    }
+
+    // ==================== Service Providers (Doctors / Field Owners / Merchants) ====================
+
+    fun setActiveProvider(providerId: Long) {
+        viewModelScope.launch {
+            repository.setActiveProvider(providerId)
+            val prov = uiState.value.providers.find { it.id == providerId }
+            if (prov != null) {
+                filterState.update { it.copy(selectedMerchantVenueId = prov.venueId) }
+                _toastMessage.emit("أنت تعمل الآن بصلاحية: ${prov.name} (${prov.customTitle})")
+            } else {
+                _toastMessage.emit("العودة إلى وضع الإدارة الكامل")
+            }
+        }
+    }
+
+    fun addServiceProvider(
+        name: String,
+        role: ProviderRole,
+        customTitle: String,
+        phone: String,
+        venueId: Int,
+        canAcceptTickets: Boolean,
+        canCallNext: Boolean,
+        canPauseVenue: Boolean
+    ) {
+        viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_PROVIDERS)) return@launch
+            repository.addServiceProvider(
+                name = name,
+                role = role,
+                customTitle = customTitle,
+                phone = phone,
+                venueId = venueId,
+                canAcceptTickets = canAcceptTickets,
+                canCallNext = canCallNext,
+                canPauseVenue = canPauseVenue
+            ).onSuccess { prov ->
+                _toastMessage.emit("تمت إضافة ${prov.name} (${prov.customTitle})")
+            }.onFailure { err ->
+                _toastMessage.emit(err.message ?: "تعذر إضافة مقدم الخدمة")
+            }
+        }
+    }
+
+    fun updateServiceProvider(provider: ServiceProviderEntity) {
+        viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_PROVIDERS)) return@launch
+            repository.updateServiceProvider(provider)
+        }
+    }
+
+    fun deleteServiceProvider(providerId: Long) {
+        viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_PROVIDERS)) return@launch
+            repository.deleteServiceProvider(providerId)
+            _toastMessage.emit("تم حذف مقدم الخدمة")
+        }
+    }
+
+    fun acceptBookingTicket(bookingId: Long, note: String = "") {
+        viewModelScope.launch {
+            val prov = uiState.value.activeProvider
+            if (prov != null) {
+                if (!prov.canAcceptTickets || !prov.isActive) {
+                    _toastMessage.emit("حساب ${prov.name} لا يملك صلاحية قبول التذاكر")
+                    return@launch
+                }
+            } else if (!requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)) {
+                return@launch
+            }
+            val actorName = prov?.let { "${it.name} (${it.customTitle})" }
+                ?: uiState.value.activeAdmin?.name
+                ?: "إدارة المركز"
+            val updated = repository.acceptBookingTicket(
+                bookingId = bookingId,
+                actorName = actorName,
+                note = note,
+                providerId = prov?.id
+            ) ?: return@launch
+            withContext(Dispatchers.IO) {
+                DoriLocalBridgeClient.pushBookingDecisionToUser(
+                    context = getApplication(),
+                    ticketCode = updated.ticketCode,
+                    approvalStatus = updated.approvalStatus,
+                    handledByProvider = updated.handledByProvider,
+                    approvalNote = updated.approvalNote
+                )
+            }
+            _toastMessage.emit("تم قبول التذكرة ${updated.ticketCode} بواسطة $actorName ✓")
+        }
+    }
+
+    fun rejectBookingTicket(bookingId: Long, note: String = "") {
+        viewModelScope.launch {
+            val prov = uiState.value.activeProvider
+            if (prov != null) {
+                if (!prov.canAcceptTickets || !prov.isActive) {
+                    _toastMessage.emit("حساب ${prov.name} لا يملك صلاحية رفض التذاكر")
+                    return@launch
+                }
+            } else if (!requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)) {
+                return@launch
+            }
+            val actorName = prov?.let { "${it.name} (${it.customTitle})" }
+                ?: uiState.value.activeAdmin?.name
+                ?: "إدارة المركز"
+            val updated = repository.rejectBookingTicket(
+                bookingId = bookingId,
+                actorName = actorName,
+                note = note
+            ) ?: return@launch
+            withContext(Dispatchers.IO) {
+                DoriLocalBridgeClient.pushBookingDecisionToUser(
+                    context = getApplication(),
+                    ticketCode = updated.ticketCode,
+                    approvalStatus = updated.approvalStatus,
+                    handledByProvider = updated.handledByProvider,
+                    approvalNote = updated.approvalNote
+                )
+            }
+            _toastMessage.emit("تم الاعتذار عن التذكرة ${updated.ticketCode}")
+        }
+    }
+
+    // ==================== Merchant Dashboard actions ====================
+
     fun selectMerchantVenue(venueId: Int) {
         filterState.update { it.copy(selectedMerchantVenueId = venueId) }
     }
 
     fun callNextCustomer(venueId: Int) {
         viewModelScope.launch {
+            val prov = uiState.value.activeProvider
+            if (prov != null && !prov.canCallNext) {
+                _toastMessage.emit("${prov.name} لا يملك صلاحية استدعاء الدور")
+                return@launch
+            }
+            if (prov == null && !requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)) return@launch
             val alerts = repository.callNextCustomer(venueId)
             handleTurnAlerts(alerts)
         }
@@ -456,6 +836,12 @@ class DoriViewModel(
 
     fun skipCurrentCustomer(venueId: Int) {
         viewModelScope.launch {
+            val prov = uiState.value.activeProvider
+            if (prov != null && !prov.canCallNext) {
+                _toastMessage.emit("${prov.name} لا يملك صلاحية تخطي الدور")
+                return@launch
+            }
+            if (prov == null && !requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)) return@launch
             val alerts = repository.skipCurrentCustomer(venueId)
             handleTurnAlerts(alerts)
             _toastMessage.emit("تم تخطي العميل الحالي والنداء على التالي")
@@ -464,6 +850,12 @@ class DoriViewModel(
 
     fun callCustomerByName(venueId: Int, queueItemId: Long, customerName: String) {
         viewModelScope.launch {
+            val prov = uiState.value.activeProvider
+            if (prov != null && !prov.canCallNext) {
+                _toastMessage.emit("${prov.name} لا يملك صلاحية استدعاء العميل")
+                return@launch
+            }
+            if (prov == null && !requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)) return@launch
             val alerts = repository.callCustomerByName(venueId, queueItemId)
             handleTurnAlerts(alerts)
             _toastMessage.emit("تم استدعاء $customerName الآن")
@@ -472,6 +864,9 @@ class DoriViewModel(
 
     fun markCustomerNoShow(venueId: Int, queueItemId: Long, customerName: String) {
         viewModelScope.launch {
+            if (uiState.value.activeProvider == null &&
+                !requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)
+            ) return@launch
             val alerts = repository.markCustomerNoShow(venueId, queueItemId)
             handleTurnAlerts(alerts)
             _toastMessage.emit("تم تسجيل توقف $customerName عن الحضور")
@@ -480,18 +875,33 @@ class DoriViewModel(
 
     fun togglePauseQueue(venueId: Int) {
         viewModelScope.launch {
+            val prov = uiState.value.activeProvider
+            if (prov != null && !prov.canPauseVenue) {
+                _toastMessage.emit("${prov.name} لا يملك صلاحية إيقاف الطابور")
+                return@launch
+            }
+            if (prov == null && !requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)) return@launch
             repository.togglePauseQueue(venueId)
         }
     }
 
     fun toggleAcceptingBookings(venueId: Int) {
         viewModelScope.launch {
+            val prov = uiState.value.activeProvider
+            if (prov != null && !prov.canPauseVenue) {
+                _toastMessage.emit("${prov.name} لا يملك صلاحية تعديل استقبال الحجوزات")
+                return@launch
+            }
+            if (prov == null && !requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)) return@launch
             repository.toggleAcceptingBookings(venueId)
         }
     }
 
     fun addWalkIn(venueId: Int, name: String, option: String) {
         viewModelScope.launch {
+            if (uiState.value.activeProvider == null &&
+                !requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)
+            ) return@launch
             repository.addWalkInCustomer(venueId, name, option)
             _toastMessage.emit("تمت إضافة العميل إلى طابور المحل")
         }
@@ -545,6 +955,7 @@ class DoriViewModel(
 
     fun updateControlConfig(transform: (UserAppControlConfig) -> UserAppControlConfig) {
         viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_FEATURES)) return@launch
             repository.updateControlConfig(transform)
         }
     }
@@ -552,6 +963,7 @@ class DoriViewModel(
     fun toggleCategoryEnabled(category: ServiceCategory) {
         if (category == ServiceCategory.ALL) return
         viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_FEATURES)) return@launch
             repository.updateControlConfig { cfg ->
                 val next = cfg.disabledCategories.toMutableSet()
                 if (category.displayName in next) {
@@ -569,6 +981,7 @@ class DoriViewModel(
 
     fun setBroadcastMessage(message: String) {
         viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_FEATURES)) return@launch
             repository.updateControlConfig { it.copy(broadcastMessage = message.trim()) }
             _toastMessage.emit(
                 if (message.isBlank()) "تم مسح رسالة الإعلان العام"
@@ -588,6 +1001,7 @@ class DoriViewModel(
         phone: String
     ) {
         viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_VENUES)) return@launch
             repository.addCustomVenue(name, district, area, category, specialty, priceDinar, avgMinutes, phone)
                 .onSuccess { venue ->
                     _toastMessage.emit("تمت إضافة \"${venue.name}\" إلى نسخة المستخدم")
@@ -599,19 +1013,29 @@ class DoriViewModel(
     }
 
     fun toggleVenueOpen(venueId: Int) {
-        viewModelScope.launch { repository.toggleVenueOpen(venueId) }
+        viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_VENUES)) return@launch
+            repository.toggleVenueOpen(venueId)
+        }
     }
 
     fun adjustVenuePrice(venueId: Int, deltaDinar: Int) {
-        viewModelScope.launch { repository.adjustVenuePrice(venueId, deltaDinar) }
+        viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_VENUES)) return@launch
+            repository.adjustVenuePrice(venueId, deltaDinar)
+        }
     }
 
     fun adjustVenueWaitMinutes(venueId: Int, deltaMinutes: Int) {
-        viewModelScope.launch { repository.adjustVenueWaitMinutes(venueId, deltaMinutes) }
+        viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_VENUES)) return@launch
+            repository.adjustVenueWaitMinutes(venueId, deltaMinutes)
+        }
     }
 
     fun deleteVenue(venueId: Int) {
         viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_VENUES)) return@launch
             repository.deleteVenue(venueId)
             _toastMessage.emit("تم حذف المركز من القائمة")
         }
@@ -619,6 +1043,7 @@ class DoriViewModel(
 
     fun setDistrictVenuesOpen(open: Boolean) {
         viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_VENUES)) return@launch
             val district = uiState.value.preferences.selectedDistrict
             repository.setAllVenuesOpenInDistrict(district, open)
             _toastMessage.emit(
@@ -630,6 +1055,7 @@ class DoriViewModel(
 
     fun advanceAllQueuesNow() {
         viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
             val alerts = repository.advanceActiveUserTicketDemoStep()
             handleTurnAlerts(alerts)
             _toastMessage.emit("تم تقديم جميع الأدوار النشطة خطوة للأمام")
@@ -638,6 +1064,7 @@ class DoriViewModel(
 
     fun completeAllActiveBookings() {
         viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
             val count = repository.completeAllActiveBookings()
             _toastMessage.emit("تم إتمام $count تذكرة نشطة")
         }
@@ -645,6 +1072,7 @@ class DoriViewModel(
 
     fun cancelAllActiveBookings() {
         viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
             val count = repository.cancelAllActiveBookings()
             _toastMessage.emit("تم إلغاء $count تذكرة نشطة")
         }
@@ -652,6 +1080,7 @@ class DoriViewModel(
 
     fun resetAllQueuesToOne() {
         viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
             repository.resetAllQueuesToOne()
             _toastMessage.emit("تم تصفير جميع الطوابير والبدء من التذكرة #1")
         }
@@ -659,6 +1088,7 @@ class DoriViewModel(
 
     fun adjustLoyaltyPoints(delta: Int) {
         viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
             repository.adjustLoyaltyPoints(delta)
             _toastMessage.emit("تم تحديث نقاط الولاء")
         }
@@ -666,6 +1096,7 @@ class DoriViewModel(
 
     fun resetLoyaltyPoints() {
         viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
             repository.resetLoyaltyPoints()
             _toastMessage.emit("تم تصفير نقاط الولاء")
         }
@@ -673,6 +1104,7 @@ class DoriViewModel(
 
     fun factoryResetAllData() {
         viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
             simulationJob?.cancel()
             simulationJob = null
             filterState.update { it.copy(isLiveSimulationRunning = false, activeTurnAlert = null) }

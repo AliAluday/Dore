@@ -35,10 +35,12 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Share
@@ -62,10 +64,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -80,7 +85,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.data.local.ServiceProviderEntity
 import com.example.data.local.VenueEntity
+import com.example.data.model.AdminPermissionType
 import com.example.data.model.MedicalSpecialty
 import com.example.data.model.NinevehDistrict
 import com.example.data.model.ServiceCategory
@@ -88,6 +95,7 @@ import com.example.data.model.UserAppControlConfig
 import com.example.ui.theme.AmberAccent
 import com.example.ui.theme.AmberGold
 import com.example.ui.theme.EmeraldPrimary
+import com.example.ui.theme.IndigoAccentLight
 import com.example.ui.theme.MintPrimaryDark
 import com.example.ui.theme.StatusOpen
 import com.example.ui.theme.StatusUrgent
@@ -125,12 +133,22 @@ fun ControlPanelScreen(
     onAdjustLoyaltyPoints: (Int) -> Unit,
     onResetLoyaltyPoints: () -> Unit,
     onFactoryReset: () -> Unit,
+    onSyncBridge: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val ctrl = state.preferences.controlConfig
     var broadcastInput by remember(ctrl.broadcastMessage) { mutableStateOf(ctrl.broadcastMessage) }
     var showAddVenueDialog by remember { mutableStateOf(false) }
     var showFactoryResetConfirm by remember { mutableStateOf(false) }
+    var featuresSubTab by remember { mutableIntStateOf(0) }
+
+    val activeAdmin = state.activeAdmin
+    val canManageFeatures = activeAdmin?.hasPermission(AdminPermissionType.MANAGE_FEATURES) ?: true
+    val canManageVenues = activeAdmin?.hasPermission(AdminPermissionType.MANAGE_VENUES) ?: true
+    val canRunCommands = activeAdmin?.hasPermission(AdminPermissionType.RUN_COMMANDS) ?: true
+    val providersByVenue = remember(state.providers) {
+        state.providers.filter { it.isActive }.groupBy { it.venueId }
+    }
 
     Box(
         modifier = modifier.fillMaxSize(),
@@ -176,15 +194,19 @@ fun ControlPanelScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column {
                                     Text(
-                                        text = "تطبيق التحكم — دوري تحكم",
+                                        text = "دوري تحكم • ${activeAdmin?.name ?: "الإدارة العامة"}",
                                         style = MaterialTheme.typography.titleMedium,
                                         color = Color.White,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = "وضع تجريبي محلي • ${state.allVenues.size} مركز • ${state.activeBookings.size} تذكرة نشطة",
+                                        text = "${activeAdmin?.roleTitle ?: "مدير عام"} • ${state.allVenues.size} مركز • ${state.pendingApprovalBookings.size} بانتظار القبول",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White.copy(alpha = 0.85f)
+                                        color = Color.White.copy(alpha = 0.85f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -212,7 +234,7 @@ fun ControlPanelScreen(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Local Trial Status Card
+                        // Local Trial & Cross-App Sync Card
                         item {
                             Card(
                                 shape = RoundedCornerShape(18.dp),
@@ -239,12 +261,12 @@ fun ControlPanelScreen(
                                         )
                                         Column {
                                             Text(
-                                                text = "نسخة تجريبية محلية • بدون تسجيل دخول",
+                                                text = "وضع تجريبي محلي • الجسر مفعّل",
                                                 style = MaterialTheme.typography.titleSmall,
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Text(
-                                                text = "تدير بيانات نينوى محلياً على الجهاز عبر قاعدة Room",
+                                                text = "مزامنة رسائل الدعم وقبول التذاكر مباشرة مع نسخة المستخدم",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 maxLines = 2,
@@ -253,21 +275,57 @@ fun ControlPanelScreen(
                                         }
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Surface(
+                                    OutlinedButton(
+                                        onClick = onSyncBridge,
                                         shape = RoundedCornerShape(12.dp),
-                                        color = EmeraldPrimary.copy(alpha = 0.14f)
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                        modifier = Modifier.testTag("ctrl_sync_bridge_button")
                                     ) {
-                                        Text(
-                                            text = "تجريبي",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = EmeraldPrimary,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                        )
+                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("مزامنة", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
                         }
+
+                        // Segmented Sub-tabs: Features vs Quick Commands
+                        item {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            ) {
+                                TabRow(
+                                    selectedTabIndex = featuresSubTab,
+                                    containerColor = Color.Transparent,
+                                    divider = {}
+                                ) {
+                                    Tab(
+                                        selected = featuresSubTab == 0,
+                                        onClick = { featuresSubTab = 0 },
+                                        text = { Text("المميزات والإعلانات", fontWeight = FontWeight.Bold) },
+                                        modifier = Modifier.testTag("ctrl_subtab_features")
+                                    )
+                                    Tab(
+                                        selected = featuresSubTab == 1,
+                                        onClick = { featuresSubTab = 1 },
+                                        text = { Text("الأوامر السريعة", fontWeight = FontWeight.Bold) },
+                                        modifier = Modifier.testTag("ctrl_subtab_commands")
+                                    )
+                                }
+                            }
+                        }
+
+                        if (featuresSubTab == 0) {
+                            if (!canManageFeatures) {
+                                item {
+                                    PermissionLockedBanner(
+                                        permissionName = AdminPermissionType.MANAGE_FEATURES.label,
+                                        adminName = activeAdmin?.name ?: ""
+                                    )
+                                }
+                            }
 
                         // Broadcast Message Card
                         item {
@@ -499,6 +557,111 @@ fun ControlPanelScreen(
                                 }
                             }
                         }
+                        } else {
+                            if (!canRunCommands) {
+                                item {
+                                    PermissionLockedBanner(
+                                        permissionName = AdminPermissionType.RUN_COMMANDS.label,
+                                        adminName = activeAdmin?.name ?: ""
+                                    )
+                                }
+                            }
+                            item {
+                                CommandActionCard(
+                                    title = "تقديم جميع الأدوار خطوة",
+                                    subtitle = "تحريك كل التذاكر النشطة في الطوابير وتنبيه المستخدمين",
+                                    buttonLabel = "تنفيذ الآن",
+                                    icon = Icons.Default.FastForward,
+                                    accent = EmeraldPrimary,
+                                    testTag = "ctrl_cmd_advance_all",
+                                    onClick = onAdvanceAllQueues
+                                )
+                            }
+                            item {
+                                CommandActionCard(
+                                    title = "إتمام كل التذاكر النشطة (${state.activeBookings.size})",
+                                    subtitle = "إنهاء جميع التذاكر الجارية ومنح نقاط الولاء",
+                                    buttonLabel = "إتمام الكل",
+                                    icon = Icons.Default.CheckCircle,
+                                    accent = StatusOpen,
+                                    testTag = "ctrl_cmd_complete_all",
+                                    onClick = onCompleteAllActive
+                                )
+                            }
+                            item {
+                                CommandActionCard(
+                                    title = "إلغاء كل التذاكر النشطة",
+                                    subtitle = "نقل التذاكر النشطة إلى السجل وتفريغ الدور للمستخدم",
+                                    buttonLabel = "إلغاء الكل",
+                                    icon = Icons.Default.Cancel,
+                                    accent = AmberAccent,
+                                    testTag = "ctrl_cmd_cancel_all",
+                                    onClick = onCancelAllActive
+                                )
+                            }
+                            item {
+                                CommandActionCard(
+                                    title = "تصفير الطوابير والبدء من #1",
+                                    subtitle = "إعادة ترقيم جميع المراكز لتبدأ من التذكرة رقم 1",
+                                    buttonLabel = "تصفير #1",
+                                    icon = Icons.Default.LockOpen,
+                                    accent = MaterialTheme.colorScheme.secondary,
+                                    testTag = "ctrl_cmd_reset_queues",
+                                    onClick = onResetAllQueues
+                                )
+                            }
+                            item {
+                                Card(
+                                    shape = RoundedCornerShape(18.dp),
+                                    border = BorderStroke(1.dp, AmberGold.copy(alpha = 0.4f)),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(14.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "نقاط ولاء المستخدم (${state.preferences.loyaltyPoints})",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = "منح مكافأة فورية أو تصفير الرصيد",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Button(
+                                                onClick = { onAdjustLoyaltyPoints(50) },
+                                                colors = ButtonDefaults.buttonColors(containerColor = AmberGold, contentColor = Color(0xFF1F1600)),
+                                                modifier = Modifier.testTag("ctrl_cmd_add_50_points")
+                                            ) {
+                                                Text("+50", fontWeight = FontWeight.Bold)
+                                            }
+                                            OutlinedButton(onClick = onResetLoyaltyPoints) {
+                                                Text("تصفير")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            item {
+                                CommandActionCard(
+                                    title = "إعادة ضبط المصنع بالكامل",
+                                    subtitle = "استعادة المراكز الأولية والطاقم وإعدادات نسخة المستخدم الافتراضية",
+                                    buttonLabel = "إعادة الضبط",
+                                    icon = Icons.Default.RestartAlt,
+                                    accent = StatusUrgent,
+                                    testTag = "ctrl_cmd_factory_reset",
+                                    onClick = { showFactoryResetConfirm = true }
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -507,6 +670,14 @@ fun ControlPanelScreen(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        if (!canManageVenues) {
+                            item {
+                                PermissionLockedBanner(
+                                    permissionName = AdminPermissionType.MANAGE_VENUES.label,
+                                    adminName = activeAdmin?.name ?: ""
+                                )
+                            }
+                        }
                         item {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -545,6 +716,7 @@ fun ControlPanelScreen(
                         items(state.districtVenues, key = { it.id }) { venue ->
                             ControlVenueCard(
                                 venue = venue,
+                                linkedProviders = providersByVenue[venue.id].orEmpty(),
                                 onToggleOpen = { onToggleVenueOpen(venue.id) },
                                 onAdjustPrice = { delta -> onAdjustVenuePrice(venue.id, delta) },
                                 onAdjustWait = { delta -> onAdjustVenueWait(venue.id, delta) },
@@ -554,108 +726,7 @@ fun ControlPanelScreen(
                     }
                 }
 
-                else -> {
-                    LazyColumn(
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        item {
-                            CommandActionCard(
-                                title = "تقديم جميع الأدوار خطوة",
-                                subtitle = "تحريك كل التذاكر النشطة في الطوابير وتنبيه المستخدمين",
-                                buttonLabel = "تنفيذ الآن",
-                                icon = Icons.Default.FastForward,
-                                accent = EmeraldPrimary,
-                                testTag = "ctrl_cmd_advance_all",
-                                onClick = onAdvanceAllQueues
-                            )
-                        }
-                        item {
-                            CommandActionCard(
-                                title = "إتمام كل التذاكر النشطة (${state.activeBookings.size})",
-                                subtitle = "إنهاء جميع التذاكر الجارية ومنح نقاط الولاء",
-                                buttonLabel = "إتمام الكل",
-                                icon = Icons.Default.CheckCircle,
-                                accent = StatusOpen,
-                                testTag = "ctrl_cmd_complete_all",
-                                onClick = onCompleteAllActive
-                            )
-                        }
-                        item {
-                            CommandActionCard(
-                                title = "إلغاء كل التذاكر النشطة",
-                                subtitle = "نقل التذاكر النشطة إلى السجل وتفريغ الدور للمستخدم",
-                                buttonLabel = "إلغاء الكل",
-                                icon = Icons.Default.Cancel,
-                                accent = AmberAccent,
-                                testTag = "ctrl_cmd_cancel_all",
-                                onClick = onCancelAllActive
-                            )
-                        }
-                        item {
-                            CommandActionCard(
-                                title = "تصفير الطوابير والبدء من #1",
-                                subtitle = "إعادة ترقيم جميع الشركات والمحلات لتبدأ من التذكرة رقم 1",
-                                buttonLabel = "تصفير #1",
-                                icon = Icons.Default.LockOpen,
-                                accent = MaterialTheme.colorScheme.secondary,
-                                testTag = "ctrl_cmd_reset_queues",
-                                onClick = onResetAllQueues
-                            )
-                        }
-                        item {
-                            Card(
-                                shape = RoundedCornerShape(18.dp),
-                                border = BorderStroke(1.dp, AmberGold.copy(alpha = 0.4f)),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "نقاط ولاء المستخدم (${state.preferences.loyaltyPoints})",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "منح مكافأة فورية أو تصفير الرصيد",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Button(
-                                            onClick = { onAdjustLoyaltyPoints(50) },
-                                            colors = ButtonDefaults.buttonColors(containerColor = AmberGold, contentColor = Color(0xFF1F1600)),
-                                            modifier = Modifier.testTag("ctrl_cmd_add_50_points")
-                                        ) {
-                                            Text("+50", fontWeight = FontWeight.Bold)
-                                        }
-                                        OutlinedButton(onClick = onResetLoyaltyPoints) {
-                                            Text("تصفير")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        item {
-                            CommandActionCard(
-                                title = "إعادة ضبط المصنع بالكامل",
-                                subtitle = "استعادة المراكز الأولية وإعدادات نسخة المستخدم الافتراضية",
-                                buttonLabel = "إعادة الضبط",
-                                icon = Icons.Default.RestartAlt,
-                                accent = StatusUrgent,
-                                testTag = "ctrl_cmd_factory_reset",
-                                onClick = { showFactoryResetConfirm = true }
-                            )
-                        }
-                    }
-                }
+                else -> Unit
             }
         }
     }
@@ -745,8 +816,36 @@ private fun ControlSwitchRow(
 }
 
 @Composable
+private fun PermissionLockedBanner(
+    permissionName: String,
+    adminName: String
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = StatusUrgent.copy(alpha = 0.1f),
+        border = BorderStroke(1.dp, StatusUrgent.copy(alpha = 0.35f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(Icons.Default.Lock, contentDescription = null, tint = StatusUrgent, modifier = Modifier.size(18.dp))
+            Text(
+                text = "الحساب الحالي ($adminName) لا يملك صلاحية ($permissionName) — التعديلات محمية.",
+                style = MaterialTheme.typography.labelMedium,
+                color = StatusUrgent,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
 private fun ControlVenueCard(
     venue: VenueEntity,
+    linkedProviders: List<ServiceProviderEntity>,
     onToggleOpen: () -> Unit,
     onAdjustPrice: (Int) -> Unit,
     onAdjustWait: (Int) -> Unit,
@@ -784,6 +883,16 @@ private fun ControlVenueCard(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (linkedProviders.isNotEmpty()) {
+                        Text(
+                            text = linkedProviders.joinToString(" • ") { "${it.name} (${it.customTitle})" },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = IndigoAccentLight,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(

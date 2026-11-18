@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.local.BookingEntity
+import com.example.data.model.BookingApprovalStatus
 import com.example.data.model.TicketStage
 import com.example.data.model.UserAppControlConfig
 import com.example.ui.theme.AmberGold
@@ -241,6 +242,32 @@ fun PerforatedTicketCard(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        val approval = BookingApprovalStatus.fromName(booking.approvalStatus)
+                        val approvalColor = when (approval) {
+                            BookingApprovalStatus.ACCEPTED -> StatusOpen
+                            BookingApprovalStatus.REJECTED -> StatusUrgent
+                            BookingApprovalStatus.PENDING -> AmberGold
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = approvalColor.copy(alpha = 0.14f),
+                            border = BorderStroke(1.dp, approvalColor.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = when (approval) {
+                                    BookingApprovalStatus.ACCEPTED ->
+                                        "✓ تم القبول${if (booking.handledByProvider.isNotBlank()) " من ${booking.handledByProvider}" else ""}"
+                                    BookingApprovalStatus.REJECTED ->
+                                        "✕ مرفوضة${if (booking.handledByProvider.isNotBlank()) " من ${booking.handledByProvider}" else ""}"
+                                    BookingApprovalStatus.PENDING -> "⏳ بانتظار قبول مقدم الخدمة"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = approvalColor,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                            )
+                        }
                     }
 
                     Surface(

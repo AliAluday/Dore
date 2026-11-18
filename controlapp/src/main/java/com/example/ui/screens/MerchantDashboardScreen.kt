@@ -1,10 +1,13 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,16 +21,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonOff
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.AlertDialog
@@ -37,6 +47,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -59,20 +70,29 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.data.local.BookingEntity
 import com.example.data.local.MerchantQueueItemEntity
+import com.example.data.model.BookingApprovalStatus
 import com.example.data.model.QueueItemStatus
 import com.example.ui.theme.AmberAccent
 import com.example.ui.theme.AmberGold
 import com.example.ui.theme.EmeraldPrimary
+import com.example.ui.theme.IndigoAccentLight
 import com.example.ui.theme.StatusOpen
 import com.example.ui.theme.StatusPaused
 import com.example.ui.theme.StatusUrgent
 import com.example.ui.viewmodel.DoriUiState
+import com.example.util.IntentHelpers
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MerchantDashboardScreen(
     state: DoriUiState,
     onSelectVenue: (Int) -> Unit,
+    onSelectProvider: (Long) -> Unit,
+    onAcceptTicket: (Long, String) -> Unit,
+    onRejectTicket: (Long, String) -> Unit,
+    onSyncBridge: () -> Unit,
     onCallNext: (Int) -> Unit,
     onSkipCurrent: (Int) -> Unit,
     onCallCustomerByName: (Int, Long, String) -> Unit,
@@ -94,13 +114,18 @@ fun MerchantDashboardScreen(
 
     var showWalkInDialog by remember { mutableStateOf(false) }
     var venueMenuExpanded by remember { mutableStateOf(false) }
+    var providerMenuExpanded by remember { mutableStateOf(false) }
+    var rejectingBooking by remember { mutableStateOf<BookingEntity?>(null) }
+
+    val activeProvider = state.activeProvider
+    val activeProviders = remember(state.providers) { state.providers.filter { it.isActive } }
 
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
     ) {
         if (selectedVenue == null) {
-            Text("لا توجد محلات مسجلة")
+            Text("لا توجد مراكز مسجلة")
             return
         }
 
@@ -113,6 +138,11 @@ fun MerchantDashboardScreen(
                 it.status == QueueItemStatus.NO_SHOW.name
         }.reversed()
 
+        val venueBookings = remember(state.activeBookings, selectedVenue.id) {
+            state.activeBookings.filter { it.venueId == selectedVenue.id }
+        }
+        val pendingCount = venueBookings.count { it.approvalStatus == BookingApprovalStatus.PENDING.name }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -120,7 +150,185 @@ fun MerchantDashboardScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Compact Venue Selector Dropdown (replaces 35 scrolling chips)
+            // Active Operator / Provider Switcher Card
+            item {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (activeProvider != null) IndigoAccentLight.copy(alpha = 0.55f)
+                        else EmeraldPrimary.copy(alpha = 0.38f)
+                    ),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (activeProvider != null) {
+                            IndigoAccentLight.copy(alpha = 0.08f)
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        }
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .clickable { providerMenuExpanded = true }
+                                        .testTag("merchant_provider_switcher")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(34.dp)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        if (activeProvider != null) IndigoAccentLight.copy(alpha = 0.18f)
+                                                        else EmeraldPrimary.copy(alpha = 0.16f)
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (activeProvider != null) Icons.Default.Badge else Icons.Default.AdminPanelSettings,
+                                                    contentDescription = null,
+                                                    tint = if (activeProvider != null) IndigoAccentLight else EmeraldPrimary,
+                                                    modifier = Modifier.size(19.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = activeProvider?.let { "${it.name} • ${it.customTitle}" }
+                                                        ?: "وضع الأدمن الكامل (${state.activeAdmin?.name ?: "الإدارة"})",
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = activeProvider?.let {
+                                                        "مرتبط بـ ${it.venueName} • قَبِل ${it.acceptedCount} تذكرة"
+                                                    } ?: "تبديل إلى طبيب / صاحب ملعب / تاجر",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowDown,
+                                            contentDescription = "تبديل المشغّل",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                DropdownMenu(
+                                    expanded = providerMenuExpanded,
+                                    onDismissRequest = { providerMenuExpanded = false },
+                                    modifier = Modifier.heightIn(max = 320.dp)
+                                ) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(
+                                                    text = "وضع الأدمن الكامل",
+                                                    fontWeight = if (activeProvider == null) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (activeProvider == null) EmeraldPrimary else MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = "إدارة جميع المراكز والطوابير بحرية",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            onSelectProvider(0L)
+                                            providerMenuExpanded = false
+                                        }
+                                    )
+                                    HorizontalDivider()
+                                    activeProviders.forEach { provider ->
+                                        val isCurrent = activeProvider?.id == provider.id
+                                        DropdownMenuItem(
+                                            text = {
+                                                Column {
+                                                    Text(
+                                                        text = "${provider.name} (${provider.customTitle})",
+                                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (isCurrent) IndigoAccentLight else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Text(
+                                                        text = provider.venueName,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            },
+                                            onClick = {
+                                                onSelectProvider(provider.id)
+                                                providerMenuExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            OutlinedButton(
+                                onClick = onSyncBridge,
+                                shape = RoundedCornerShape(14.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
+                                modifier = Modifier.testTag("merchant_sync_bridge_button")
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = "مزامنة التذاكر", modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("مزامنة", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+
+                        if (activeProvider != null) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                ProviderCapTag("قبول التذاكر", activeProvider.canAcceptTickets)
+                                ProviderCapTag("استدعاء الدور", activeProvider.canCallNext)
+                                ProviderCapTag("إيقاف المركز", activeProvider.canPauseVenue)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Venue Selector Dropdown
             item {
                 Box(modifier = Modifier.fillMaxWidth()) {
                     Surface(
@@ -131,7 +339,7 @@ fun MerchantDashboardScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(18.dp))
-                            .clickable { venueMenuExpanded = true }
+                            .clickable(enabled = activeProvider == null) { venueMenuExpanded = true }
                             .testTag("merchant_venue_dropdown")
                     ) {
                         Row(
@@ -161,17 +369,27 @@ fun MerchantDashboardScreen(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = "${selectedVenue.city} • ${selectedVenue.area}",
+                                        text = if (activeProvider != null) {
+                                            "${selectedVenue.city} • مثبّت حسب صلاحية ${activeProvider.customTitle}"
+                                        } else {
+                                            "${selectedVenue.city} • ${selectedVenue.area}"
+                                        },
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = "تبديل المحل",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (activeProvider == null) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "تبديل المركز",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                TextButton(onClick = { onSelectProvider(0L) }) {
+                                    Text("تحرير", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
                         }
                     }
 
@@ -207,24 +425,24 @@ fun MerchantDashboardScreen(
                 }
             }
 
-            // Instant Stats Cards: Waiting, Served Today, Current Number
+            // Instant Stats Cards
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     MerchantStatCard(
-                        label = "بالانتظار",
-                        value = "${waitingItems.size}",
-                        icon = Icons.Default.Group,
+                        label = "بانتظار القبول",
+                        value = "$pendingCount",
+                        icon = Icons.Default.HourglassTop,
                         tint = AmberAccent,
                         modifier = Modifier.weight(1f)
                     )
                     MerchantStatCard(
-                        label = "خُدموا اليوم",
-                        value = "${selectedVenue.servedTodayCount}",
-                        icon = Icons.Default.CheckCircle,
-                        tint = StatusOpen,
+                        label = "بالانتظار",
+                        value = "${waitingItems.size}",
+                        icon = Icons.Default.Group,
+                        tint = IndigoAccentLight,
                         modifier = Modifier.weight(1f)
                     )
                     MerchantStatCard(
@@ -237,7 +455,71 @@ fun MerchantDashboardScreen(
                 }
             }
 
-            // Compact Live Simulation Toggle Row
+            // Incoming Bookings & Ticket Acceptance Section
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.EventAvailable,
+                            contentDescription = null,
+                            tint = EmeraldPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "التذاكر الواردة وقبول الطلبات (${venueBookings.size})",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (pendingCount > 0) {
+                        Surface(
+                            shape = CircleShape,
+                            color = AmberGold.copy(alpha = 0.2f)
+                        ) {
+                            Text(
+                                text = "$pendingCount جديد",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = AmberAccent,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (venueBookings.isEmpty()) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "لا توجد تذاكر محجوزة حالياً لهذا المركز — اضغط (مزامنة) لسحب الحجوزات الجديدة من نسخة المستخدم.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(14.dp)
+                        )
+                    }
+                }
+            } else {
+                items(venueBookings, key = { "bk_${it.id}" }) { booking ->
+                    IncomingTicketApprovalCard(
+                        booking = booking,
+                        canAct = activeProvider?.canAcceptTickets ?: true,
+                        onAccept = { onAcceptTicket(booking.id, "تم القبول وتأكيد الموعد") },
+                        onReject = { rejectingBooking = booking }
+                    )
+                }
+            }
+
+            // Live Simulation Toggle Row
             item {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -392,7 +674,7 @@ fun MerchantDashboardScreen(
             // Waiting Queue List
             item {
                 Text(
-                    text = "بالانتظار (${waitingItems.size})",
+                    text = "طابور الانتظار (${waitingItems.size})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -406,7 +688,7 @@ fun MerchantDashboardScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "الطابور فارغ حالياً — أضف عميل حضوري أو احجز تذكرة من الاستكشاف.",
+                            text = "الطابور فارغ حالياً — أضف عميل حضوري أو اسحب الحجوزات بالمزامنة.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(16.dp)
@@ -427,7 +709,7 @@ fun MerchantDashboardScreen(
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "المنتهية اليوم",
+                        text = "المنتهية اليوم (${selectedVenue.servedTodayCount})",
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -510,6 +792,197 @@ fun MerchantDashboardScreen(
             }
         )
     }
+
+    rejectingBooking?.let { target ->
+        var rejectNote by remember { mutableStateOf("الجدول ممتلئ حالياً — يرجى الحجز في وقت لاحق") }
+        AlertDialog(
+            onDismissRequest = { rejectingBooking = null },
+            title = { Text("الاعتذار عن التذكرة ${target.ticketCode}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "العميل: ${target.customerName} (${target.selectedOption})",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = rejectNote,
+                        onValueChange = { rejectNote = it },
+                        label = { Text("سبب الاعتذار (يصل للمستخدم)") },
+                        maxLines = 3,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onRejectTicket(target.id, rejectNote)
+                        rejectingBooking = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatusUrgent)
+                ) {
+                    Text("تأكيد الرفض")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { rejectingBooking = null }) {
+                    Text("تراجع")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun ProviderCapTag(label: String, allowed: Boolean) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = if (allowed) StatusOpen.copy(alpha = 0.14f) else StatusUrgent.copy(alpha = 0.12f)
+    ) {
+        Text(
+            text = if (allowed) "✓ $label" else "✕ $label",
+            style = MaterialTheme.typography.labelSmall,
+            color = if (allowed) StatusOpen else StatusUrgent,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+        )
+    }
+}
+
+@Composable
+private fun IncomingTicketApprovalCard(
+    booking: BookingEntity,
+    canAct: Boolean,
+    onAccept: () -> Unit,
+    onReject: () -> Unit
+) {
+    val approval = BookingApprovalStatus.entries.find { it.name == booking.approvalStatus }
+        ?: BookingApprovalStatus.PENDING
+    val badgeColor = when (approval) {
+        BookingApprovalStatus.PENDING -> AmberAccent
+        BookingApprovalStatus.ACCEPTED -> StatusOpen
+        BookingApprovalStatus.REJECTED -> StatusUrgent
+    }
+
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(
+            1.dp,
+            if (approval == BookingApprovalStatus.PENDING) AmberGold.copy(alpha = 0.55f)
+            else StatusOpen.copy(alpha = 0.4f)
+        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("incoming_ticket_card_${booking.id}")
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "${booking.customerName} • #${booking.queueNumber}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${booking.ticketCode} • ${booking.selectedOption} • ${IntentHelpers.formatDinar(booking.priceDinar)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (booking.customerPhone.isNotBlank()) {
+                        Text(
+                            text = "هاتف: ${booking.customerPhone}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (booking.notes.isNotBlank() || booking.optionalInfo.isNotBlank()) {
+                        Text(
+                            text = listOf(booking.notes, booking.optionalInfo)
+                                .filter { it.isNotBlank() }
+                                .joinToString(" • "),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Surface(
+                    shape = CircleShape,
+                    color = badgeColor.copy(alpha = 0.16f)
+                ) {
+                    Text(
+                        text = approval.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = badgeColor,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            if (approval == BookingApprovalStatus.PENDING) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onAccept,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (canAct) EmeraldPrimary else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (canAct) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .testTag("accept_ticket_${booking.id}")
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(17.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("قبول التذكرة", fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(
+                        onClick = onReject,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(0.9f)
+                            .testTag("reject_ticket_${booking.id}")
+                    ) {
+                        Icon(Icons.Default.Cancel, contentDescription = null, modifier = Modifier.size(17.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("رفض")
+                    }
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = StatusOpen.copy(alpha = 0.12f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = buildString {
+                            append("✓ تم التعامل مع الطلب")
+                            if (booking.handledByProvider.isNotBlank()) append(" بواسطة ${booking.handledByProvider}")
+                            if (booking.approvalNote.isNotBlank()) append(" — ${booking.approvalNote}")
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = StatusOpen,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -540,7 +1013,9 @@ private fun MerchantStatCard(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

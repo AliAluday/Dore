@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -29,6 +30,8 @@ class UserPreferencesDataStore(private val context: Context) {
         val LOYALTY_POINTS = intPreferencesKey("loyalty_points")
         val MUTE_SOUND = booleanPreferencesKey("mute_sound")
         val MUTE_VIBRATION = booleanPreferencesKey("mute_vibration")
+        val ACTIVE_ADMIN_ID = longPreferencesKey("active_admin_id")
+        val ACTIVE_PROVIDER_ID = longPreferencesKey("active_provider_id")
 
         // User Edition Control Panel Settings
         val CTRL_ALLOW_BOOKINGS = booleanPreferencesKey("ctrl_allow_bookings")
@@ -57,6 +60,8 @@ class UserPreferencesDataStore(private val context: Context) {
             loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 60,
             muteSound = prefs[Keys.MUTE_SOUND] ?: false,
             muteVibration = prefs[Keys.MUTE_VIBRATION] ?: false,
+            activeAdminId = prefs[Keys.ACTIVE_ADMIN_ID] ?: 1L,
+            activeProviderId = prefs[Keys.ACTIVE_PROVIDER_ID] ?: 0L,
             controlConfig = UserAppControlConfig(
                 allowNewBookings = prefs[Keys.CTRL_ALLOW_BOOKINGS] ?: true,
                 enableFastestTurn = prefs[Keys.CTRL_FASTEST_TURN] ?: true,
@@ -116,6 +121,14 @@ class UserPreferencesDataStore(private val context: Context) {
 
     suspend fun setMuteVibration(muted: Boolean) {
         context.dataStore.edit { it[Keys.MUTE_VIBRATION] = muted }
+    }
+
+    suspend fun setActiveAdminId(adminId: Long) {
+        context.dataStore.edit { it[Keys.ACTIVE_ADMIN_ID] = adminId }
+    }
+
+    suspend fun setActiveProviderId(providerId: Long) {
+        context.dataStore.edit { it[Keys.ACTIVE_PROVIDER_ID] = providerId }
     }
 
     suspend fun saveControlConfig(config: UserAppControlConfig) {

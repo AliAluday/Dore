@@ -187,6 +187,67 @@ enum class BookingStatus(val label: String) {
     CANCELLED("ملغى")
 }
 
+enum class BookingApprovalStatus(val label: String) {
+    PENDING("بانتظار القبول"),
+    ACCEPTED("مقبولة"),
+    REJECTED("مرفوضة");
+
+    companion object {
+        fun fromName(value: String): BookingApprovalStatus =
+            entries.find { it.name == value } ?: PENDING
+    }
+}
+
+enum class SupportCategory(val displayName: String) {
+    BOOKING_ISSUE("مشكلة حجز"),
+    TECHNICAL("عطل تقني"),
+    VENUE_REPORT("بلاغ عن مركز"),
+    SUGGESTION("اقتراح وتحسين"),
+    GENERAL("استفسار عام");
+
+    companion object {
+        fun fromName(value: String): SupportCategory =
+            entries.find { it.name == value || it.displayName == value } ?: GENERAL
+    }
+}
+
+enum class SupportTicketStatus(val label: String) {
+    SENT("مرسلة"),
+    DELIVERED("وصلت للتحكم"),
+    IN_REVIEW("قيد المراجعة"),
+    REPLIED("تم الرد"),
+    CLOSED("مغلقة");
+
+    companion object {
+        fun fromName(value: String): SupportTicketStatus =
+            entries.find { it.name == value } ?: SENT
+    }
+}
+
+enum class ProviderRole(val displayName: String) {
+    DOCTOR("طبيب"),
+    FIELD_OWNER("صاحب ملعب"),
+    LAB_SPECIALIST("أخصائي مختبر"),
+    WORKSHOP_OWNER("صاحب ورشة"),
+    BEAUTY_EXPERT("خبير تجميل"),
+    MERCHANT("تاجر / مقدم خدمة");
+
+    companion object {
+        fun fromName(value: String): ProviderRole =
+            entries.find { it.name == value || it.displayName == value } ?: MERCHANT
+    }
+}
+
+enum class AdminPermissionType(val label: String) {
+    MANAGE_FEATURES("إدارة المميزات والإعلانات"),
+    MANAGE_VENUES("إدارة المراكز والأسعار"),
+    MANAGE_QUEUES("إدارة الطوابير وقبول التذاكر"),
+    REPLY_SUPPORT("الرد على رسائل الدعم"),
+    MANAGE_PROVIDERS("إدارة الأطباء والتجار"),
+    MANAGE_ADMINS("إدارة الأدمن والصلاحيات"),
+    RUN_COMMANDS("تنفيذ الأوامر السريعة والتصفير")
+}
+
 enum class QueueItemStatus(val label: String) {
     WAITING("بالانتظار"),
     SERVING("قيد الخدمة"),
@@ -238,6 +299,8 @@ data class UserProfileSettings(
     val loyaltyPoints: Int = 60,
     val muteSound: Boolean = false,
     val muteVibration: Boolean = false,
+    val activeAdminId: Long = 1L,
+    val activeProviderId: Long = 0L,
     val controlConfig: UserAppControlConfig = UserAppControlConfig()
 ) {
     val hasMandatoryInfo: Boolean

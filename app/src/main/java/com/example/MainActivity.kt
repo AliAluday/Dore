@@ -67,6 +67,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.InstantTicketPassDialog
 import com.example.ui.components.LiveOverlayAlertBanner
+import com.example.ui.components.SupportCenterSheet
 import com.example.ui.components.TopStickyHeader
 import com.example.ui.components.VenueDetailsSheet
 import com.example.ui.screens.ExploreScreen
@@ -117,6 +118,7 @@ fun DoriAppRoot(
         mutableStateOf(DoriNotificationHelper.hasNotificationPermission(context))
     }
     var isSearchExpanded by remember { mutableStateOf(false) }
+    var showSupportSheet by remember { mutableStateOf(false) }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -201,7 +203,12 @@ fun DoriAppRoot(
                         },
                         onSelectDistrict = viewModel::selectDistrict,
                         onToggleDarkMode = viewModel::toggleDarkMode,
-                        onOpenTickets = { viewModel.selectTab(AppTab.TICKETS) }
+                        onOpenTickets = { viewModel.selectTab(AppTab.TICKETS) },
+                        supportBadgeCount = state.supportAlertCount,
+                        onOpenSupport = {
+                            viewModel.syncLocalBridge(silent = true)
+                            showSupportSheet = true
+                        }
                     )
                 }
             ) { innerPadding ->
@@ -224,7 +231,11 @@ fun DoriAppRoot(
                             onSortSelect = viewModel::selectSortOption,
                             onBookFastestTurn = viewModel::bookFastestTurn,
                             onDirectBookVenue = viewModel::quickBookVenue,
-                            onToggleFavorite = viewModel::toggleVenueFavorite
+                            onToggleFavorite = viewModel::toggleVenueFavorite,
+                            onOpenSupport = {
+                                viewModel.syncLocalBridge(silent = true)
+                                showSupportSheet = true
+                            }
                         )
 
                         AppTab.TICKETS -> TicketsScreen(
@@ -236,7 +247,12 @@ fun DoriAppRoot(
                             onCancelBooking = viewModel::cancelBooking,
                             onQuickRebook = viewModel::quickRebook,
                             onSubmitHistoryReview = viewModel::submitHistoryReview,
-                            onExploreClick = { viewModel.selectTab(AppTab.EXPLORE) }
+                            onExploreClick = { viewModel.selectTab(AppTab.EXPLORE) },
+                            onSyncBridge = { viewModel.syncLocalBridge(silent = false) },
+                            onOpenSupport = {
+                                viewModel.syncLocalBridge(silent = true)
+                                showSupportSheet = true
+                            }
                         )
 
                         else -> ProfileScreen(
@@ -247,7 +263,11 @@ fun DoriAppRoot(
                             onSelectDistrict = viewModel::selectDistrict,
                             onToggleDarkMode = viewModel::toggleDarkMode,
                             onSetMuteSound = viewModel::setMuteSound,
-                            onSetMuteVibration = viewModel::setMuteVibration
+                            onSetMuteVibration = viewModel::setMuteVibration,
+                            onOpenSupport = {
+                                viewModel.syncLocalBridge(silent = true)
+                                showSupportSheet = true
+                            }
                         )
                     }
 
@@ -313,6 +333,17 @@ fun DoriAppRoot(
                     },
                     onDismiss = viewModel::dismissTurnAlert,
                     modifier = Modifier.align(Alignment.TopCenter)
+                )
+            }
+
+            if (showSupportSheet) {
+                SupportCenterSheet(
+                    tickets = state.supportTickets,
+                    defaultName = state.preferences.userName,
+                    defaultPhone = state.preferences.userPhone,
+                    onSendTicket = viewModel::sendSupportMessage,
+                    onSyncReplies = { viewModel.syncLocalBridge(silent = false) },
+                    onDismiss = { showSupportSheet = false }
                 )
             }
         }

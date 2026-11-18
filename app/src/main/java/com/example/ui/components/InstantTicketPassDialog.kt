@@ -44,7 +44,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.data.local.BookingEntity
+import com.example.data.model.BookingApprovalStatus
 import com.example.data.model.UserAppControlConfig
+import com.example.ui.theme.AmberGold
 import com.example.ui.theme.MintPrimaryDark
 import com.example.ui.theme.StatusOpen
 import com.example.util.IntentHelpers
@@ -119,14 +121,19 @@ fun InstantTicketPassDialog(
                             color = Color.White.copy(alpha = 0.88f),
                             textAlign = TextAlign.Center
                         )
+                        val approval = BookingApprovalStatus.fromName(booking.approvalStatus)
                         Surface(
                             shape = CircleShape,
                             color = Color.White.copy(alpha = 0.14f)
                         ) {
                             Text(
-                                text = "حجز بنفس اليوم • تذكرة رقمية",
+                                text = if (approval == BookingApprovalStatus.ACCEPTED) {
+                                    "حجز بنفس اليوم • مقبولة ✓"
+                                } else {
+                                    "حجز بنفس اليوم • بانتظار القبول"
+                                },
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MintPrimaryDark,
+                                color = if (approval == BookingApprovalStatus.ACCEPTED) MintPrimaryDark else AmberGold,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
                             )

@@ -80,6 +80,9 @@ interface DoriDao {
     @Query("SELECT * FROM bookings WHERE id = :bookingId")
     suspend fun getBookingById(bookingId: Long): BookingEntity?
 
+    @Query("SELECT * FROM bookings WHERE ticketCode = :ticketCode LIMIT 1")
+    suspend fun getBookingByTicketCode(ticketCode: String): BookingEntity?
+
     @Query("SELECT * FROM bookings WHERE status = 'ACTIVE'")
     suspend fun getActiveBookingsOnce(): List<BookingEntity>
 
@@ -128,6 +131,84 @@ interface DoriDao {
         deleteAllQueueItems()
         if (items.isNotEmpty()) insertQueueItems(items)
     }
+
+    // Support Tickets
+    @Query("SELECT * FROM support_tickets ORDER BY updatedAt DESC, createdAt DESC")
+    fun observeAllSupportTickets(): Flow<List<SupportTicketEntity>>
+
+    @Query("SELECT * FROM support_tickets ORDER BY updatedAt DESC, createdAt DESC")
+    suspend fun getAllSupportTicketsOnce(): List<SupportTicketEntity>
+
+    @Query("SELECT * FROM support_tickets WHERE id = :id LIMIT 1")
+    suspend fun getSupportTicketById(id: Long): SupportTicketEntity?
+
+    @Query("SELECT * FROM support_tickets WHERE externalId = :externalId LIMIT 1")
+    suspend fun getSupportTicketByExternalId(externalId: String): SupportTicketEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSupportTicket(ticket: SupportTicketEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSupportTickets(tickets: List<SupportTicketEntity>)
+
+    @Update
+    suspend fun updateSupportTicket(ticket: SupportTicketEntity)
+
+    @Query("DELETE FROM support_tickets WHERE id = :id")
+    suspend fun deleteSupportTicketById(id: Long)
+
+    @Query("DELETE FROM support_tickets")
+    suspend fun deleteAllSupportTickets()
+
+    // Admin Accounts
+    @Query("SELECT * FROM admin_accounts ORDER BY isSuperAdmin DESC, createdAt ASC")
+    fun observeAllAdmins(): Flow<List<AdminAccountEntity>>
+
+    @Query("SELECT * FROM admin_accounts ORDER BY isSuperAdmin DESC, createdAt ASC")
+    suspend fun getAllAdminsOnce(): List<AdminAccountEntity>
+
+    @Query("SELECT * FROM admin_accounts WHERE id = :id LIMIT 1")
+    suspend fun getAdminById(id: Long): AdminAccountEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAdmin(admin: AdminAccountEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAdmins(admins: List<AdminAccountEntity>)
+
+    @Update
+    suspend fun updateAdmin(admin: AdminAccountEntity)
+
+    @Query("DELETE FROM admin_accounts WHERE id = :id")
+    suspend fun deleteAdminById(id: Long)
+
+    @Query("DELETE FROM admin_accounts")
+    suspend fun deleteAllAdmins()
+
+    // Service Providers (Doctors, Field Owners, Merchants, etc.)
+    @Query("SELECT * FROM service_providers ORDER BY createdAt DESC")
+    fun observeAllProviders(): Flow<List<ServiceProviderEntity>>
+
+    @Query("SELECT * FROM service_providers ORDER BY createdAt DESC")
+    suspend fun getAllProvidersOnce(): List<ServiceProviderEntity>
+
+    @Query("SELECT * FROM service_providers WHERE id = :id LIMIT 1")
+    suspend fun getProviderById(id: Long): ServiceProviderEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProvider(provider: ServiceProviderEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProviders(providers: List<ServiceProviderEntity>)
+
+    @Update
+    suspend fun updateProvider(provider: ServiceProviderEntity)
+
+    @Query("DELETE FROM service_providers WHERE id = :id")
+    suspend fun deleteProviderById(id: Long)
+
+    @Query("DELETE FROM service_providers")
+    suspend fun deleteAllProviders()
 
     @Query("DELETE FROM venues")
     suspend fun deleteAllVenues()

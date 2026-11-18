@@ -1,22 +1,30 @@
 package com.example.data.repository
 
+import com.example.data.local.AdminAccountEntity
 import com.example.data.local.BookingEntity
 import com.example.data.local.DoriDao
 import com.example.data.local.MerchantQueueItemEntity
 import com.example.data.local.ReviewEntity
 import com.example.data.local.SeedData
+import com.example.data.local.ServiceProviderEntity
+import com.example.data.local.SupportTicketEntity
 import com.example.data.local.UserPreferencesDataStore
 import com.example.data.local.VenueEntity
+import com.example.data.model.BookingApprovalStatus
 import com.example.data.model.BookingStatus
 import com.example.data.model.LiveTurnAlert
 import com.example.data.model.NinevehDistrict
+import com.example.data.model.ProviderRole
 import com.example.data.model.QueueItemStatus
 import com.example.data.model.ServiceCategory
+import com.example.data.model.SupportCategory
+import com.example.data.model.SupportTicketStatus
 import com.example.data.model.TicketStage
 import com.example.data.model.UserAppControlConfig
 import com.example.data.model.UserProfileSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import java.util.UUID
 
 class DoriRepository(
     private val dao: DoriDao,
@@ -26,6 +34,9 @@ class DoriRepository(
     val reviews: Flow<List<ReviewEntity>> = dao.observeAllReviews()
     val bookings: Flow<List<BookingEntity>> = dao.observeAllBookings()
     val queueItems: Flow<List<MerchantQueueItemEntity>> = dao.observeAllQueueItems()
+    val supportTickets: Flow<List<SupportTicketEntity>> = dao.observeAllSupportTickets()
+    val admins: Flow<List<AdminAccountEntity>> = dao.observeAllAdmins()
+    val providers: Flow<List<ServiceProviderEntity>> = dao.observeAllProviders()
     val userPreferences: Flow<UserProfileSettings> = prefs.userPreferences
 
     suspend fun ensureSeeded() {
@@ -44,6 +55,13 @@ class DoriRepository(
             dao.insertVenues(venues)
             dao.insertReviews(SeedData.initialReviews())
             dao.insertQueueItems(SeedData.initialQueueItems(venues))
+        }
+        if (dao.getAllAdminsOnce().isEmpty()) {
+            dao.insertAdmins(SeedData.initialAdmins())
+            prefs.setActiveAdminId(1L)
+        }
+        if (dao.getAllProvidersOnce().isEmpty()) {
+            dao.insertProviders(SeedData.initialProviders())
         }
     }
 
@@ -654,13 +672,340 @@ class DoriRepository(
         dao.deleteAllQueueItems()
         dao.deleteAllReviews()
         dao.deleteAllVenues()
+        dao.deleteAllSupportTickets()
+        dao.deleteAllAdmins()
+        dao.deleteAllProviders()
         val venues = SeedData.initialVenues()
         val reviews = SeedData.initialReviews()
         val queueItems = SeedData.initialQueueItems(venues)
         dao.insertVenues(venues)
         dao.insertReviews(reviews)
         dao.insertQueueItems(queueItems)
+        dao.insertAdmins(SeedData.initialAdmins())
+        dao.insertProviders(SeedData.initialProviders())
+        prefs.setActiveAdminId(1L)
+        prefs.setActiveProviderId(0L)
         prefs.saveControlConfig(UserAppControlConfig())
         prefs.setLoyaltyPoints(60)
+    }
+
+    // ==================== Support Center ====================
+
+    suspend fun getAllSupportTicketsSnapshot(): List<SupportTicketEntity> =
+        dao.getAllSupportTicketsOnce()
+
+    suspend fun createSupportTicket(
+        senderName: String,
+        senderPhone: String,
+        category: SupportCategory,
+        subject: String,
+        message: String
+    ): Result<SupportTicketEntity> {
+        val cleanName = senderName.trim().ifBlank { "مستخدم دوري" }
+        val cleanPhone = senderPhone.trim()
+        val cleanSubject = subject.trim().ifBlank { category.displayName }
+        val cleanMessage = message.trim()
+        if (cleanMessage.length < 4) {
+            return Result.failure(IllegalArgumentException("يرجى كتابة تفاصيل الرسالة (4 أحرف على الأقل)"))
+        }
+        val now = System.currentTimeMillis()
+        val entity = SupportTicketEntity(
+            externalId = "SUP-${UUID.randomUUID().toString().take(8).uppercase()}",
+            senderName = cleanName,
+            senderPhone = cleanPhone,
+            category = category.name,
+            subject = cleanSubject,
+            message = cleanMessage,
+            status = SupportTicketStatus.SENT.name,
+            syncedToControl = false,
+            createdAt = now,
+            updatedAt = now
+        )
+        val id = dao.insertSupportTicket(entity)
+        return Result.success(entity.copy(id = id))
+    }
+
+    suspend fun markSupportTicketDelivered(ticketId: Long) {
+        val existing = dao.getSupportTicketById(ticketId) ?: return
+        val nextStatus = if (existing.status == SupportTicketStatus.SENT.name) {
+            SupportTicketStatus.DELIVERED.name
+        } else {
+            existing.status
+        }
+        dao.updateSupportTicket(
+            existing.copy(
+                status = nextStatus,
+                syncedToControl = true,
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun replyToSupportTicket(
+        ticketId: Long,
+        replyText: String,
+        adminName: String
+    ): Result<SupportTicketEntity> {
+        val cleanReply = replyText.trim()
+        if (cleanReply.length < 2) {
+            return Result.failure(IllegalArgumentException("يرجى كتابة رد واضح للمستخدم"))
+        }
+        val existing = dao.getSupportTicketById(ticketId)
+            ?: return Result.failure(IllegalStateException("رسالة الدعم غير موجودة"))
+        val updated = existing.copy(
+            adminReply = cleanReply,
+            repliedByAdmin = adminName.ifBlank { "فريق الدعم الفني" },
+            status = SupportTicketStatus.REPLIED.name,
+            syncedToControl = true,
+            updatedAt = System.currentTimeMillis()
+        )
+        dao.updateSupportTicket(updated)
+        return Result.success(updated)
+    }
+
+    suspend fun updateSupportTicketStatus(ticketId: Long, status: SupportTicketStatus): SupportTicketEntity? {
+        val existing = dao.getSupportTicketById(ticketId) ?: return null
+        val updated = existing.copy(
+            status = status.name,
+            updatedAt = System.currentTimeMillis()
+        )
+        dao.updateSupportTicket(updated)
+        return updated
+    }
+
+    suspend fun mergePulledSupportTickets(incoming: List<SupportTicketEntity>, isControlApp: Boolean): Int {
+        var changed = 0
+        for (remote in incoming) {
+            if (remote.externalId.isBlank()) continue
+            val local = dao.getSupportTicketByExternalId(remote.externalId)
+            if (local == null) {
+                dao.insertSupportTicket(
+                    remote.copy(
+                        id = 0L,
+                        status = if (isControlApp && remote.status == SupportTicketStatus.SENT.name) {
+                            SupportTicketStatus.DELIVERED.name
+                        } else {
+                            remote.status
+                        },
+                        syncedToControl = true
+                    )
+                )
+                changed++
+            } else if (remote.updatedAt > local.updatedAt ||
+                (remote.adminReply.isNotBlank() && local.adminReply != remote.adminReply)
+            ) {
+                dao.updateSupportTicket(
+                    local.copy(
+                        status = remote.status.ifBlank { local.status },
+                        adminReply = remote.adminReply.ifBlank { local.adminReply },
+                        repliedByAdmin = remote.repliedByAdmin.ifBlank { local.repliedByAdmin },
+                        syncedToControl = true,
+                        updatedAt = maxOf(local.updatedAt, remote.updatedAt)
+                    )
+                )
+                changed++
+            }
+        }
+        return changed
+    }
+
+    suspend fun mergePulledBookingsForControl(incoming: List<BookingEntity>): Int {
+        var added = 0
+        for (remote in incoming) {
+            if (remote.ticketCode.isBlank()) continue
+            if (dao.getBookingByTicketCode(remote.ticketCode) == null) {
+                val bId = dao.insertBooking(remote.copy(id = 0L))
+                dao.insertQueueItem(
+                    MerchantQueueItemEntity(
+                        venueId = remote.venueId,
+                        ticketNumber = remote.queueNumber,
+                        ticketCode = remote.ticketCode,
+                        customerName = remote.customerName,
+                        customerPhone = remote.customerPhone,
+                        selectedOption = remote.selectedOption,
+                        status = QueueItemStatus.WAITING.name,
+                        bookingId = bId,
+                        createdAt = remote.createdAt
+                    )
+                )
+                added++
+            }
+        }
+        return added
+    }
+
+    suspend fun applyBookingApprovalDecisionLocal(
+        ticketCode: String,
+        approvalStatus: String,
+        handledByProvider: String,
+        approvalNote: String
+    ): Boolean {
+        val booking = dao.getBookingByTicketCode(ticketCode) ?: return false
+        if (booking.approvalStatus == approvalStatus &&
+            booking.handledByProvider == handledByProvider &&
+            booking.approvalNote == approvalNote
+        ) {
+            return false
+        }
+        dao.updateBooking(
+            booking.copy(
+                approvalStatus = approvalStatus,
+                handledByProvider = handledByProvider,
+                approvalNote = approvalNote
+            )
+        )
+        return true
+    }
+
+    // ==================== Admin Management ====================
+
+    suspend fun setActiveAdmin(adminId: Long) {
+        prefs.setActiveAdminId(adminId)
+    }
+
+    suspend fun addAdminAccount(
+        name: String,
+        roleTitle: String,
+        phone: String,
+        canManageFeatures: Boolean,
+        canManageVenues: Boolean,
+        canManageQueues: Boolean,
+        canReplySupport: Boolean,
+        canManageProviders: Boolean,
+        canManageAdmins: Boolean,
+        canRunCommands: Boolean
+    ): Result<AdminAccountEntity> {
+        val cleanName = name.trim()
+        if (cleanName.length < 3) {
+            return Result.failure(IllegalArgumentException("اسم الأدمن يجب أن لا يقل عن 3 أحرف"))
+        }
+        val admin = AdminAccountEntity(
+            name = cleanName,
+            roleTitle = roleTitle.trim().ifBlank { "مشرف تشغيل" },
+            phone = phone.trim(),
+            isActive = true,
+            isSuperAdmin = false,
+            canManageFeatures = canManageFeatures,
+            canManageVenues = canManageVenues,
+            canManageQueues = canManageQueues,
+            canReplySupport = canReplySupport,
+            canManageProviders = canManageProviders,
+            canManageAdmins = canManageAdmins,
+            canRunCommands = canRunCommands
+        )
+        val id = dao.insertAdmin(admin)
+        return Result.success(admin.copy(id = id))
+    }
+
+    suspend fun updateAdminAccount(admin: AdminAccountEntity) {
+        dao.updateAdmin(admin)
+    }
+
+    suspend fun deleteAdminAccount(adminId: Long): Result<Unit> {
+        val target = dao.getAdminById(adminId)
+            ?: return Result.failure(IllegalStateException("الحساب غير موجود"))
+        if (target.isSuperAdmin) {
+            return Result.failure(IllegalStateException("لا يمكن حذف حساب المدير العام الأساسي"))
+        }
+        dao.deleteAdminById(adminId)
+        val currentActive = prefs.userPreferences.first().activeAdminId
+        if (currentActive == adminId) {
+            val fallback = dao.getAllAdminsOnce().firstOrNull()?.id ?: 1L
+            prefs.setActiveAdminId(fallback)
+        }
+        return Result.success(Unit)
+    }
+
+    // ==================== Service Providers (Doctors / Field Owners / Merchants) ====================
+
+    suspend fun setActiveProvider(providerId: Long) {
+        prefs.setActiveProviderId(providerId)
+    }
+
+    suspend fun addServiceProvider(
+        name: String,
+        role: ProviderRole,
+        customTitle: String,
+        phone: String,
+        venueId: Int,
+        canAcceptTickets: Boolean,
+        canCallNext: Boolean,
+        canPauseVenue: Boolean
+    ): Result<ServiceProviderEntity> {
+        val cleanName = name.trim()
+        if (cleanName.length < 3) {
+            return Result.failure(IllegalArgumentException("الاسم يجب أن لا يقل عن 3 أحرف"))
+        }
+        val venue = dao.getVenueById(venueId)
+            ?: return Result.failure(IllegalStateException("يرجى اختيار مركز صالح"))
+        val provider = ServiceProviderEntity(
+            name = cleanName,
+            providerRole = role.name,
+            customTitle = customTitle.trim().ifBlank { role.displayName },
+            phone = phone.trim().ifBlank { venue.phone },
+            venueId = venue.id,
+            venueName = venue.name,
+            canAcceptTickets = canAcceptTickets,
+            canCallNext = canCallNext,
+            canPauseVenue = canPauseVenue,
+            isActive = true
+        )
+        val id = dao.insertProvider(provider)
+        return Result.success(provider.copy(id = id))
+    }
+
+    suspend fun updateServiceProvider(provider: ServiceProviderEntity) {
+        dao.updateProvider(provider)
+    }
+
+    suspend fun deleteServiceProvider(providerId: Long) {
+        dao.deleteProviderById(providerId)
+        val current = prefs.userPreferences.first().activeProviderId
+        if (current == providerId) {
+            prefs.setActiveProviderId(0L)
+        }
+    }
+
+    suspend fun acceptBookingTicket(
+        bookingId: Long,
+        actorName: String,
+        note: String = "",
+        providerId: Long? = null
+    ): BookingEntity? {
+        val booking = dao.getBookingById(bookingId) ?: return null
+        val updated = booking.copy(
+            approvalStatus = BookingApprovalStatus.ACCEPTED.name,
+            handledByProvider = actorName,
+            approvalNote = note.trim().ifBlank { "تم تأكيد قبول التذكرة من $actorName" }
+        )
+        dao.updateBooking(updated)
+        if (providerId != null && providerId > 0L) {
+            dao.getProviderById(providerId)?.let { prov ->
+                dao.updateProvider(prov.copy(acceptedCount = prov.acceptedCount + 1))
+            }
+        }
+        return updated
+    }
+
+    suspend fun rejectBookingTicket(
+        bookingId: Long,
+        actorName: String,
+        note: String = ""
+    ): BookingEntity? {
+        val booking = dao.getBookingById(bookingId) ?: return null
+        val updated = booking.copy(
+            approvalStatus = BookingApprovalStatus.REJECTED.name,
+            handledByProvider = actorName,
+            approvalNote = note.trim().ifBlank { "تعذر استقبال الطلب حالياً — يرجى الحجز لاحقاً" },
+            status = BookingStatus.CANCELLED.name,
+            completedAt = System.currentTimeMillis()
+        )
+        dao.updateBooking(updated)
+        val qItems = dao.getQueueItemsForVenueOnce(booking.venueId)
+        qItems.find { it.bookingId == bookingId }?.let { item ->
+            dao.updateQueueItem(item.copy(status = QueueItemStatus.SKIPPED.name))
+        }
+        syncVenueQueueAndBookings(booking.venueId)
+        return updated
     }
 }

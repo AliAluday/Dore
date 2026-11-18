@@ -7,11 +7,15 @@ import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
 import com.example.bridge.DoriBridgeContract.BookingCols
+import com.example.bridge.DoriBridgeContract.ControlConfigCols
+import com.example.bridge.DoriBridgeContract.ProviderCols
 import com.example.bridge.DoriBridgeContract.SupportCols
+import com.example.bridge.DoriBridgeContract.VenueCols
 import com.example.data.local.BookingEntity
 import com.example.data.local.DoriDatabase
 import com.example.data.local.MerchantQueueItemEntity
 import com.example.data.local.SupportTicketEntity
+import com.example.data.local.UserPreferencesDataStore
 import com.example.data.model.BookingApprovalStatus
 import com.example.data.model.QueueItemStatus
 import com.example.data.model.SupportTicketStatus
@@ -24,6 +28,9 @@ class ControlBridgeProvider : ContentProvider() {
         addURI(DoriBridgeContract.CONTROL_AUTHORITY, DoriBridgeContract.PATH_SUPPORT_TICKETS, CODE_SUPPORT)
         addURI(DoriBridgeContract.CONTROL_AUTHORITY, DoriBridgeContract.PATH_BOOKINGS, CODE_BOOKINGS)
         addURI(DoriBridgeContract.CONTROL_AUTHORITY, DoriBridgeContract.PATH_BOOKING_DECISIONS, CODE_DECISIONS)
+        addURI(DoriBridgeContract.CONTROL_AUTHORITY, DoriBridgeContract.PATH_CONTROL_CONFIG, CODE_CONTROL_CONFIG)
+        addURI(DoriBridgeContract.CONTROL_AUTHORITY, DoriBridgeContract.PATH_VENUES, CODE_VENUES)
+        addURI(DoriBridgeContract.CONTROL_AUTHORITY, DoriBridgeContract.PATH_PROVIDERS, CODE_PROVIDERS)
     }
 
     override fun onCreate(): Boolean = true
@@ -82,7 +89,11 @@ class ControlBridgeProvider : ContentProvider() {
                     BookingCols.TICKET_CODE,
                     BookingCols.APPROVAL_STATUS,
                     BookingCols.HANDLED_BY_PROVIDER,
-                    BookingCols.APPROVAL_NOTE
+                    BookingCols.APPROVAL_NOTE,
+                    BookingCols.STATUS,
+                    BookingCols.STAGE,
+                    BookingCols.PEOPLE_AHEAD,
+                    BookingCols.ESTIMATED_MINUTES
                 )
                 MatrixCursor(cols).apply {
                     val bookings = runBlocking { dao.getAllBookingsOnce() }
@@ -92,7 +103,156 @@ class ControlBridgeProvider : ContentProvider() {
                                 b.ticketCode,
                                 b.approvalStatus,
                                 b.handledByProvider,
-                                b.approvalNote
+                                b.approvalNote,
+                                b.status,
+                                b.stage,
+                                b.peopleAhead,
+                                b.estimatedMinutes
+                            )
+                        )
+                    }
+                }
+            }
+
+            CODE_CONTROL_CONFIG -> {
+                val cols = arrayOf(
+                    ControlConfigCols.ALLOW_NEW_BOOKINGS,
+                    ControlConfigCols.ENABLE_FASTEST_TURN,
+                    ControlConfigCols.ENABLE_QR_CODE,
+                    ControlConfigCols.ENABLE_WHATSAPP_SHARE,
+                    ControlConfigCols.ENABLE_REVIEWS,
+                    ControlConfigCols.ENABLE_LOYALTY,
+                    ControlConfigCols.ENABLE_OPTIONAL_FIELDS,
+                    ControlConfigCols.ENABLE_LIVE_ALERTS,
+                    ControlConfigCols.POINTS_PER_BOOKING,
+                    ControlConfigCols.DISABLED_CATEGORIES_CSV,
+                    ControlConfigCols.BROADCAST_MESSAGE,
+                    ControlConfigCols.CONTROL_REVISION,
+                    ControlConfigCols.QUEUE_RESET_REVISION,
+                    ControlConfigCols.LOYALTY_REVISION,
+                    ControlConfigCols.LOYALTY_POINTS
+                )
+                val meta = runBlocking { UserPreferencesDataStore(ctx).getControlSyncMetadata() }
+                val cfg = meta.controlConfig
+                MatrixCursor(cols).apply {
+                    addRow(
+                        arrayOf<Any?>(
+                            if (cfg.allowNewBookings) 1 else 0,
+                            if (cfg.enableFastestTurn) 1 else 0,
+                            if (cfg.enableQrCode) 1 else 0,
+                            if (cfg.enableWhatsAppShare) 1 else 0,
+                            if (cfg.enableReviews) 1 else 0,
+                            if (cfg.enableLoyalty) 1 else 0,
+                            if (cfg.enableOptionalFields) 1 else 0,
+                            if (cfg.enableLiveAlerts) 1 else 0,
+                            cfg.pointsPerBooking,
+                            cfg.disabledCategories.joinToString("\n"),
+                            cfg.broadcastMessage,
+                            meta.controlRevision,
+                            meta.queueResetRevision,
+                            meta.loyaltyRevision,
+                            meta.loyaltyPoints
+                        )
+                    )
+                }
+            }
+
+            CODE_VENUES -> {
+                val cols = arrayOf(
+                    VenueCols.ID,
+                    VenueCols.NAME,
+                    VenueCols.CITY,
+                    VenueCols.CATEGORY,
+                    VenueCols.SPECIALTY,
+                    VenueCols.AREA,
+                    VenueCols.PRICE_DINAR,
+                    VenueCols.RATING,
+                    VenueCols.REVIEW_COUNT,
+                    VenueCols.WORKING_HOURS,
+                    VenueCols.PHONE,
+                    VenueCols.WHATSAPP,
+                    VenueCols.LATITUDE,
+                    VenueCols.LONGITUDE,
+                    VenueCols.DESCRIPTION,
+                    VenueCols.CUSTOM_OPTIONS_CSV,
+                    VenueCols.IS_OPEN,
+                    VenueCols.IS_PAUSED,
+                    VenueCols.IS_ACCEPTING_BOOKINGS,
+                    VenueCols.CURRENT_SERVING_NUMBER,
+                    VenueCols.NEXT_TICKET_NUMBER,
+                    VenueCols.SERVED_TODAY_COUNT,
+                    VenueCols.AVG_MINUTES_PER_PERSON,
+                    VenueCols.WAITING_COUNT
+                )
+                MatrixCursor(cols).apply {
+                    val venues = runBlocking { dao.getAllVenuesOnce() }
+                    venues.forEach { v ->
+                        addRow(
+                            arrayOf<Any?>(
+                                v.id,
+                                v.name,
+                                v.city,
+                                v.category,
+                                v.specialty,
+                                v.area,
+                                v.priceDinar,
+                                v.rating,
+                                v.reviewCount,
+                                v.workingHours,
+                                v.phone,
+                                v.whatsapp,
+                                v.latitude,
+                                v.longitude,
+                                v.description,
+                                v.customOptionsCsv,
+                                if (v.isOpen) 1 else 0,
+                                if (v.isPaused) 1 else 0,
+                                if (v.isAcceptingBookings) 1 else 0,
+                                v.currentServingNumber,
+                                v.nextTicketNumber,
+                                v.servedTodayCount,
+                                v.avgMinutesPerPerson,
+                                v.waitingCount
+                            )
+                        )
+                    }
+                }
+            }
+
+            CODE_PROVIDERS -> {
+                val cols = arrayOf(
+                    ProviderCols.ID,
+                    ProviderCols.NAME,
+                    ProviderCols.PROVIDER_ROLE,
+                    ProviderCols.CUSTOM_TITLE,
+                    ProviderCols.PHONE,
+                    ProviderCols.VENUE_ID,
+                    ProviderCols.VENUE_NAME,
+                    ProviderCols.CAN_ACCEPT_TICKETS,
+                    ProviderCols.CAN_CALL_NEXT,
+                    ProviderCols.CAN_PAUSE_VENUE,
+                    ProviderCols.IS_ACTIVE,
+                    ProviderCols.ACCEPTED_COUNT,
+                    ProviderCols.CREATED_AT
+                )
+                MatrixCursor(cols).apply {
+                    val providers = runBlocking { dao.getAllProvidersOnce() }
+                    providers.forEach { p ->
+                        addRow(
+                            arrayOf<Any?>(
+                                p.id,
+                                p.name,
+                                p.providerRole,
+                                p.customTitle,
+                                p.phone,
+                                p.venueId,
+                                p.venueName,
+                                if (p.canAcceptTickets) 1 else 0,
+                                if (p.canCallNext) 1 else 0,
+                                if (p.canPauseVenue) 1 else 0,
+                                if (p.isActive) 1 else 0,
+                                p.acceptedCount,
+                                p.createdAt
                             )
                         )
                     }
@@ -168,6 +328,7 @@ class ControlBridgeProvider : ContentProvider() {
                 val customerName = v.getAsString(BookingCols.CUSTOMER_NAME).orEmpty()
                 val customerPhone = v.getAsString(BookingCols.CUSTOMER_PHONE).orEmpty()
                 val selectedOption = v.getAsString(BookingCols.SELECTED_OPTION).orEmpty()
+                val peopleAhead = v.getAsInteger(BookingCols.PEOPLE_AHEAD) ?: 0
 
                 runBlocking {
                     val existing = dao.getBookingByTicketCode(ticketCode)
@@ -193,7 +354,7 @@ class ControlBridgeProvider : ContentProvider() {
                                     .ifBlank { BookingApprovalStatus.PENDING.name },
                                 handledByProvider = v.getAsString(BookingCols.HANDLED_BY_PROVIDER).orEmpty(),
                                 approvalNote = v.getAsString(BookingCols.APPROVAL_NOTE).orEmpty(),
-                                peopleAhead = v.getAsInteger(BookingCols.PEOPLE_AHEAD) ?: 0,
+                                peopleAhead = peopleAhead,
                                 estimatedMinutes = v.getAsInteger(BookingCols.ESTIMATED_MINUTES) ?: 0,
                                 createdAt = v.getAsLong(BookingCols.CREATED_AT) ?: System.currentTimeMillis()
                             )
@@ -206,10 +367,23 @@ class ControlBridgeProvider : ContentProvider() {
                                 customerName = customerName,
                                 customerPhone = customerPhone,
                                 selectedOption = selectedOption,
-                                status = QueueItemStatus.WAITING.name,
+                                status = if (peopleAhead == 0) QueueItemStatus.SERVING.name else QueueItemStatus.WAITING.name,
                                 bookingId = bId
                             )
                         )
+                        dao.getVenueById(venueId)?.let { venue ->
+                            dao.updateVenue(
+                                venue.copy(
+                                    nextTicketNumber = maxOf(venue.nextTicketNumber, queueNumber + 1),
+                                    waitingCount = if (peopleAhead > 0) venue.waitingCount + 1 else venue.waitingCount,
+                                    currentServingNumber = if (peopleAhead == 0 && venue.currentServingNumber == 0) {
+                                        queueNumber
+                                    } else {
+                                        venue.currentServingNumber
+                                    }
+                                )
+                            )
+                        }
                     }
                 }
                 DoriNotificationHelper.showSupportMessageNotification(
@@ -233,5 +407,8 @@ class ControlBridgeProvider : ContentProvider() {
         const val CODE_SUPPORT = 1
         const val CODE_BOOKINGS = 2
         const val CODE_DECISIONS = 3
+        const val CODE_CONTROL_CONFIG = 4
+        const val CODE_VENUES = 5
+        const val CODE_PROVIDERS = 6
     }
 }

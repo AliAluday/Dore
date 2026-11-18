@@ -60,7 +60,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.LiveOverlayAlertBanner
 import com.example.ui.components.TopStickyHeader
@@ -75,6 +78,7 @@ import com.example.ui.viewmodel.DoriViewModel
 import com.example.ui.viewmodel.DoriViewModelFactory
 import com.example.util.DoriNotificationHelper
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 class ControlMainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -103,12 +107,22 @@ class ControlMainActivity : ComponentActivity() {
 private fun ControlAppRoot(
     viewModel: DoriViewModel
 ) {
+    val lifecycleOwner = LocalLifecycleOwner.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
         viewModel.toastMessage.collect { msg ->
             snackbarHostState.showSnackbar(msg)
+        }
+    }
+
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (isActive) {
+                viewModel.syncLocalBridge(silent = true)
+                delay(3500L)
+            }
         }
     }
 

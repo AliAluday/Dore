@@ -210,6 +210,12 @@ interface DoriDao {
     @Query("DELETE FROM service_providers")
     suspend fun deleteAllProviders()
 
+    @Transaction
+    suspend fun replaceAllProviders(providers: List<ServiceProviderEntity>) {
+        deleteAllProviders()
+        if (providers.isNotEmpty()) insertProviders(providers)
+    }
+
     @Query("DELETE FROM venues")
     suspend fun deleteAllVenues()
 

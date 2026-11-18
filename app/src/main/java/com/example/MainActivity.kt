@@ -63,7 +63,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.InstantTicketPassDialog
 import com.example.ui.components.LiveOverlayAlertBanner
@@ -80,6 +83,7 @@ import com.example.ui.viewmodel.DoriViewModel
 import com.example.ui.viewmodel.DoriViewModelFactory
 import com.example.util.DoriNotificationHelper
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -110,6 +114,7 @@ fun DoriAppRoot(
     viewModel: DoriViewModel
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -151,6 +156,15 @@ fun DoriAppRoot(
     LaunchedEffect(Unit) {
         viewModel.toastMessage.collect { msg ->
             snackbarHostState.showSnackbar(msg)
+        }
+    }
+
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (isActive) {
+                viewModel.syncLocalBridge(silent = true)
+                delay(2500L)
+            }
         }
     }
 

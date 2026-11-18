@@ -109,7 +109,11 @@ fun InstantTicketPassDialog(
                             )
                         }
                         Text(
-                            text = "تم إصدار تكت الحجز ورمز QR",
+                            text = if (controlConfig.enableQrCode) {
+                                "تم إصدار تكت الحجز ورمز QR"
+                            } else {
+                                "تم إصدار تكت الحجز بنجاح"
+                            },
                             style = MaterialTheme.typography.titleMedium,
                             color = Color.White,
                             fontWeight = FontWeight.Bold,

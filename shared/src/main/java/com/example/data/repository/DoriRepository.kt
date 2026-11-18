@@ -1,5 +1,7 @@
 package com.example.data.repository
 
+import com.example.bridge.BookingDecisionSnapshot
+import com.example.bridge.ControlStatePayload
 import com.example.data.local.AdminAccountEntity
 import com.example.data.local.BookingEntity
 import com.example.data.local.DoriDao
@@ -301,11 +303,13 @@ class DoriRepository(
     suspend fun togglePauseQueue(venueId: Int) {
         val venue = dao.getVenueById(venueId) ?: return
         dao.updateVenue(venue.copy(isPaused = !venue.isPaused))
+        prefs.bumpControlRevision()
     }
 
     suspend fun toggleAcceptingBookings(venueId: Int) {
         val venue = dao.getVenueById(venueId) ?: return
         dao.updateVenue(venue.copy(isAcceptingBookings = !venue.isAcceptingBookings))
+        prefs.bumpControlRevision()
     }
 
     suspend fun addWalkInCustomer(venueId: Int, name: String, option: String) {
@@ -330,6 +334,7 @@ class DoriRepository(
             )
         )
         syncVenueQueueAndBookings(venueId)
+        prefs.bumpControlRevision()
     }
 
     suspend fun callNextCustomer(venueId: Int): List<LiveTurnAlert> {
@@ -369,7 +374,9 @@ class DoriRepository(
         } else if (currentServing != null) {
             dao.updateVenue(venue.copy(servedTodayCount = venue.servedTodayCount + 1))
         }
-        return syncVenueQueueAndBookings(venueId)
+        return syncVenueQueueAndBookings(venueId).also {
+            prefs.bumpControlRevision()
+        }
     }
 
     suspend fun skipCurrentCustomer(venueId: Int): List<LiveTurnAlert> {
@@ -394,7 +401,9 @@ class DoriRepository(
             dao.updateQueueItem(nextWaiting.copy(status = QueueItemStatus.SERVING.name))
             dao.updateVenue(venue.copy(currentServingNumber = nextWaiting.ticketNumber))
         }
-        return syncVenueQueueAndBookings(venueId)
+        return syncVenueQueueAndBookings(venueId).also {
+            prefs.bumpControlRevision()
+        }
     }
 
     suspend fun callCustomerByName(venueId: Int, queueItemId: Long): List<LiveTurnAlert> {
@@ -408,7 +417,9 @@ class DoriRepository(
             }
         dao.updateQueueItem(target.copy(status = QueueItemStatus.SERVING.name))
         dao.updateVenue(venue.copy(currentServingNumber = target.ticketNumber))
-        return syncVenueQueueAndBookings(venueId)
+        return syncVenueQueueAndBookings(venueId).also {
+            prefs.bumpControlRevision()
+        }
     }
 
     suspend fun markCustomerNoShow(venueId: Int, queueItemId: Long): List<LiveTurnAlert> {
@@ -427,7 +438,9 @@ class DoriRepository(
                 }
             }
         }
-        return syncVenueQueueAndBookings(venueId)
+        return syncVenueQueueAndBookings(venueId).also {
+            prefs.bumpControlRevision()
+        }
     }
 
     suspend fun advanceActiveUserTicketDemoStep(): List<LiveTurnAlert> {
@@ -444,6 +457,9 @@ class DoriRepository(
             if (waiting.isNotEmpty() || (serving != null && serving.bookingId == null)) {
                 alerts.addAll(callNextCustomer(vId))
             }
+        }
+        if (alerts.isNotEmpty()) {
+            prefs.bumpControlRevision()
         }
         return alerts
     }
@@ -529,22 +545,24 @@ class DoriRepository(
 
     suspend fun updateControlConfig(transform: (UserAppControlConfig) -> UserAppControlConfig) {
         val current = prefs.userPreferences.first().controlConfig
-        prefs.saveControlConfig(transform(current))
+        prefs.saveControlConfigAndBumpRevision(transform(current))
     }
 
     suspend fun resetControlConfig() {
-        prefs.saveControlConfig(UserAppControlConfig())
+        prefs.saveControlConfigAndBumpRevision(UserAppControlConfig())
     }
 
     suspend fun toggleVenueOpen(venueId: Int) {
         val venue = dao.getVenueById(venueId) ?: return
         dao.updateVenue(venue.copy(isOpen = !venue.isOpen))
+        prefs.bumpControlRevision()
     }
 
     suspend fun adjustVenuePrice(venueId: Int, deltaDinar: Int) {
         val venue = dao.getVenueById(venueId) ?: return
         val nextPrice = (venue.priceDinar + deltaDinar).coerceIn(1000, 250000)
         dao.updateVenue(venue.copy(priceDinar = nextPrice))
+        prefs.bumpControlRevision()
     }
 
     suspend fun adjustVenueWaitMinutes(venueId: Int, deltaMinutes: Int) {
@@ -552,6 +570,7 @@ class DoriRepository(
         val nextAvg = (venue.avgMinutesPerPerson + deltaMinutes).coerceIn(1, 60)
         dao.updateVenue(venue.copy(avgMinutesPerPerson = nextAvg))
         syncVenueQueueAndBookings(venueId)
+        prefs.bumpControlRevision()
     }
 
     suspend fun addCustomVenue(
@@ -584,7 +603,7 @@ class DoriRepository(
             name = cleanName,
             city = district.displayName,
             category = category.displayName,
-            specialty = if (category == ServiceCategory.CLINICS) specialty else "",
+            specialty = if (category == ServiceCategory.CLINICS) specialty.ifBlank { "طب عام" } else "",
             area = cleanArea,
             priceDinar = priceDinar.coerceIn(1000, 250000),
             rating = 5.0,
@@ -605,12 +624,14 @@ class DoriRepository(
             waitingCount = 0
         )
         dao.insertVenue(newVenue)
+        prefs.bumpControlRevision()
         return Result.success(newVenue)
     }
 
     suspend fun deleteVenue(venueId: Int) {
         dao.deleteQueueItemsForVenue(venueId)
         dao.deleteVenueById(venueId)
+        prefs.bumpControlRevision()
     }
 
     suspend fun setAllVenuesOpenInDistrict(district: NinevehDistrict, open: Boolean) {
@@ -623,6 +644,7 @@ class DoriRepository(
         val updatedList = targets.map { it.copy(isOpen = open, isAcceptingBookings = open) }
         if (updatedList.isNotEmpty()) {
             dao.insertVenues(updatedList)
+            prefs.bumpControlRevision()
         }
     }
 
@@ -631,6 +653,7 @@ class DoriRepository(
         active.forEach { b ->
             completeBookingWithOptionalReview(b.id, null, null)
         }
+        prefs.bumpControlRevision(bumpQueueReset = true)
         return active.size
     }
 
@@ -639,6 +662,7 @@ class DoriRepository(
         active.forEach { b ->
             cancelBooking(b.id)
         }
+        prefs.bumpControlRevision(bumpQueueReset = true)
         return active.size
     }
 
@@ -657,14 +681,17 @@ class DoriRepository(
         if (resetVenues.isNotEmpty()) {
             dao.insertVenues(resetVenues)
         }
+        prefs.bumpControlRevision(bumpQueueReset = true)
     }
 
     suspend fun adjustLoyaltyPoints(delta: Int) {
         prefs.addLoyaltyPoints(delta)
+        prefs.bumpControlRevision(bumpLoyalty = true)
     }
 
     suspend fun resetLoyaltyPoints() {
         prefs.setLoyaltyPoints(0)
+        prefs.bumpControlRevision(bumpLoyalty = true)
     }
 
     suspend fun factoryResetAllData() {
@@ -687,6 +714,95 @@ class DoriRepository(
         prefs.setActiveProviderId(0L)
         prefs.saveControlConfig(UserAppControlConfig())
         prefs.setLoyaltyPoints(60)
+        prefs.bumpControlRevision(bumpQueueReset = true, bumpLoyalty = true)
+    }
+
+    // ==================== Cross-App Bridge Snapshots & Merge ====================
+
+    suspend fun getAppliedBridgeSyncState(): UserPreferencesDataStore.AppliedBridgeSyncState =
+        prefs.getAppliedBridgeSyncState()
+
+    suspend fun getControlBridgeSnapshot(): Triple<ControlStatePayload, List<VenueEntity>, List<ServiceProviderEntity>> {
+        val meta = prefs.getControlSyncMetadata()
+        val payload = ControlStatePayload(
+            controlConfig = meta.controlConfig,
+            controlRevision = meta.controlRevision,
+            queueResetRevision = meta.queueResetRevision,
+            loyaltyRevision = meta.loyaltyRevision,
+            loyaltyPoints = meta.loyaltyPoints
+        )
+        return Triple(payload, dao.getAllVenuesOnce(), dao.getAllProvidersOnce())
+    }
+
+    suspend fun applyPulledControlState(payload: ControlStatePayload): Boolean =
+        prefs.applySyncedControlStateFromBridge(
+            controlConfig = payload.controlConfig,
+            controlRevision = payload.controlRevision,
+            queueResetRevision = payload.queueResetRevision,
+            loyaltyRevision = payload.loyaltyRevision,
+            loyaltyPointsFromControl = payload.loyaltyPoints
+        )
+
+    suspend fun mergeSyncedVenuesFromControl(
+        remoteVenues: List<VenueEntity>,
+        queueResetChanged: Boolean = false
+    ): Int {
+        val localVenues = dao.getAllVenuesOnce()
+        val localById = localVenues.associateBy { it.id }
+        val activeBookingVenueIds = dao.getActiveBookingsOnce().map { it.venueId }.toSet()
+
+        val merged = remoteVenues.map { remote ->
+            val local = localById[remote.id]
+            val keepLocalFav = local?.isFavorite ?: false
+            if (local == null || queueResetChanged) {
+                remote.copy(isFavorite = keepLocalFav)
+            } else {
+                val hasLocalActive = remote.id in activeBookingVenueIds
+                remote.copy(
+                    isFavorite = keepLocalFav,
+                    currentServingNumber = if (hasLocalActive) {
+                        maxOf(local.currentServingNumber, remote.currentServingNumber)
+                    } else {
+                        remote.currentServingNumber
+                    },
+                    nextTicketNumber = if (hasLocalActive) {
+                        maxOf(local.nextTicketNumber, remote.nextTicketNumber)
+                    } else {
+                        remote.nextTicketNumber
+                    },
+                    waitingCount = if (hasLocalActive) {
+                        maxOf(local.waitingCount, remote.waitingCount)
+                    } else {
+                        remote.waitingCount
+                    },
+                    servedTodayCount = maxOf(local.servedTodayCount, remote.servedTodayCount)
+                )
+            }
+        }
+
+        val localSorted = localVenues.sortedBy { it.id }
+        val mergedSorted = merged.sortedBy { it.id }
+        if (localSorted == mergedSorted) return 0
+
+        dao.replaceAllVenues(merged)
+        return 1
+    }
+
+    suspend fun mergeSyncedProvidersFromControl(remoteProviders: List<ServiceProviderEntity>): Int {
+        val localSorted = dao.getAllProvidersOnce().sortedBy { it.id }
+        val remoteSorted = remoteProviders.sortedBy { it.id }
+        if (localSorted == remoteSorted) return 0
+        dao.replaceAllProviders(remoteProviders)
+        return 1
+    }
+
+    suspend fun getAllBookingsSnapshot(): List<BookingEntity> = dao.getAllBookingsOnce()
+
+    suspend fun bumpControlBridgeRevision(
+        bumpQueueReset: Boolean = false,
+        bumpLoyalty: Boolean = false
+    ) {
+        prefs.bumpControlRevision(bumpQueueReset = bumpQueueReset, bumpLoyalty = bumpLoyalty)
     }
 
     // ==================== Support Center ====================
@@ -823,35 +939,61 @@ class DoriRepository(
                         customerName = remote.customerName,
                         customerPhone = remote.customerPhone,
                         selectedOption = remote.selectedOption,
-                        status = QueueItemStatus.WAITING.name,
+                        status = if (remote.peopleAhead == 0) QueueItemStatus.SERVING.name else QueueItemStatus.WAITING.name,
                         bookingId = bId,
                         createdAt = remote.createdAt
                     )
                 )
+                dao.getVenueById(remote.venueId)?.let { v ->
+                    dao.updateVenue(
+                        v.copy(
+                            nextTicketNumber = maxOf(v.nextTicketNumber, remote.queueNumber + 1),
+                            waitingCount = if (remote.peopleAhead > 0) v.waitingCount + 1 else v.waitingCount,
+                            currentServingNumber = if (remote.peopleAhead == 0 && v.currentServingNumber == 0) {
+                                remote.queueNumber
+                            } else {
+                                v.currentServingNumber
+                            }
+                        )
+                    )
+                }
                 added++
             }
         }
         return added
     }
 
-    suspend fun applyBookingApprovalDecisionLocal(
-        ticketCode: String,
-        approvalStatus: String,
-        handledByProvider: String,
-        approvalNote: String
-    ): Boolean {
-        val booking = dao.getBookingByTicketCode(ticketCode) ?: return false
-        if (booking.approvalStatus == approvalStatus &&
-            booking.handledByProvider == handledByProvider &&
-            booking.approvalNote == approvalNote
+    suspend fun applyBookingApprovalDecisionLocal(decision: BookingDecisionSnapshot): Boolean {
+        val booking = dao.getBookingByTicketCode(decision.ticketCode) ?: return false
+        val nextStatus = decision.status.takeIf { it.isNotBlank() } ?: booking.status
+        val nextStage = decision.stage.takeIf { it.isNotBlank() } ?: booking.stage
+        val nextAhead = if (decision.peopleAhead >= 0) decision.peopleAhead else booking.peopleAhead
+        val nextEta = if (decision.estimatedMinutes >= 0) decision.estimatedMinutes else booking.estimatedMinutes
+        val nextCompletedAt = if (nextStatus != BookingStatus.ACTIVE.name && booking.completedAt == null) {
+            System.currentTimeMillis()
+        } else {
+            booking.completedAt
+        }
+        if (booking.approvalStatus == decision.approvalStatus &&
+            booking.handledByProvider == decision.handledByProvider &&
+            booking.approvalNote == decision.approvalNote &&
+            booking.status == nextStatus &&
+            booking.stage == nextStage &&
+            booking.peopleAhead == nextAhead &&
+            booking.estimatedMinutes == nextEta
         ) {
             return false
         }
         dao.updateBooking(
             booking.copy(
-                approvalStatus = approvalStatus,
-                handledByProvider = handledByProvider,
-                approvalNote = approvalNote
+                approvalStatus = decision.approvalStatus,
+                handledByProvider = decision.handledByProvider,
+                approvalNote = decision.approvalNote,
+                status = nextStatus,
+                stage = nextStage,
+                peopleAhead = nextAhead,
+                estimatedMinutes = nextEta,
+                completedAt = nextCompletedAt
             )
         )
         return true
@@ -951,11 +1093,13 @@ class DoriRepository(
             isActive = true
         )
         val id = dao.insertProvider(provider)
+        prefs.bumpControlRevision()
         return Result.success(provider.copy(id = id))
     }
 
     suspend fun updateServiceProvider(provider: ServiceProviderEntity) {
         dao.updateProvider(provider)
+        prefs.bumpControlRevision()
     }
 
     suspend fun deleteServiceProvider(providerId: Long) {
@@ -964,6 +1108,7 @@ class DoriRepository(
         if (current == providerId) {
             prefs.setActiveProviderId(0L)
         }
+        prefs.bumpControlRevision()
     }
 
     suspend fun acceptBookingTicket(
@@ -982,6 +1127,7 @@ class DoriRepository(
         if (providerId != null && providerId > 0L) {
             dao.getProviderById(providerId)?.let { prov ->
                 dao.updateProvider(prov.copy(acceptedCount = prov.acceptedCount + 1))
+                prefs.bumpControlRevision()
             }
         }
         return updated
@@ -1006,6 +1152,7 @@ class DoriRepository(
             dao.updateQueueItem(item.copy(status = QueueItemStatus.SKIPPED.name))
         }
         syncVenueQueueAndBookings(booking.venueId)
+        prefs.bumpControlRevision()
         return updated
     }
 }

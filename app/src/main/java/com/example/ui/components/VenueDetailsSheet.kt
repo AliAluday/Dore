@@ -130,7 +130,7 @@ fun VenueDetailsSheet(
     val isNameValid = UserProfileSettings.isValidFullName(customerName)
     val isPhoneValid = UserProfileSettings.isValidPhone(customerPhone)
 
-    val calculatedPrice = remember(venue.id, selectedHours, doctorVisitType) {
+    val calculatedPrice = remember(venue.id, venue.priceDinar, selectedHours, doctorVisitType) {
         when {
             isField -> (venue.priceDinar * selectedHours).toInt()
             isClinic -> (venue.priceDinar * doctorVisitType.priceMultiplier).toInt()

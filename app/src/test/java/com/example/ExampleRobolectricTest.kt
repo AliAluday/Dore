@@ -17,6 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 import com.example.data.model.UserProfileSettings
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertFalse
 
 @RunWith(RobolectricTestRunner::class)
@@ -417,6 +418,121 @@ class ExampleRobolectricTest {
                 assertFalse(editedDoctor.canAcceptTickets)
                 assertTrue(editedDoctor.canPauseVenue)
                 assertEquals("استشاري باطنية", editedDoctor.customTitle)
+            } finally {
+                db.close()
+            }
+        }
+
+    @Test
+    fun `control to user bridge sync propagates hidden buttons, prices, custom venues, and providers while preserving user favorites`() =
+        kotlinx.coroutines.runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val db = androidx.room.Room.inMemoryDatabaseBuilder(
+                context,
+                com.example.data.local.DoriDatabase::class.java
+            ).allowMainThreadQueries().build()
+            try {
+                val prefs = com.example.data.local.UserPreferencesDataStore(context)
+                val repo = com.example.data.repository.DoriRepository(db.doriDao(), prefs)
+                repo.ensureSeeded()
+
+                // User marks venue #1 as favorite locally
+                val initialVenue1 = db.doriDao().getVenueById(1)!!
+                repo.toggleFavorite(initialVenue1.id, initialVenue1.isFavorite)
+                assertTrue(db.doriDao().getVenueById(1)!!.isFavorite)
+
+                // Control side builds modified config, price, closed venue, custom venue, and provider
+                val customConfig = com.example.data.model.UserAppControlConfig(
+                    allowNewBookings = true,
+                    enableFastestTurn = false,
+                    enableQrCode = false,
+                    enableWhatsAppShare = false,
+                    enableReviews = false,
+                    enableLoyalty = false,
+                    enableOptionalFields = false,
+                    enableLiveAlerts = false,
+                    pointsPerBooking = 30,
+                    disabledCategories = setOf(ServiceCategory.FIELDS.displayName),
+                    broadcastMessage = "تنبيه: صيانة قصيرة اليوم"
+                )
+                val nextRev = maxOf(
+                    repo.getAppliedBridgeSyncState().lastControlRevision + 10L,
+                    System.currentTimeMillis() + 5000L
+                )
+                val payload = com.example.bridge.ControlStatePayload(
+                    controlConfig = customConfig,
+                    controlRevision = nextRev,
+                    queueResetRevision = 0L,
+                    loyaltyRevision = 0L,
+                    loyaltyPoints = 60
+                )
+
+                // Round-trip ContentValues serialization check
+                val roundTrippedPayload = com.example.bridge.DoriLocalBridgeClient.controlStateFromContentValues(
+                    com.example.bridge.DoriLocalBridgeClient.controlStateToContentValues(payload)
+                )
+                assertEquals(customConfig, roundTrippedPayload.controlConfig)
+                assertEquals(nextRev, roundTrippedPayload.controlRevision)
+
+                val editedVenue1 = initialVenue1.copy(
+                    priceDinar = initialVenue1.priceDinar + 7000,
+                    isOpen = false
+                )
+                val addedVenue = initialVenue1.copy(
+                    id = 999,
+                    name = "عيادة المزامنة التجريبية",
+                    priceDinar = 35000,
+                    isOpen = true,
+                    isFavorite = false
+                )
+                val remoteVenues = listOf(editedVenue1, addedVenue).map { v ->
+                    com.example.bridge.DoriLocalBridgeClient.venueFromContentValues(
+                        com.example.bridge.DoriLocalBridgeClient.venueToContentValues(v)
+                    )!!
+                }
+                val mergedVenuesChanged = repo.mergeSyncedVenuesFromControl(
+                    remoteVenues = remoteVenues,
+                    queueResetChanged = false
+                )
+                assertEquals(1, mergedVenuesChanged)
+
+                val syncedVenue1 = db.doriDao().getVenueById(1)!!
+                assertEquals(initialVenue1.priceDinar + 7000, syncedVenue1.priceDinar)
+                assertFalse(syncedVenue1.isOpen)
+                // User's local favorite flag must stay true!
+                assertTrue(syncedVenue1.isFavorite)
+                // Custom venue appears and deleted venues (like #2) disappear
+                assertEquals("عيادة المزامنة التجريبية", db.doriDao().getVenueById(999)!!.name)
+                org.junit.Assert.assertNull(db.doriDao().getVenueById(2))
+
+                // Apply control config from bridge
+                assertTrue(repo.applyPulledControlState(roundTrippedPayload))
+                val updatedPrefs = prefs.userPreferences.first()
+                assertFalse(updatedPrefs.controlConfig.enableFastestTurn)
+                assertFalse(updatedPrefs.controlConfig.enableQrCode)
+                assertEquals(setOf(ServiceCategory.FIELDS.displayName), updatedPrefs.controlConfig.disabledCategories)
+                assertEquals("تنبيه: صيانة قصيرة اليوم", updatedPrefs.controlConfig.broadcastMessage)
+                assertEquals(30, updatedPrefs.controlConfig.pointsPerBooking)
+
+                // Provider merge check
+                val syncedProvider = com.example.data.local.ServiceProviderEntity(
+                    id = 55L,
+                    name = "د. طارق الموصلي",
+                    providerRole = com.example.data.model.ProviderRole.DOCTOR.name,
+                    customTitle = "أخصائي عيون",
+                    phone = "07701234567",
+                    venueId = 1,
+                    venueName = syncedVenue1.name,
+                    canAcceptTickets = true,
+                    canCallNext = true,
+                    canPauseVenue = true,
+                    isActive = true
+                )
+                val roundTrippedProvider = com.example.bridge.DoriLocalBridgeClient.providerFromContentValues(
+                    com.example.bridge.DoriLocalBridgeClient.providerToContentValues(syncedProvider)
+                )!!
+                assertEquals(1, repo.mergeSyncedProvidersFromControl(listOf(roundTrippedProvider)))
+                assertEquals("د. طارق الموصلي", db.doriDao().getProviderById(55L)!!.name)
             } finally {
                 db.close()
             }

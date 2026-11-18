@@ -10,8 +10,11 @@ import com.example.bridge.DoriBridgeContract.BookingCols
 import com.example.bridge.DoriBridgeContract.SupportCols
 import com.example.data.local.DoriDatabase
 import com.example.data.local.SupportTicketEntity
+import com.example.data.local.UserPreferencesDataStore
 import com.example.data.model.BookingApprovalStatus
+import com.example.data.model.BookingStatus
 import com.example.data.model.SupportTicketStatus
+import com.example.data.repository.DoriRepository
 import com.example.util.DoriNotificationHelper
 import kotlinx.coroutines.runBlocking
 
@@ -21,6 +24,9 @@ class UserBridgeProvider : ContentProvider() {
         addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_SUPPORT_TICKETS, CODE_SUPPORT)
         addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_BOOKINGS, CODE_BOOKINGS)
         addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_BOOKING_DECISIONS, CODE_DECISIONS)
+        addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_CONTROL_CONFIG, CODE_CONTROL_CONFIG)
+        addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_VENUES, CODE_VENUES)
+        addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_PROVIDERS, CODE_PROVIDERS)
     }
 
     override fun onCreate(): Boolean = true
@@ -198,15 +204,33 @@ class UserBridgeProvider : ContentProvider() {
                     .ifBlank { BookingApprovalStatus.PENDING.name }
                 val handledBy = v.getAsString(BookingCols.HANDLED_BY_PROVIDER).orEmpty()
                 val note = v.getAsString(BookingCols.APPROVAL_NOTE).orEmpty()
+                val status = v.getAsString(BookingCols.STATUS).orEmpty()
+                val stage = v.getAsString(BookingCols.STAGE).orEmpty()
+                val peopleAhead = v.getAsInteger(BookingCols.PEOPLE_AHEAD) ?: -1
+                val estimatedMinutes = v.getAsInteger(BookingCols.ESTIMATED_MINUTES) ?: -1
 
+                var shouldNotifyDecision = false
                 val found = runBlocking {
                     val b = dao.getBookingByTicketCode(ticketCode)
                     if (b != null) {
+                        shouldNotifyDecision = b.approvalStatus != approvalStatus &&
+                            (approvalStatus == BookingApprovalStatus.ACCEPTED.name ||
+                                approvalStatus == BookingApprovalStatus.REJECTED.name)
+                        val nextStatus = status.takeIf { it.isNotBlank() } ?: b.status
                         dao.updateBooking(
                             b.copy(
                                 approvalStatus = approvalStatus,
-                                handledByProvider = handledBy,
-                                approvalNote = note
+                                handledByProvider = handledBy.ifBlank { b.handledByProvider },
+                                approvalNote = note.ifBlank { b.approvalNote },
+                                status = nextStatus,
+                                stage = stage.takeIf { it.isNotBlank() } ?: b.stage,
+                                peopleAhead = if (peopleAhead >= 0) peopleAhead else b.peopleAhead,
+                                estimatedMinutes = if (estimatedMinutes >= 0) estimatedMinutes else b.estimatedMinutes,
+                                completedAt = if (nextStatus != BookingStatus.ACTIVE.name && b.completedAt == null) {
+                                    System.currentTimeMillis()
+                                } else {
+                                    b.completedAt
+                                }
                             )
                         )
                         true
@@ -215,23 +239,86 @@ class UserBridgeProvider : ContentProvider() {
                     }
                 }
                 if (found) {
-                    DoriNotificationHelper.showTicketDecisionNotification(
-                        context = ctx,
-                        ticketCode = ticketCode,
-                        accepted = approvalStatus == BookingApprovalStatus.ACCEPTED.name,
-                        providerName = handledBy.ifBlank { "مقدم الخدمة" }
-                    )
+                    if (shouldNotifyDecision) {
+                        DoriNotificationHelper.showTicketDecisionNotification(
+                            context = ctx,
+                            ticketCode = ticketCode,
+                            accepted = approvalStatus == BookingApprovalStatus.ACCEPTED.name,
+                            providerName = handledBy.ifBlank { "مقدم الخدمة" }
+                        )
+                    }
                     Uri.withAppendedPath(DoriBridgeContract.USER_DECISIONS_URI, ticketCode)
                 } else {
                     null
                 }
             }
 
+            CODE_CONTROL_CONFIG -> {
+                val payload = DoriLocalBridgeClient.controlStateFromContentValues(v)
+                runBlocking {
+                    UserPreferencesDataStore(ctx).applySyncedControlStateFromBridge(
+                        controlConfig = payload.controlConfig,
+                        controlRevision = payload.controlRevision,
+                        queueResetRevision = payload.queueResetRevision,
+                        loyaltyRevision = payload.loyaltyRevision,
+                        loyaltyPointsFromControl = payload.loyaltyPoints
+                    )
+                }
+                Uri.withAppendedPath(DoriBridgeContract.USER_CONFIG_URI, payload.controlRevision.toString())
+            }
+
             else -> null
         }
     }
 
-    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int = 0
+    override fun bulkInsert(uri: Uri, values: Array<out ContentValues>): Int {
+        val ctx = context ?: return 0
+        val dao = DoriDatabase.getInstance(ctx).doriDao()
+        val prefs = UserPreferencesDataStore(ctx)
+        val repo = DoriRepository(dao, prefs)
+
+        return when (matcher.match(uri)) {
+            CODE_VENUES -> {
+                val venues = values.mapNotNull { DoriLocalBridgeClient.venueFromContentValues(it) }
+                val looksReset = venues.isNotEmpty() && venues.all {
+                    it.nextTicketNumber == 1 && it.currentServingNumber == 0 && it.waitingCount == 0
+                }
+                runBlocking {
+                    repo.mergeSyncedVenuesFromControl(venues, queueResetChanged = looksReset)
+                }
+                venues.size
+            }
+
+            CODE_PROVIDERS -> {
+                val providers = values.mapNotNull { DoriLocalBridgeClient.providerFromContentValues(it) }
+                runBlocking {
+                    repo.mergeSyncedProvidersFromControl(providers)
+                }
+                providers.size
+            }
+
+            else -> super.bulkInsert(uri, values)
+        }
+    }
+
+    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int {
+        val ctx = context ?: return 0
+        val dao = DoriDatabase.getInstance(ctx).doriDao()
+        return when (matcher.match(uri)) {
+            CODE_VENUES -> {
+                runBlocking { dao.deleteAllVenues() }
+                1
+            }
+
+            CODE_PROVIDERS -> {
+                runBlocking { dao.deleteAllProviders() }
+                1
+            }
+
+            else -> 0
+        }
+    }
+
     override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?): Int = 0
     override fun getType(uri: Uri): String? = null
 
@@ -239,5 +326,8 @@ class UserBridgeProvider : ContentProvider() {
         const val CODE_SUPPORT = 1
         const val CODE_BOOKINGS = 2
         const val CODE_DECISIONS = 3
+        const val CODE_CONTROL_CONFIG = 4
+        const val CODE_VENUES = 5
+        const val CODE_PROVIDERS = 6
     }
 }

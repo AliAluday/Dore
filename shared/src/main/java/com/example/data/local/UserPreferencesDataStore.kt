@@ -14,11 +14,28 @@ import com.example.data.model.NinevehDistrict
 import com.example.data.model.UserAppControlConfig
 import com.example.data.model.UserProfileSettings
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "dori_nineveh_prefs_v2")
 
-class UserPreferencesDataStore(private val context: Context) {
+class UserPreferencesDataStore(context: Context) {
+
+    private val appContext = context.applicationContext
+
+    data class ControlSyncMetadata(
+        val controlRevision: Long = 0L,
+        val queueResetRevision: Long = 0L,
+        val loyaltyRevision: Long = 0L,
+        val loyaltyPoints: Int = 60,
+        val controlConfig: UserAppControlConfig = UserAppControlConfig()
+    )
+
+    data class AppliedBridgeSyncState(
+        val lastControlRevision: Long = 0L,
+        val lastQueueResetRevision: Long = 0L,
+        val lastLoyaltyRevision: Long = 0L
+    )
 
     private object Keys {
         val SELECTED_DISTRICT = stringPreferencesKey("selected_district")
@@ -45,9 +62,17 @@ class UserPreferencesDataStore(private val context: Context) {
         val CTRL_POINTS_PER_BOOKING = intPreferencesKey("ctrl_points_per_booking")
         val CTRL_DISABLED_CATEGORIES = stringSetPreferencesKey("ctrl_disabled_categories")
         val CTRL_BROADCAST_MSG = stringPreferencesKey("ctrl_broadcast_msg")
+
+        // Cross-App Sync Revisions
+        val CTRL_REVISION = longPreferencesKey("ctrl_sync_revision")
+        val CTRL_QUEUE_RESET_REVISION = longPreferencesKey("ctrl_queue_reset_revision")
+        val CTRL_LOYALTY_REVISION = longPreferencesKey("ctrl_loyalty_revision")
+        val APPLIED_CTRL_REVISION = longPreferencesKey("applied_ctrl_revision")
+        val APPLIED_QUEUE_RESET_REVISION = longPreferencesKey("applied_queue_reset_revision")
+        val APPLIED_LOYALTY_REVISION = longPreferencesKey("applied_loyalty_revision")
     }
 
-    val userPreferences: Flow<UserProfileSettings> = context.dataStore.data.map { prefs ->
+    val userPreferences: Flow<UserProfileSettings> = appContext.dataStore.data.map { prefs ->
         UserProfileSettings(
             selectedDistrict = NinevehDistrict.fromName(
                 prefs[Keys.SELECTED_DISTRICT] ?: NinevehDistrict.ALL_NINEVEH.displayName
@@ -62,28 +87,30 @@ class UserPreferencesDataStore(private val context: Context) {
             muteVibration = prefs[Keys.MUTE_VIBRATION] ?: false,
             activeAdminId = prefs[Keys.ACTIVE_ADMIN_ID] ?: 1L,
             activeProviderId = prefs[Keys.ACTIVE_PROVIDER_ID] ?: 0L,
-            controlConfig = UserAppControlConfig(
-                allowNewBookings = prefs[Keys.CTRL_ALLOW_BOOKINGS] ?: true,
-                enableFastestTurn = prefs[Keys.CTRL_FASTEST_TURN] ?: true,
-                enableQrCode = prefs[Keys.CTRL_QR_CODE] ?: true,
-                enableWhatsAppShare = prefs[Keys.CTRL_WHATSAPP] ?: true,
-                enableReviews = prefs[Keys.CTRL_REVIEWS] ?: true,
-                enableLoyalty = prefs[Keys.CTRL_LOYALTY] ?: true,
-                enableOptionalFields = prefs[Keys.CTRL_OPTIONAL_FIELDS] ?: true,
-                enableLiveAlerts = prefs[Keys.CTRL_LIVE_ALERTS] ?: true,
-                pointsPerBooking = prefs[Keys.CTRL_POINTS_PER_BOOKING] ?: 10,
-                disabledCategories = prefs[Keys.CTRL_DISABLED_CATEGORIES] ?: emptySet(),
-                broadcastMessage = prefs[Keys.CTRL_BROADCAST_MSG] ?: ""
-            )
+            controlConfig = readControlConfig(prefs)
         )
     }
 
+    private fun readControlConfig(prefs: Preferences): UserAppControlConfig = UserAppControlConfig(
+        allowNewBookings = prefs[Keys.CTRL_ALLOW_BOOKINGS] ?: true,
+        enableFastestTurn = prefs[Keys.CTRL_FASTEST_TURN] ?: true,
+        enableQrCode = prefs[Keys.CTRL_QR_CODE] ?: true,
+        enableWhatsAppShare = prefs[Keys.CTRL_WHATSAPP] ?: true,
+        enableReviews = prefs[Keys.CTRL_REVIEWS] ?: true,
+        enableLoyalty = prefs[Keys.CTRL_LOYALTY] ?: true,
+        enableOptionalFields = prefs[Keys.CTRL_OPTIONAL_FIELDS] ?: true,
+        enableLiveAlerts = prefs[Keys.CTRL_LIVE_ALERTS] ?: true,
+        pointsPerBooking = prefs[Keys.CTRL_POINTS_PER_BOOKING] ?: 10,
+        disabledCategories = prefs[Keys.CTRL_DISABLED_CATEGORIES] ?: emptySet(),
+        broadcastMessage = prefs[Keys.CTRL_BROADCAST_MSG] ?: ""
+    )
+
     suspend fun setSelectedDistrict(district: NinevehDistrict) {
-        context.dataStore.edit { it[Keys.SELECTED_DISTRICT] = district.displayName }
+        appContext.dataStore.edit { it[Keys.SELECTED_DISTRICT] = district.displayName }
     }
 
     suspend fun setDarkMode(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.IS_DARK_MODE] = enabled }
+        appContext.dataStore.edit { it[Keys.IS_DARK_MODE] = enabled }
     }
 
     suspend fun updateProfile(
@@ -93,7 +120,7 @@ class UserPreferencesDataStore(private val context: Context) {
         age: String = "",
         optionalNote: String = ""
     ) {
-        context.dataStore.edit {
+        appContext.dataStore.edit {
             it[Keys.USER_NAME] = name.trim()
             it[Keys.USER_PHONE] = phone.trim()
             it[Keys.SELECTED_DISTRICT] = district.displayName
@@ -103,52 +130,134 @@ class UserPreferencesDataStore(private val context: Context) {
     }
 
     suspend fun addLoyaltyPoints(delta: Int) {
-        context.dataStore.edit {
+        appContext.dataStore.edit {
             val current = it[Keys.LOYALTY_POINTS] ?: 60
             it[Keys.LOYALTY_POINTS] = (current + delta).coerceAtLeast(0)
         }
     }
 
     suspend fun setLoyaltyPoints(points: Int) {
-        context.dataStore.edit {
+        appContext.dataStore.edit {
             it[Keys.LOYALTY_POINTS] = points.coerceAtLeast(0)
         }
     }
 
     suspend fun setMuteSound(muted: Boolean) {
-        context.dataStore.edit { it[Keys.MUTE_SOUND] = muted }
+        appContext.dataStore.edit { it[Keys.MUTE_SOUND] = muted }
     }
 
     suspend fun setMuteVibration(muted: Boolean) {
-        context.dataStore.edit { it[Keys.MUTE_VIBRATION] = muted }
+        appContext.dataStore.edit { it[Keys.MUTE_VIBRATION] = muted }
     }
 
     suspend fun setActiveAdminId(adminId: Long) {
-        context.dataStore.edit { it[Keys.ACTIVE_ADMIN_ID] = adminId }
+        appContext.dataStore.edit { it[Keys.ACTIVE_ADMIN_ID] = adminId }
     }
 
     suspend fun setActiveProviderId(providerId: Long) {
-        context.dataStore.edit { it[Keys.ACTIVE_PROVIDER_ID] = providerId }
+        appContext.dataStore.edit { it[Keys.ACTIVE_PROVIDER_ID] = providerId }
     }
 
     suspend fun saveControlConfig(config: UserAppControlConfig) {
-        context.dataStore.edit {
-            it[Keys.CTRL_ALLOW_BOOKINGS] = config.allowNewBookings
-            it[Keys.CTRL_FASTEST_TURN] = config.enableFastestTurn
-            it[Keys.CTRL_QR_CODE] = config.enableQrCode
-            it[Keys.CTRL_WHATSAPP] = config.enableWhatsAppShare
-            it[Keys.CTRL_REVIEWS] = config.enableReviews
-            it[Keys.CTRL_LOYALTY] = config.enableLoyalty
-            it[Keys.CTRL_OPTIONAL_FIELDS] = config.enableOptionalFields
-            it[Keys.CTRL_LIVE_ALERTS] = config.enableLiveAlerts
-            it[Keys.CTRL_POINTS_PER_BOOKING] = config.pointsPerBooking.coerceIn(0, 100)
-            it[Keys.CTRL_DISABLED_CATEGORIES] = config.disabledCategories
-            it[Keys.CTRL_BROADCAST_MSG] = config.broadcastMessage.trim()
+        appContext.dataStore.edit {
+            writeControlConfig(it, config)
         }
     }
 
+    suspend fun saveControlConfigAndBumpRevision(config: UserAppControlConfig): ControlSyncMetadata {
+        var result = ControlSyncMetadata()
+        appContext.dataStore.edit { prefs ->
+            writeControlConfig(prefs, config)
+            val nextRev = nextRevision(prefs[Keys.CTRL_REVISION] ?: 0L)
+            prefs[Keys.CTRL_REVISION] = nextRev
+            result = ControlSyncMetadata(
+                controlRevision = nextRev,
+                queueResetRevision = prefs[Keys.CTRL_QUEUE_RESET_REVISION] ?: 0L,
+                loyaltyRevision = prefs[Keys.CTRL_LOYALTY_REVISION] ?: 0L,
+                loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 60,
+                controlConfig = readControlConfig(prefs)
+            )
+        }
+        return result
+    }
+
+    suspend fun bumpControlRevision(
+        bumpQueueReset: Boolean = false,
+        bumpLoyalty: Boolean = false
+    ): ControlSyncMetadata {
+        var result = ControlSyncMetadata()
+        appContext.dataStore.edit { prefs ->
+            val nextRev = nextRevision(prefs[Keys.CTRL_REVISION] ?: 0L)
+            prefs[Keys.CTRL_REVISION] = nextRev
+            if (bumpQueueReset) {
+                prefs[Keys.CTRL_QUEUE_RESET_REVISION] = nextRevision(prefs[Keys.CTRL_QUEUE_RESET_REVISION] ?: 0L)
+            }
+            if (bumpLoyalty) {
+                prefs[Keys.CTRL_LOYALTY_REVISION] = nextRevision(prefs[Keys.CTRL_LOYALTY_REVISION] ?: 0L)
+            }
+            result = ControlSyncMetadata(
+                controlRevision = nextRev,
+                queueResetRevision = prefs[Keys.CTRL_QUEUE_RESET_REVISION] ?: 0L,
+                loyaltyRevision = prefs[Keys.CTRL_LOYALTY_REVISION] ?: 0L,
+                loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 60,
+                controlConfig = readControlConfig(prefs)
+            )
+        }
+        return result
+    }
+
+    suspend fun getControlSyncMetadata(): ControlSyncMetadata {
+        val prefs = appContext.dataStore.data.first()
+        return ControlSyncMetadata(
+            controlRevision = prefs[Keys.CTRL_REVISION] ?: 0L,
+            queueResetRevision = prefs[Keys.CTRL_QUEUE_RESET_REVISION] ?: 0L,
+            loyaltyRevision = prefs[Keys.CTRL_LOYALTY_REVISION] ?: 0L,
+            loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 60,
+            controlConfig = readControlConfig(prefs)
+        )
+    }
+
+    suspend fun getAppliedBridgeSyncState(): AppliedBridgeSyncState {
+        val prefs = appContext.dataStore.data.first()
+        return AppliedBridgeSyncState(
+            lastControlRevision = prefs[Keys.APPLIED_CTRL_REVISION] ?: 0L,
+            lastQueueResetRevision = prefs[Keys.APPLIED_QUEUE_RESET_REVISION] ?: 0L,
+            lastLoyaltyRevision = prefs[Keys.APPLIED_LOYALTY_REVISION] ?: 0L
+        )
+    }
+
+    suspend fun applySyncedControlStateFromBridge(
+        controlConfig: UserAppControlConfig,
+        controlRevision: Long,
+        queueResetRevision: Long,
+        loyaltyRevision: Long,
+        loyaltyPointsFromControl: Int
+    ): Boolean {
+        var changed = false
+        appContext.dataStore.edit { prefs ->
+            val prevCtrlRev = prefs[Keys.APPLIED_CTRL_REVISION] ?: 0L
+            val prevLoyaltyRev = prefs[Keys.APPLIED_LOYALTY_REVISION] ?: 0L
+            val currentConfig = readControlConfig(prefs)
+            if (controlRevision > prevCtrlRev || currentConfig != controlConfig) {
+                writeControlConfig(prefs, controlConfig)
+                prefs[Keys.APPLIED_CTRL_REVISION] = maxOf(prevCtrlRev, controlRevision)
+                changed = true
+            }
+            if (queueResetRevision > (prefs[Keys.APPLIED_QUEUE_RESET_REVISION] ?: 0L)) {
+                prefs[Keys.APPLIED_QUEUE_RESET_REVISION] = queueResetRevision
+                changed = true
+            }
+            if (loyaltyRevision > prevLoyaltyRev) {
+                prefs[Keys.LOYALTY_POINTS] = loyaltyPointsFromControl.coerceAtLeast(0)
+                prefs[Keys.APPLIED_LOYALTY_REVISION] = loyaltyRevision
+                changed = true
+            }
+        }
+        return changed
+    }
+
     suspend fun applySyncedSettings(settings: UserProfileSettings) {
-        context.dataStore.edit {
+        appContext.dataStore.edit {
             it[Keys.SELECTED_DISTRICT] = settings.selectedDistrict.displayName
             it[Keys.IS_DARK_MODE] = settings.isDarkMode
             it[Keys.USER_NAME] = settings.userName
@@ -158,19 +267,28 @@ class UserPreferencesDataStore(private val context: Context) {
             it[Keys.LOYALTY_POINTS] = settings.loyaltyPoints.coerceAtLeast(0)
             it[Keys.MUTE_SOUND] = settings.muteSound
             it[Keys.MUTE_VIBRATION] = settings.muteVibration
-            val cfg = settings.controlConfig
-            it[Keys.CTRL_ALLOW_BOOKINGS] = cfg.allowNewBookings
-            it[Keys.CTRL_FASTEST_TURN] = cfg.enableFastestTurn
-            it[Keys.CTRL_QR_CODE] = cfg.enableQrCode
-            it[Keys.CTRL_WHATSAPP] = cfg.enableWhatsAppShare
-            it[Keys.CTRL_REVIEWS] = cfg.enableReviews
-            it[Keys.CTRL_LOYALTY] = cfg.enableLoyalty
-            it[Keys.CTRL_OPTIONAL_FIELDS] = cfg.enableOptionalFields
-            it[Keys.CTRL_LIVE_ALERTS] = cfg.enableLiveAlerts
-            it[Keys.CTRL_POINTS_PER_BOOKING] = cfg.pointsPerBooking.coerceIn(0, 100)
-            it[Keys.CTRL_DISABLED_CATEGORIES] = cfg.disabledCategories
-            it[Keys.CTRL_BROADCAST_MSG] = cfg.broadcastMessage.trim()
+            writeControlConfig(it, settings.controlConfig)
         }
     }
+
+    private fun writeControlConfig(
+        prefs: androidx.datastore.preferences.core.MutablePreferences,
+        config: UserAppControlConfig
+    ) {
+        prefs[Keys.CTRL_ALLOW_BOOKINGS] = config.allowNewBookings
+        prefs[Keys.CTRL_FASTEST_TURN] = config.enableFastestTurn
+        prefs[Keys.CTRL_QR_CODE] = config.enableQrCode
+        prefs[Keys.CTRL_WHATSAPP] = config.enableWhatsAppShare
+        prefs[Keys.CTRL_REVIEWS] = config.enableReviews
+        prefs[Keys.CTRL_LOYALTY] = config.enableLoyalty
+        prefs[Keys.CTRL_OPTIONAL_FIELDS] = config.enableOptionalFields
+        prefs[Keys.CTRL_LIVE_ALERTS] = config.enableLiveAlerts
+        prefs[Keys.CTRL_POINTS_PER_BOOKING] = config.pointsPerBooking.coerceIn(0, 100)
+        prefs[Keys.CTRL_DISABLED_CATEGORIES] = config.disabledCategories
+        prefs[Keys.CTRL_BROADCAST_MSG] = config.broadcastMessage.trim()
+    }
+
+    private fun nextRevision(previous: Long): Long =
+        maxOf(previous + 1L, System.currentTimeMillis())
 }
 

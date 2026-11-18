@@ -45,6 +45,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 enum class DoriAppMode {
@@ -140,6 +142,7 @@ class DoriViewModel(
     private val filterState = MutableStateFlow(FilterState(currentTab = initialTab))
     private val _toastMessage = MutableSharedFlow<String>()
     val toastMessage = _toastMessage.asSharedFlow()
+    private val bridgeSyncMutex = Mutex()
 
     private var simulationJob: Job? = null
 
@@ -197,6 +200,14 @@ class DoriViewModel(
         }
 
         val disabledCategories = userPrefs.controlConfig.disabledCategories
+        val effectiveCategory = if (
+            filters.selectedCategory != ServiceCategory.ALL &&
+            filters.selectedCategory.displayName in disabledCategories
+        ) {
+            ServiceCategory.ALL
+        } else {
+            filters.selectedCategory
+        }
         val enabledDistrictVenues = districtVenues.filter { it.category !in disabledCategories }
         val activeArea = filters.selectedArea?.takeIf { it in availableAreas }
         val openDistrictVenues = enabledDistrictVenues.filter { it.isOpen && it.isAcceptingBookings && !it.isPaused }
@@ -207,9 +218,9 @@ class DoriViewModel(
 
         val filtered = enabledDistrictVenues
             .filter { venue ->
-                val matchesCategory = filters.selectedCategory == ServiceCategory.ALL ||
-                    venue.category == filters.selectedCategory.displayName
-                val matchesSpecialty = filters.selectedCategory != ServiceCategory.CLINICS ||
+                val matchesCategory = effectiveCategory == ServiceCategory.ALL ||
+                    venue.category == effectiveCategory.displayName
+                val matchesSpecialty = effectiveCategory != ServiceCategory.CLINICS ||
                     filters.selectedSpecialty == MedicalSpecialty.ALL ||
                     venue.specialty == filters.selectedSpecialty.displayName
                 val matchesArea = activeArea == null ||
@@ -276,7 +287,7 @@ class DoriViewModel(
             selectedArea = activeArea,
             availableAreas = availableAreas,
             searchQuery = filters.searchQuery,
-            selectedCategory = filters.selectedCategory,
+            selectedCategory = effectiveCategory,
             selectedSpecialty = filters.selectedSpecialty,
             showFavoritesOnly = filters.showFavoritesOnly,
             sortOption = filters.sortOption,
@@ -321,9 +332,7 @@ class DoriViewModel(
 
     fun selectTab(tab: AppTab) {
         filterState.update { it.copy(currentTab = tab) }
-        if (tab == AppTab.TICKETS || tab == AppTab.CONTROL_SUPPORT || tab == AppTab.CONTROL_QUEUES) {
-            viewModelScope.launch { syncLocalBridgeInternal(silent = true) }
-        }
+        viewModelScope.launch { syncLocalBridgeInternal(silent = true) }
     }
 
     fun syncLocalBridge(silent: Boolean = false) {
@@ -332,7 +341,33 @@ class DoriViewModel(
         }
     }
 
-    private suspend fun syncLocalBridgeInternal(silent: Boolean) {
+    private suspend fun pushControlSnapshotToUserApp(includeBookings: Boolean = false) {
+        if (appMode != DoriAppMode.CONTROL_APP) return
+        val ctx = getApplication<Application>()
+        withContext(Dispatchers.IO) {
+            if (includeBookings) {
+                repository.getAllBookingsSnapshot().forEach { b ->
+                    DoriLocalBridgeClient.pushBookingDecisionToUser(
+                        context = ctx,
+                        ticketCode = b.ticketCode,
+                        approvalStatus = b.approvalStatus,
+                        handledByProvider = b.handledByProvider,
+                        approvalNote = b.approvalNote,
+                        status = b.status,
+                        stage = b.stage,
+                        peopleAhead = b.peopleAhead,
+                        estimatedMinutes = b.estimatedMinutes
+                    )
+                }
+            }
+            val (payload, venues, providers) = repository.getControlBridgeSnapshot()
+            DoriLocalBridgeClient.pushVenuesToUser(ctx, venues)
+            DoriLocalBridgeClient.pushProvidersToUser(ctx, providers)
+            DoriLocalBridgeClient.pushControlStateToUser(ctx, payload)
+        }
+    }
+
+    private suspend fun syncLocalBridgeInternal(silent: Boolean) = bridgeSyncMutex.withLock {
         val ctx = getApplication<Application>()
         val isCtrl = appMode == DoriAppMode.CONTROL_APP
         val changedCount = withContext(Dispatchers.IO) {
@@ -347,6 +382,27 @@ class DoriViewModel(
                 }
                 val remoteBookings = DoriLocalBridgeClient.pullBookingsFromUser(ctx)
                 count += repository.mergePulledBookingsForControl(remoteBookings)
+
+                repository.getAllBookingsSnapshot().forEach { b ->
+                    DoriLocalBridgeClient.pushBookingDecisionToUser(
+                        context = ctx,
+                        ticketCode = b.ticketCode,
+                        approvalStatus = b.approvalStatus,
+                        handledByProvider = b.handledByProvider,
+                        approvalNote = b.approvalNote,
+                        status = b.status,
+                        stage = b.stage,
+                        peopleAhead = b.peopleAhead,
+                        estimatedMinutes = b.estimatedMinutes
+                    )
+                }
+
+                val (payload, venues, providers) = repository.getControlBridgeSnapshot()
+                if (payload.controlRevision > 0L || payload.queueResetRevision > 0L || payload.loyaltyRevision > 0L) {
+                    DoriLocalBridgeClient.pushVenuesToUser(ctx, venues)
+                    DoriLocalBridgeClient.pushProvidersToUser(ctx, providers)
+                    DoriLocalBridgeClient.pushControlStateToUser(ctx, payload)
+                }
             } else {
                 val localTickets = repository.getAllSupportTicketsSnapshot()
                 localTickets.filter { !it.syncedToControl }.forEach { pending ->
@@ -355,16 +411,43 @@ class DoriViewModel(
                         count++
                     }
                 }
+                repository.getAllBookingsSnapshot()
+                    .filter { it.status == BookingStatus.ACTIVE.name }
+                    .forEach { activeBooking ->
+                        DoriLocalBridgeClient.pushBookingToControl(ctx, activeBooking)
+                    }
+
                 val decisions = DoriLocalBridgeClient.pullBookingDecisionsFromControl(ctx)
                 decisions.forEach { d ->
-                    if (repository.applyBookingApprovalDecisionLocal(
-                            d.ticketCode,
-                            d.approvalStatus,
-                            d.handledByProvider,
-                            d.approvalNote
-                        )
-                    ) {
+                    if (repository.applyBookingApprovalDecisionLocal(d)) {
                         count++
+                    }
+                }
+
+                val remoteControl = DoriLocalBridgeClient.pullControlStateFromControl(ctx)
+                if (remoteControl != null) {
+                    val applied = repository.getAppliedBridgeSyncState()
+                    val needsControlSync =
+                        remoteControl.controlRevision > applied.lastControlRevision ||
+                            remoteControl.queueResetRevision > applied.lastQueueResetRevision ||
+                            remoteControl.loyaltyRevision > applied.lastLoyaltyRevision
+                    if (needsControlSync) {
+                        val queueResetChanged =
+                            remoteControl.queueResetRevision > applied.lastQueueResetRevision
+                        val remoteVenues = DoriLocalBridgeClient.pullVenuesFromControl(ctx)
+                        if (remoteVenues != null) {
+                            count += repository.mergeSyncedVenuesFromControl(
+                                remoteVenues = remoteVenues,
+                                queueResetChanged = queueResetChanged
+                            )
+                        }
+                        val remoteProviders = DoriLocalBridgeClient.pullProvidersFromControl(ctx)
+                        if (remoteProviders != null) {
+                            count += repository.mergeSyncedProvidersFromControl(remoteProviders)
+                        }
+                        if (repository.applyPulledControlState(remoteControl)) {
+                            count++
+                        }
                     }
                 }
             }
@@ -742,6 +825,7 @@ class DoriViewModel(
                 canCallNext = canCallNext,
                 canPauseVenue = canPauseVenue
             ).onSuccess { prov ->
+                pushControlSnapshotToUserApp()
                 _toastMessage.emit("تمت إضافة ${prov.name} (${prov.customTitle})")
             }.onFailure { err ->
                 _toastMessage.emit(err.message ?: "تعذر إضافة مقدم الخدمة")
@@ -767,6 +851,7 @@ class DoriViewModel(
                 venueName = venue?.name ?: provider.venueName
             )
             repository.updateServiceProvider(normalized)
+            pushControlSnapshotToUserApp()
             _toastMessage.emit("تم تحديث بيانات وصلاحيات ${normalized.name} ✓")
         }
     }
@@ -775,6 +860,7 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.MANAGE_PROVIDERS)) return@launch
             repository.deleteServiceProvider(providerId)
+            pushControlSnapshotToUserApp()
             _toastMessage.emit("تم حذف مقدم الخدمة")
         }
     }
@@ -805,9 +891,14 @@ class DoriViewModel(
                     ticketCode = updated.ticketCode,
                     approvalStatus = updated.approvalStatus,
                     handledByProvider = updated.handledByProvider,
-                    approvalNote = updated.approvalNote
+                    approvalNote = updated.approvalNote,
+                    status = updated.status,
+                    stage = updated.stage,
+                    peopleAhead = updated.peopleAhead,
+                    estimatedMinutes = updated.estimatedMinutes
                 )
             }
+            pushControlSnapshotToUserApp()
             _toastMessage.emit("تم قبول التذكرة ${updated.ticketCode} بواسطة $actorName ✓")
         }
     }
@@ -837,9 +928,14 @@ class DoriViewModel(
                     ticketCode = updated.ticketCode,
                     approvalStatus = updated.approvalStatus,
                     handledByProvider = updated.handledByProvider,
-                    approvalNote = updated.approvalNote
+                    approvalNote = updated.approvalNote,
+                    status = updated.status,
+                    stage = updated.stage,
+                    peopleAhead = updated.peopleAhead,
+                    estimatedMinutes = updated.estimatedMinutes
                 )
             }
+            pushControlSnapshotToUserApp()
             _toastMessage.emit("تم الاعتذار عن التذكرة ${updated.ticketCode}")
         }
     }
@@ -860,6 +956,7 @@ class DoriViewModel(
             if (prov == null && !requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)) return@launch
             val alerts = repository.callNextCustomer(venueId)
             handleTurnAlerts(alerts)
+            pushControlSnapshotToUserApp(includeBookings = true)
         }
     }
 
@@ -873,6 +970,7 @@ class DoriViewModel(
             if (prov == null && !requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)) return@launch
             val alerts = repository.skipCurrentCustomer(venueId)
             handleTurnAlerts(alerts)
+            pushControlSnapshotToUserApp(includeBookings = true)
             _toastMessage.emit("تم تخطي العميل الحالي والنداء على التالي")
         }
     }
@@ -887,6 +985,7 @@ class DoriViewModel(
             if (prov == null && !requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)) return@launch
             val alerts = repository.callCustomerByName(venueId, queueItemId)
             handleTurnAlerts(alerts)
+            pushControlSnapshotToUserApp(includeBookings = true)
             _toastMessage.emit("تم استدعاء $customerName الآن")
         }
     }
@@ -898,6 +997,7 @@ class DoriViewModel(
             ) return@launch
             val alerts = repository.markCustomerNoShow(venueId, queueItemId)
             handleTurnAlerts(alerts)
+            pushControlSnapshotToUserApp(includeBookings = true)
             _toastMessage.emit("تم تسجيل توقف $customerName عن الحضور")
         }
     }
@@ -911,6 +1011,7 @@ class DoriViewModel(
             }
             if (prov == null && !requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)) return@launch
             repository.togglePauseQueue(venueId)
+            pushControlSnapshotToUserApp()
         }
     }
 
@@ -923,6 +1024,7 @@ class DoriViewModel(
             }
             if (prov == null && !requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)) return@launch
             repository.toggleAcceptingBookings(venueId)
+            pushControlSnapshotToUserApp()
         }
     }
 
@@ -932,6 +1034,7 @@ class DoriViewModel(
                 !requireAdminPermission(AdminPermissionType.MANAGE_QUEUES)
             ) return@launch
             repository.addWalkInCustomer(venueId, name, option)
+            pushControlSnapshotToUserApp(includeBookings = true)
             _toastMessage.emit("تمت إضافة العميل إلى طابور المحل")
         }
     }
@@ -986,6 +1089,7 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.MANAGE_FEATURES)) return@launch
             repository.updateControlConfig(transform)
+            pushControlSnapshotToUserApp()
         }
     }
 
@@ -1005,6 +1109,7 @@ class DoriViewModel(
             if (filterState.value.selectedCategory == category) {
                 filterState.update { it.copy(selectedCategory = ServiceCategory.ALL) }
             }
+            pushControlSnapshotToUserApp()
         }
     }
 
@@ -1012,6 +1117,7 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.MANAGE_FEATURES)) return@launch
             repository.updateControlConfig { it.copy(broadcastMessage = message.trim()) }
+            pushControlSnapshotToUserApp()
             _toastMessage.emit(
                 if (message.isBlank()) "تم مسح رسالة الإعلان العام"
                 else "تم نشر الإعلان لنسخة المستخدم"
@@ -1033,6 +1139,7 @@ class DoriViewModel(
             if (!requireAdminPermission(AdminPermissionType.MANAGE_VENUES)) return@launch
             repository.addCustomVenue(name, district, area, category, specialty, priceDinar, avgMinutes, phone)
                 .onSuccess { venue ->
+                    pushControlSnapshotToUserApp()
                     _toastMessage.emit("تمت إضافة \"${venue.name}\" إلى نسخة المستخدم")
                 }
                 .onFailure { err ->
@@ -1045,6 +1152,7 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.MANAGE_VENUES)) return@launch
             repository.toggleVenueOpen(venueId)
+            pushControlSnapshotToUserApp()
         }
     }
 
@@ -1052,6 +1160,7 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.MANAGE_VENUES)) return@launch
             repository.adjustVenuePrice(venueId, deltaDinar)
+            pushControlSnapshotToUserApp()
         }
     }
 
@@ -1059,6 +1168,7 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.MANAGE_VENUES)) return@launch
             repository.adjustVenueWaitMinutes(venueId, deltaMinutes)
+            pushControlSnapshotToUserApp(includeBookings = true)
         }
     }
 
@@ -1066,6 +1176,7 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.MANAGE_VENUES)) return@launch
             repository.deleteVenue(venueId)
+            pushControlSnapshotToUserApp()
             _toastMessage.emit("تم حذف المركز من القائمة")
         }
     }
@@ -1075,6 +1186,7 @@ class DoriViewModel(
             if (!requireAdminPermission(AdminPermissionType.MANAGE_VENUES)) return@launch
             val district = uiState.value.preferences.selectedDistrict
             repository.setAllVenuesOpenInDistrict(district, open)
+            pushControlSnapshotToUserApp()
             _toastMessage.emit(
                 if (open) "تم فتح جميع مراكز ${district.displayName}"
                 else "تم إغلاق جميع مراكز ${district.displayName} مؤقتاً"
@@ -1087,6 +1199,7 @@ class DoriViewModel(
             if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
             val alerts = repository.advanceActiveUserTicketDemoStep()
             handleTurnAlerts(alerts)
+            pushControlSnapshotToUserApp(includeBookings = true)
             _toastMessage.emit("تم تقديم جميع الأدوار النشطة خطوة للأمام")
         }
     }
@@ -1095,6 +1208,7 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
             val count = repository.completeAllActiveBookings()
+            pushControlSnapshotToUserApp(includeBookings = true)
             _toastMessage.emit("تم إتمام $count تذكرة نشطة")
         }
     }
@@ -1103,6 +1217,7 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
             val count = repository.cancelAllActiveBookings()
+            pushControlSnapshotToUserApp(includeBookings = true)
             _toastMessage.emit("تم إلغاء $count تذكرة نشطة")
         }
     }
@@ -1111,6 +1226,7 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
             repository.resetAllQueuesToOne()
+            pushControlSnapshotToUserApp()
             _toastMessage.emit("تم تصفير جميع الطوابير والبدء من التذكرة #1")
         }
     }
@@ -1119,6 +1235,7 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
             repository.adjustLoyaltyPoints(delta)
+            pushControlSnapshotToUserApp()
             _toastMessage.emit("تم تحديث نقاط الولاء")
         }
     }
@@ -1127,6 +1244,7 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
             repository.resetLoyaltyPoints()
+            pushControlSnapshotToUserApp()
             _toastMessage.emit("تم تصفير نقاط الولاء")
         }
     }
@@ -1138,6 +1256,7 @@ class DoriViewModel(
             simulationJob = null
             filterState.update { it.copy(isLiveSimulationRunning = false, activeTurnAlert = null) }
             repository.factoryResetAllData()
+            pushControlSnapshotToUserApp()
             _toastMessage.emit("تمت استعادة الإعدادات والبيانات الافتراضية بالكامل")
         }
     }

@@ -10,14 +10,17 @@ import com.example.bridge.DoriBridgeContract.BookingCols
 import com.example.bridge.DoriBridgeContract.ControlConfigCols
 import com.example.bridge.DoriBridgeContract.ProviderCols
 import com.example.bridge.DoriBridgeContract.SupportCols
+import com.example.bridge.DoriBridgeContract.SupportMessageCols
 import com.example.bridge.DoriBridgeContract.VenueCols
 import com.example.data.local.BookingEntity
 import com.example.data.local.DoriDatabase
 import com.example.data.local.MerchantQueueItemEntity
+import com.example.data.local.SupportMessageEntity
 import com.example.data.local.SupportTicketEntity
 import com.example.data.local.UserPreferencesDataStore
 import com.example.data.model.BookingApprovalStatus
 import com.example.data.model.QueueItemStatus
+import com.example.data.model.SupportRequestType
 import com.example.data.model.SupportTicketStatus
 import com.example.util.DoriNotificationHelper
 import kotlinx.coroutines.runBlocking
@@ -26,6 +29,7 @@ class ControlBridgeProvider : ContentProvider() {
 
     private val matcher = UriMatcher(UriMatcher.NO_MATCH).apply {
         addURI(DoriBridgeContract.CONTROL_AUTHORITY, DoriBridgeContract.PATH_SUPPORT_TICKETS, CODE_SUPPORT)
+        addURI(DoriBridgeContract.CONTROL_AUTHORITY, DoriBridgeContract.PATH_SUPPORT_MESSAGES, CODE_SUPPORT_MESSAGES)
         addURI(DoriBridgeContract.CONTROL_AUTHORITY, DoriBridgeContract.PATH_BOOKINGS, CODE_BOOKINGS)
         addURI(DoriBridgeContract.CONTROL_AUTHORITY, DoriBridgeContract.PATH_BOOKING_DECISIONS, CODE_DECISIONS)
         addURI(DoriBridgeContract.CONTROL_AUTHORITY, DoriBridgeContract.PATH_CONTROL_CONFIG, CODE_CONTROL_CONFIG)
@@ -52,6 +56,8 @@ class ControlBridgeProvider : ContentProvider() {
                     SupportCols.SENDER_NAME,
                     SupportCols.SENDER_PHONE,
                     SupportCols.CATEGORY,
+                    SupportCols.REQUEST_TYPE,
+                    SupportCols.RELATED_VENUE_NAME,
                     SupportCols.SUBJECT,
                     SupportCols.MESSAGE,
                     SupportCols.STATUS,
@@ -70,6 +76,8 @@ class ControlBridgeProvider : ContentProvider() {
                                 t.senderName,
                                 t.senderPhone,
                                 t.category,
+                                t.requestType,
+                                t.relatedVenueName,
                                 t.subject,
                                 t.message,
                                 t.status,
@@ -78,6 +86,34 @@ class ControlBridgeProvider : ContentProvider() {
                                 if (t.syncedToControl) 1 else 0,
                                 t.createdAt,
                                 t.updatedAt
+                            )
+                        )
+                    }
+                }
+            }
+
+            CODE_SUPPORT_MESSAGES -> {
+                val cols = arrayOf(
+                    SupportMessageCols.EXTERNAL_MESSAGE_ID,
+                    SupportMessageCols.TICKET_EXTERNAL_ID,
+                    SupportMessageCols.IS_FROM_ADMIN,
+                    SupportMessageCols.SENDER_NAME,
+                    SupportMessageCols.BODY,
+                    SupportMessageCols.SYNCED_TO_PEER,
+                    SupportMessageCols.CREATED_AT
+                )
+                MatrixCursor(cols).apply {
+                    val messages = runBlocking { dao.getAllSupportMessagesOnce() }
+                    messages.forEach { m ->
+                        addRow(
+                            arrayOf<Any?>(
+                                m.externalMessageId,
+                                m.ticketExternalId,
+                                if (m.isFromAdmin) 1 else 0,
+                                m.senderName,
+                                m.body,
+                                if (m.syncedToPeer) 1 else 0,
+                                m.createdAt
                             )
                         )
                     }
@@ -275,31 +311,49 @@ class ControlBridgeProvider : ContentProvider() {
                 val senderName = v.getAsString(SupportCols.SENDER_NAME).orEmpty().ifBlank { "مستخدم دوري" }
                 val senderPhone = v.getAsString(SupportCols.SENDER_PHONE).orEmpty()
                 val category = v.getAsString(SupportCols.CATEGORY).orEmpty()
+                val reqType = v.getAsString(SupportCols.REQUEST_TYPE).orEmpty().ifBlank { SupportRequestType.CHAT.name }
+                val venueName = v.getAsString(SupportCols.RELATED_VENUE_NAME).orEmpty()
                 val subject = v.getAsString(SupportCols.SUBJECT).orEmpty().ifBlank { "رسالة دعم فني" }
                 val message = v.getAsString(SupportCols.MESSAGE).orEmpty()
-                val now = System.currentTimeMillis()
+                val incomingStatus = v.getAsString(SupportCols.STATUS).orEmpty()
+                val now = v.getAsLong(SupportCols.UPDATED_AT) ?: System.currentTimeMillis()
+                var shouldNotify = false
 
                 runBlocking {
                     val existing = dao.getSupportTicketByExternalId(externalId)
                     if (existing != null) {
+                        val nextStatus = if (incomingStatus == SupportTicketStatus.SENT.name ||
+                            incomingStatus == SupportTicketStatus.DELIVERED.name
+                        ) {
+                            SupportTicketStatus.DELIVERED.name
+                        } else {
+                            incomingStatus.ifBlank { existing.status }
+                        }
+                        shouldNotify = now > existing.updatedAt
                         dao.updateSupportTicket(
                             existing.copy(
                                 senderName = senderName,
                                 senderPhone = senderPhone,
                                 category = category,
+                                requestType = reqType,
+                                relatedVenueName = venueName.ifBlank { existing.relatedVenueName },
                                 subject = subject,
                                 message = message,
+                                status = nextStatus,
                                 syncedToControl = true,
-                                updatedAt = now
+                                updatedAt = maxOf(existing.updatedAt, now)
                             )
                         )
                     } else {
+                        shouldNotify = true
                         dao.insertSupportTicket(
                             SupportTicketEntity(
                                 externalId = externalId,
                                 senderName = senderName,
                                 senderPhone = senderPhone,
                                 category = category,
+                                requestType = reqType,
+                                relatedVenueName = venueName,
                                 subject = subject,
                                 message = message,
                                 status = SupportTicketStatus.DELIVERED.name,
@@ -311,13 +365,57 @@ class ControlBridgeProvider : ContentProvider() {
                     }
                 }
 
-                DoriNotificationHelper.showSupportMessageNotification(
-                    context = ctx,
-                    title = "📩 رسالة دعم فني جديدة من $senderName",
-                    body = "$subject — $message",
-                    idSeed = kotlin.math.abs(externalId.hashCode() % 3000) + 3500
-                )
+                if (shouldNotify) {
+                    val badgeTitle = if (reqType == SupportRequestType.COMPLAINT.name) {
+                        "📩 طلب شكوى جديد من $senderName"
+                    } else {
+                        "📩 رسالة دعم فني من $senderName"
+                    }
+                    DoriNotificationHelper.showSupportMessageNotification(
+                        context = ctx,
+                        title = badgeTitle,
+                        body = "$subject — $message",
+                        idSeed = kotlin.math.abs(externalId.hashCode() % 3000) + 3500
+                    )
+                }
                 Uri.withAppendedPath(DoriBridgeContract.CONTROL_SUPPORT_URI, externalId)
+            }
+
+            CODE_SUPPORT_MESSAGES -> {
+                val extMsgId = v.getAsString(SupportMessageCols.EXTERNAL_MESSAGE_ID)?.takeIf { it.isNotBlank() }
+                    ?: return null
+                val ticketExtId = v.getAsString(SupportMessageCols.TICKET_EXTERNAL_ID)?.takeIf { it.isNotBlank() }
+                    ?: return null
+                val isFromAdmin = (v.getAsInteger(SupportMessageCols.IS_FROM_ADMIN) ?: 0) == 1
+                val senderName = v.getAsString(SupportMessageCols.SENDER_NAME).orEmpty().ifBlank { "مستخدم دوري" }
+                val body = v.getAsString(SupportMessageCols.BODY).orEmpty()
+                val createdAt = v.getAsLong(SupportMessageCols.CREATED_AT) ?: System.currentTimeMillis()
+                var insertedNew = false
+                runBlocking {
+                    if (dao.getSupportMessageByExternalId(extMsgId) == null) {
+                        dao.insertSupportMessage(
+                            SupportMessageEntity(
+                                externalMessageId = extMsgId,
+                                ticketExternalId = ticketExtId,
+                                isFromAdmin = isFromAdmin,
+                                senderName = senderName,
+                                body = body,
+                                syncedToPeer = true,
+                                createdAt = createdAt
+                            )
+                        )
+                        insertedNew = true
+                    }
+                }
+                if (insertedNew && !isFromAdmin && body.isNotBlank()) {
+                    DoriNotificationHelper.showSupportMessageNotification(
+                        context = ctx,
+                        title = "💬 رسالة متابعة من $senderName",
+                        body = body,
+                        idSeed = kotlin.math.abs(extMsgId.hashCode() % 3000) + 3550
+                    )
+                }
+                Uri.withAppendedPath(DoriBridgeContract.CONTROL_SUPPORT_MESSAGES_URI, extMsgId)
             }
 
             CODE_BOOKINGS -> {
@@ -410,5 +508,6 @@ class ControlBridgeProvider : ContentProvider() {
         const val CODE_CONTROL_CONFIG = 4
         const val CODE_VENUES = 5
         const val CODE_PROVIDERS = 6
+        const val CODE_SUPPORT_MESSAGES = 7
     }
 }

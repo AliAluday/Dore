@@ -12,6 +12,7 @@ import com.example.data.local.DoriDatabase
 import com.example.data.local.MerchantQueueItemEntity
 import com.example.data.local.ReviewEntity
 import com.example.data.local.ServiceProviderEntity
+import com.example.data.local.SupportMessageEntity
 import com.example.data.local.SupportTicketEntity
 import com.example.data.local.UserPreferencesDataStore
 import com.example.data.local.VenueEntity
@@ -25,6 +26,7 @@ import com.example.data.model.ProviderRole
 import com.example.data.model.ServiceCategory
 import com.example.data.model.SortOption
 import com.example.data.model.SupportCategory
+import com.example.data.model.SupportRequestType
 import com.example.data.model.SupportTicketStatus
 import com.example.data.model.TicketStage
 import com.example.data.model.UserAppControlConfig
@@ -95,6 +97,7 @@ data class DoriUiState(
     val selectedMerchantVenueId: Int = 1,
     val queueItemsByVenue: Map<Int, List<MerchantQueueItemEntity>> = emptyMap(),
     val supportTickets: List<SupportTicketEntity> = emptyList(),
+    val supportMessagesByTicket: Map<String, List<SupportMessageEntity>> = emptyMap(),
     val supportAlertCount: Int = 0,
     val admins: List<AdminAccountEntity> = emptyList(),
     val activeAdmin: AdminAccountEntity? = null,
@@ -167,7 +170,8 @@ class DoriViewModel(
         repository.queueItems,
         repository.supportTickets,
         repository.admins,
-        repository.providers
+        repository.providers,
+        repository.supportMessages
     ) { values ->
         val filters = values[0] as FilterState
         val userPrefs = values[1] as UserProfileSettings
@@ -185,6 +189,8 @@ class DoriViewModel(
         val admins = values[7] as List<AdminAccountEntity>
         @Suppress("UNCHECKED_CAST")
         val providers = values[8] as List<ServiceProviderEntity>
+        @Suppress("UNCHECKED_CAST")
+        val supportMessages = values[9] as List<SupportMessageEntity>
 
         val district = userPrefs.selectedDistrict
         val districtVenues = if (district == NinevehDistrict.ALL_NINEVEH) {
@@ -305,6 +311,7 @@ class DoriViewModel(
             selectedMerchantVenueId = effectiveMerchantId,
             queueItemsByVenue = queueItems.groupBy { it.venueId },
             supportTickets = supportTickets,
+            supportMessagesByTicket = supportMessages.groupBy { it.ticketExternalId },
             supportAlertCount = supportBadgeCount,
             admins = admins,
             activeAdmin = activeAdmin,
@@ -374,12 +381,22 @@ class DoriViewModel(
             var count = 0
             val remoteTickets = DoriLocalBridgeClient.pullSupportTicketsFromPeer(ctx, isCtrl)
             count += repository.mergePulledSupportTickets(remoteTickets, isCtrl)
+            val remoteMessages = DoriLocalBridgeClient.pullSupportMessagesFromPeer(ctx, isCtrl)
+            count += repository.mergePulledSupportMessages(remoteMessages)
 
             if (isCtrl) {
                 val unsynced = repository.getAllSupportTicketsSnapshot()
                 unsynced.filter { it.adminReply.isNotBlank() }.forEach { replied ->
                     DoriLocalBridgeClient.pushSupportReplyToUser(ctx, replied)
                 }
+                repository.getAllSupportMessagesSnapshot()
+                    .filter { it.isFromAdmin && !it.syncedToPeer }
+                    .forEach { msg ->
+                        if (DoriLocalBridgeClient.pushSupportMessageToUser(ctx, msg)) {
+                            repository.markSupportMessageSynced(msg.id)
+                            count++
+                        }
+                    }
                 val remoteBookings = DoriLocalBridgeClient.pullBookingsFromUser(ctx)
                 count += repository.mergePulledBookingsForControl(remoteBookings)
 
@@ -411,6 +428,14 @@ class DoriViewModel(
                         count++
                     }
                 }
+                repository.getAllSupportMessagesSnapshot()
+                    .filter { !it.isFromAdmin && !it.syncedToPeer }
+                    .forEach { msg ->
+                        if (DoriLocalBridgeClient.pushSupportMessageToControl(ctx, msg)) {
+                            repository.markSupportMessageSynced(msg.id)
+                            count++
+                        }
+                    }
                 repository.getAllBookingsSnapshot()
                     .filter { it.status == BookingStatus.ACTIVE.name }
                     .forEach { activeBooking ->
@@ -651,7 +676,9 @@ class DoriViewModel(
         senderPhone: String,
         category: SupportCategory,
         subject: String,
-        message: String
+        message: String,
+        requestType: SupportRequestType = SupportRequestType.CHAT,
+        relatedVenueName: String = ""
     ) {
         viewModelScope.launch {
             val result = repository.createSupportTicket(
@@ -659,20 +686,62 @@ class DoriViewModel(
                 senderPhone = senderPhone,
                 category = category,
                 subject = subject,
-                message = message
+                message = message,
+                requestType = requestType,
+                relatedVenueName = relatedVenueName
             )
             result.onSuccess { ticket ->
                 val pushed = withContext(Dispatchers.IO) {
-                    DoriLocalBridgeClient.pushSupportTicketToControl(getApplication(), ticket)
+                    val ticketOk = DoriLocalBridgeClient.pushSupportTicketToControl(getApplication(), ticket)
+                    val msgs = repository.getAllSupportMessagesSnapshot()
+                        .filter { it.ticketExternalId == ticket.externalId && !it.isFromAdmin && !it.syncedToPeer }
+                    msgs.forEach { m ->
+                        if (DoriLocalBridgeClient.pushSupportMessageToControl(getApplication(), m)) {
+                            repository.markSupportMessageSynced(m.id)
+                        }
+                    }
+                    ticketOk
                 }
                 if (pushed) {
                     repository.markSupportTicketDelivered(ticket.id)
-                    _toastMessage.emit("تم إرسال رسالتك إلى الدعم الفني بنجاح ✓")
+                    _toastMessage.emit(
+                        if (requestType == SupportRequestType.COMPLAINT) "تم إرسال طلب الشكوى بنجاح ✓"
+                        else "تم إرسال رسالتك إلى الدعم الفني ✓"
+                    )
                 } else {
-                    _toastMessage.emit("تم تسجيل رسالتك بنجاح — ستصلك الإجابة في سجل الدعم ✓")
+                    _toastMessage.emit(
+                        if (requestType == SupportRequestType.COMPLAINT) "تم تسجيل طلب الشكوى بنجاح ✓"
+                        else "تم تسجيل رسالتك — ستصلك الإجابة في المحادثة ✓"
+                    )
                 }
             }.onFailure { err ->
-                _toastMessage.emit(err.message ?: "تعذر إرسال رسالة الدعم")
+                _toastMessage.emit(err.message ?: "تعذر الإرسال")
+            }
+        }
+    }
+
+    fun sendUserChatFollowUp(
+        ticketExternalId: String,
+        senderName: String,
+        messageBody: String
+    ) {
+        viewModelScope.launch {
+            repository.sendUserSupportFollowUp(
+                ticketExternalId = ticketExternalId,
+                senderName = senderName,
+                messageBody = messageBody
+            ).onSuccess { (updatedTicket, msgEntity) ->
+                val pushed = withContext(Dispatchers.IO) {
+                    val tOk = DoriLocalBridgeClient.pushSupportTicketToControl(getApplication(), updatedTicket)
+                    val mOk = DoriLocalBridgeClient.pushSupportMessageToControl(getApplication(), msgEntity)
+                    if (mOk) repository.markSupportMessageSynced(msgEntity.id)
+                    tOk && mOk
+                }
+                if (pushed) {
+                    repository.markSupportTicketDelivered(updatedTicket.id)
+                }
+            }.onFailure { err ->
+                _toastMessage.emit(err.message ?: "تعذر إرسال الرسالة")
             }
         }
     }
@@ -685,10 +754,18 @@ class DoriViewModel(
             repository.replyToSupportTicket(ticketId, replyText, adminLabel)
                 .onSuccess { updated ->
                     val pushed = withContext(Dispatchers.IO) {
-                        DoriLocalBridgeClient.pushSupportReplyToUser(getApplication(), updated)
+                        val ticketOk = DoriLocalBridgeClient.pushSupportReplyToUser(getApplication(), updated)
+                        val msgs = repository.getAllSupportMessagesSnapshot()
+                            .filter { it.ticketExternalId == updated.externalId && it.isFromAdmin && !it.syncedToPeer }
+                        msgs.forEach { m ->
+                            if (DoriLocalBridgeClient.pushSupportMessageToUser(getApplication(), m)) {
+                                repository.markSupportMessageSynced(m.id)
+                            }
+                        }
+                        ticketOk
                     }
                     _toastMessage.emit(
-                        if (pushed) "تم إرسال الرد وإشعار نسخة المستخدم ✓"
+                        if (pushed) "تم إرسال الرد وإشعار المستخدم ✓"
                         else "تم حفظ الرد وسيظهر للمستخدم عند المزامنة"
                     )
                 }

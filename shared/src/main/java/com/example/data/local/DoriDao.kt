@@ -160,6 +160,28 @@ interface DoriDao {
     @Query("DELETE FROM support_tickets")
     suspend fun deleteAllSupportTickets()
 
+    // Support Chat Messages
+    @Query("SELECT * FROM support_messages ORDER BY createdAt ASC, id ASC")
+    fun observeAllSupportMessages(): Flow<List<SupportMessageEntity>>
+
+    @Query("SELECT * FROM support_messages ORDER BY createdAt ASC, id ASC")
+    suspend fun getAllSupportMessagesOnce(): List<SupportMessageEntity>
+
+    @Query("SELECT * FROM support_messages WHERE ticketExternalId = :ticketExternalId ORDER BY createdAt ASC, id ASC")
+    suspend fun getMessagesForTicketOnce(ticketExternalId: String): List<SupportMessageEntity>
+
+    @Query("SELECT * FROM support_messages WHERE externalMessageId = :externalMessageId LIMIT 1")
+    suspend fun getSupportMessageByExternalId(externalMessageId: String): SupportMessageEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSupportMessage(message: SupportMessageEntity): Long
+
+    @Update
+    suspend fun updateSupportMessage(message: SupportMessageEntity)
+
+    @Query("DELETE FROM support_messages")
+    suspend fun deleteAllSupportMessages()
+
     // Admin Accounts
     @Query("SELECT * FROM admin_accounts ORDER BY isSuperAdmin DESC, createdAt ASC")
     fun observeAllAdmins(): Flow<List<AdminAccountEntity>>

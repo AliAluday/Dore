@@ -175,7 +175,7 @@ fun DoriAppRoot(
         }
     }
 
-    BackHandler(enabled = state.currentTab != AppTab.EXPLORE) {
+    BackHandler(enabled = !showSupportSheet && state.currentTab != AppTab.EXPLORE) {
         viewModel.selectTab(AppTab.EXPLORE)
     }
 
@@ -353,9 +353,12 @@ fun DoriAppRoot(
             if (showSupportSheet) {
                 SupportCenterSheet(
                     tickets = state.supportTickets,
+                    messagesByTicket = state.supportMessagesByTicket,
+                    venues = state.allVenues,
                     defaultName = state.preferences.userName,
                     defaultPhone = state.preferences.userPhone,
                     onSendTicket = viewModel::sendSupportMessage,
+                    onSendFollowUp = viewModel::sendUserChatFollowUp,
                     onSyncReplies = { viewModel.syncLocalBridge(silent = false) },
                     onDismiss = { showSupportSheet = false }
                 )

@@ -17,10 +17,11 @@ import com.example.data.model.ServiceCategory
         BookingEntity::class,
         MerchantQueueItemEntity::class,
         SupportTicketEntity::class,
+        SupportMessageEntity::class,
         AdminAccountEntity::class,
         ServiceProviderEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class DoriDatabase : RoomDatabase() {

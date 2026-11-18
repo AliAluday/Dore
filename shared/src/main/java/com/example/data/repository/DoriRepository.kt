@@ -9,6 +9,7 @@ import com.example.data.local.MerchantQueueItemEntity
 import com.example.data.local.ReviewEntity
 import com.example.data.local.SeedData
 import com.example.data.local.ServiceProviderEntity
+import com.example.data.local.SupportMessageEntity
 import com.example.data.local.SupportTicketEntity
 import com.example.data.local.UserPreferencesDataStore
 import com.example.data.local.VenueEntity
@@ -20,6 +21,7 @@ import com.example.data.model.ProviderRole
 import com.example.data.model.QueueItemStatus
 import com.example.data.model.ServiceCategory
 import com.example.data.model.SupportCategory
+import com.example.data.model.SupportRequestType
 import com.example.data.model.SupportTicketStatus
 import com.example.data.model.TicketStage
 import com.example.data.model.UserAppControlConfig
@@ -37,6 +39,7 @@ class DoriRepository(
     val bookings: Flow<List<BookingEntity>> = dao.observeAllBookings()
     val queueItems: Flow<List<MerchantQueueItemEntity>> = dao.observeAllQueueItems()
     val supportTickets: Flow<List<SupportTicketEntity>> = dao.observeAllSupportTickets()
+    val supportMessages: Flow<List<SupportMessageEntity>> = dao.observeAllSupportMessages()
     val admins: Flow<List<AdminAccountEntity>> = dao.observeAllAdmins()
     val providers: Flow<List<ServiceProviderEntity>> = dao.observeAllProviders()
     val userPreferences: Flow<UserProfileSettings> = prefs.userPreferences
@@ -699,6 +702,7 @@ class DoriRepository(
         dao.deleteAllQueueItems()
         dao.deleteAllReviews()
         dao.deleteAllVenues()
+        dao.deleteAllSupportMessages()
         dao.deleteAllSupportTickets()
         dao.deleteAllAdmins()
         dao.deleteAllProviders()
@@ -810,26 +814,52 @@ class DoriRepository(
     suspend fun getAllSupportTicketsSnapshot(): List<SupportTicketEntity> =
         dao.getAllSupportTicketsOnce()
 
+    suspend fun getAllSupportMessagesSnapshot(): List<SupportMessageEntity> =
+        dao.getAllSupportMessagesOnce()
+
+    suspend fun markSupportMessageSynced(messageId: Long) {
+        val all = dao.getAllSupportMessagesOnce()
+        val existing = all.find { it.id == messageId } ?: return
+        if (!existing.syncedToPeer) {
+            dao.updateSupportMessage(existing.copy(syncedToPeer = true))
+        }
+    }
+
     suspend fun createSupportTicket(
         senderName: String,
         senderPhone: String,
         category: SupportCategory,
         subject: String,
-        message: String
+        message: String,
+        requestType: SupportRequestType = SupportRequestType.CHAT,
+        relatedVenueName: String = "",
+        minMessageLength: Int = if (requestType == SupportRequestType.COMPLAINT) 4 else 1
     ): Result<SupportTicketEntity> {
         val cleanName = senderName.trim().ifBlank { "مستخدم دوري" }
         val cleanPhone = senderPhone.trim()
-        val cleanSubject = subject.trim().ifBlank { category.displayName }
+        val cleanVenue = relatedVenueName.trim()
+        val cleanSubject = subject.trim().ifBlank {
+            if (requestType == SupportRequestType.COMPLAINT) "طلب شكوى: ${category.displayName}" else category.displayName
+        }
         val cleanMessage = message.trim()
-        if (cleanMessage.length < 4) {
-            return Result.failure(IllegalArgumentException("يرجى كتابة تفاصيل الرسالة (4 أحرف على الأقل)"))
+        if (cleanMessage.length < minMessageLength) {
+            return Result.failure(
+                IllegalArgumentException(
+                    if (minMessageLength >= 4) "يرجى كتابة تفاصيل الطلب (4 أحرف على الأقل)"
+                    else "يرجى كتابة رسالتك قبل الإرسال"
+                )
+            )
         }
         val now = System.currentTimeMillis()
+        val prefix = if (requestType == SupportRequestType.COMPLAINT) "CMP" else "SUP"
+        val extId = "$prefix-${UUID.randomUUID().toString().take(8).uppercase()}"
         val entity = SupportTicketEntity(
-            externalId = "SUP-${UUID.randomUUID().toString().take(8).uppercase()}",
+            externalId = extId,
             senderName = cleanName,
             senderPhone = cleanPhone,
             category = category.name,
+            requestType = requestType.name,
+            relatedVenueName = cleanVenue,
             subject = cleanSubject,
             message = cleanMessage,
             status = SupportTicketStatus.SENT.name,
@@ -838,7 +868,49 @@ class DoriRepository(
             updatedAt = now
         )
         val id = dao.insertSupportTicket(entity)
+        val initialMessage = SupportMessageEntity(
+            externalMessageId = "MSG-${UUID.randomUUID().toString().take(10).uppercase()}",
+            ticketExternalId = extId,
+            isFromAdmin = false,
+            senderName = cleanName,
+            body = cleanMessage,
+            syncedToPeer = false,
+            createdAt = now
+        )
+        dao.insertSupportMessage(initialMessage)
         return Result.success(entity.copy(id = id))
+    }
+
+    suspend fun sendUserSupportFollowUp(
+        ticketExternalId: String,
+        senderName: String,
+        messageBody: String
+    ): Result<Pair<SupportTicketEntity, SupportMessageEntity>> {
+        val cleanBody = messageBody.trim()
+        if (cleanBody.isEmpty()) {
+            return Result.failure(IllegalArgumentException("يرجى كتابة الرسالة قبل الإرسال"))
+        }
+        val existing = dao.getSupportTicketByExternalId(ticketExternalId)
+            ?: return Result.failure(IllegalStateException("المحادثة غير موجودة"))
+        val cleanName = senderName.trim().ifBlank { existing.senderName.ifBlank { "مستخدم دوري" } }
+        val now = System.currentTimeMillis()
+        val msgEntity = SupportMessageEntity(
+            externalMessageId = "MSG-${UUID.randomUUID().toString().take(10).uppercase()}",
+            ticketExternalId = existing.externalId,
+            isFromAdmin = false,
+            senderName = cleanName,
+            body = cleanBody,
+            syncedToPeer = false,
+            createdAt = now
+        )
+        val msgId = dao.insertSupportMessage(msgEntity)
+        val updatedTicket = existing.copy(
+            status = SupportTicketStatus.SENT.name,
+            syncedToControl = false,
+            updatedAt = now
+        )
+        dao.updateSupportTicket(updatedTicket)
+        return Result.success(updatedTicket to msgEntity.copy(id = msgId))
     }
 
     suspend fun markSupportTicketDelivered(ticketId: Long) {
@@ -863,19 +935,32 @@ class DoriRepository(
         adminName: String
     ): Result<SupportTicketEntity> {
         val cleanReply = replyText.trim()
-        if (cleanReply.length < 2) {
+        if (cleanReply.isEmpty()) {
             return Result.failure(IllegalArgumentException("يرجى كتابة رد واضح للمستخدم"))
         }
         val existing = dao.getSupportTicketById(ticketId)
             ?: return Result.failure(IllegalStateException("رسالة الدعم غير موجودة"))
+        val adminLabel = adminName.ifBlank { "فريق الدعم الفني" }
+        val now = System.currentTimeMillis()
         val updated = existing.copy(
             adminReply = cleanReply,
-            repliedByAdmin = adminName.ifBlank { "فريق الدعم الفني" },
+            repliedByAdmin = adminLabel,
             status = SupportTicketStatus.REPLIED.name,
             syncedToControl = true,
-            updatedAt = System.currentTimeMillis()
+            updatedAt = now
         )
         dao.updateSupportTicket(updated)
+        dao.insertSupportMessage(
+            SupportMessageEntity(
+                externalMessageId = "MSG-${UUID.randomUUID().toString().take(10).uppercase()}",
+                ticketExternalId = existing.externalId,
+                isFromAdmin = true,
+                senderName = adminLabel,
+                body = cleanReply,
+                syncedToPeer = false,
+                createdAt = now
+            )
+        )
         return Result.success(updated)
     }
 
@@ -910,9 +995,16 @@ class DoriRepository(
             } else if (remote.updatedAt > local.updatedAt ||
                 (remote.adminReply.isNotBlank() && local.adminReply != remote.adminReply)
             ) {
+                val resolvedStatus = when {
+                    isControlApp && remote.status == SupportTicketStatus.SENT.name -> SupportTicketStatus.DELIVERED.name
+                    remote.status.isNotBlank() -> remote.status
+                    else -> local.status
+                }
                 dao.updateSupportTicket(
                     local.copy(
-                        status = remote.status.ifBlank { local.status },
+                        status = resolvedStatus,
+                        requestType = remote.requestType.ifBlank { local.requestType },
+                        relatedVenueName = remote.relatedVenueName.ifBlank { local.relatedVenueName },
                         adminReply = remote.adminReply.ifBlank { local.adminReply },
                         repliedByAdmin = remote.repliedByAdmin.ifBlank { local.repliedByAdmin },
                         syncedToControl = true,
@@ -923,6 +1015,23 @@ class DoriRepository(
             }
         }
         return changed
+    }
+
+    suspend fun mergePulledSupportMessages(incoming: List<SupportMessageEntity>): Int {
+        var added = 0
+        for (remote in incoming) {
+            if (remote.externalMessageId.isBlank() || remote.ticketExternalId.isBlank()) continue
+            if (dao.getSupportMessageByExternalId(remote.externalMessageId) == null) {
+                dao.insertSupportMessage(
+                    remote.copy(
+                        id = 0L,
+                        syncedToPeer = true
+                    )
+                )
+                added++
+            }
+        }
+        return added
     }
 
     suspend fun mergePulledBookingsForControl(incoming: List<BookingEntity>): Int {

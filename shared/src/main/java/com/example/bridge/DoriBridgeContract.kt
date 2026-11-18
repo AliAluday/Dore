@@ -10,6 +10,7 @@ object DoriBridgeContract {
     const val CONTROL_AUTHORITY = "com.aistudio.dori.control.bridge"
 
     const val PATH_SUPPORT_TICKETS = "support_tickets"
+    const val PATH_SUPPORT_MESSAGES = "support_messages"
     const val PATH_BOOKINGS = "bookings"
     const val PATH_BOOKING_DECISIONS = "booking_decisions"
     const val PATH_CONTROL_CONFIG = "control_config"
@@ -17,6 +18,7 @@ object DoriBridgeContract {
     const val PATH_PROVIDERS = "providers"
 
     val CONTROL_SUPPORT_URI: Uri = Uri.parse("content://$CONTROL_AUTHORITY/$PATH_SUPPORT_TICKETS")
+    val CONTROL_SUPPORT_MESSAGES_URI: Uri = Uri.parse("content://$CONTROL_AUTHORITY/$PATH_SUPPORT_MESSAGES")
     val CONTROL_BOOKINGS_URI: Uri = Uri.parse("content://$CONTROL_AUTHORITY/$PATH_BOOKINGS")
     val CONTROL_DECISIONS_URI: Uri = Uri.parse("content://$CONTROL_AUTHORITY/$PATH_BOOKING_DECISIONS")
     val CONTROL_CONFIG_URI: Uri = Uri.parse("content://$CONTROL_AUTHORITY/$PATH_CONTROL_CONFIG")
@@ -24,6 +26,7 @@ object DoriBridgeContract {
     val CONTROL_PROVIDERS_URI: Uri = Uri.parse("content://$CONTROL_AUTHORITY/$PATH_PROVIDERS")
 
     val USER_SUPPORT_URI: Uri = Uri.parse("content://$USER_AUTHORITY/$PATH_SUPPORT_TICKETS")
+    val USER_SUPPORT_MESSAGES_URI: Uri = Uri.parse("content://$USER_AUTHORITY/$PATH_SUPPORT_MESSAGES")
     val USER_BOOKINGS_URI: Uri = Uri.parse("content://$USER_AUTHORITY/$PATH_BOOKINGS")
     val USER_DECISIONS_URI: Uri = Uri.parse("content://$USER_AUTHORITY/$PATH_BOOKING_DECISIONS")
     val USER_CONFIG_URI: Uri = Uri.parse("content://$USER_AUTHORITY/$PATH_CONTROL_CONFIG")
@@ -35,6 +38,8 @@ object DoriBridgeContract {
         const val SENDER_NAME = "sender_name"
         const val SENDER_PHONE = "sender_phone"
         const val CATEGORY = "category"
+        const val REQUEST_TYPE = "request_type"
+        const val RELATED_VENUE_NAME = "related_venue_name"
         const val SUBJECT = "subject"
         const val MESSAGE = "message"
         const val STATUS = "status"
@@ -43,6 +48,16 @@ object DoriBridgeContract {
         const val SYNCED_TO_CONTROL = "synced_to_control"
         const val CREATED_AT = "created_at"
         const val UPDATED_AT = "updated_at"
+    }
+
+    object SupportMessageCols {
+        const val EXTERNAL_MESSAGE_ID = "external_message_id"
+        const val TICKET_EXTERNAL_ID = "ticket_external_id"
+        const val IS_FROM_ADMIN = "is_from_admin"
+        const val SENDER_NAME = "sender_name"
+        const val BODY = "body"
+        const val SYNCED_TO_PEER = "synced_to_peer"
+        const val CREATED_AT = "created_at"
     }
 
     object BookingCols {

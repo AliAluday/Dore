@@ -198,7 +198,18 @@ enum class BookingApprovalStatus(val label: String) {
     }
 }
 
+enum class SupportRequestType(val displayName: String) {
+    CHAT("محادثة مباشرة"),
+    COMPLAINT("طلب شكوى");
+
+    companion object {
+        fun fromName(value: String): SupportRequestType =
+            entries.find { it.name == value || it.displayName == value } ?: CHAT
+    }
+}
+
 enum class SupportCategory(val displayName: String) {
+    COMPLAINT("تقديم شكوى"),
     BOOKING_ISSUE("مشكلة حجز"),
     TECHNICAL("عطل تقني"),
     VENUE_REPORT("بلاغ عن مركز"),

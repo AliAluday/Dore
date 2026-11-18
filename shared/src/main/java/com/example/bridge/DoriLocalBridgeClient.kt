@@ -7,12 +7,15 @@ import com.example.bridge.DoriBridgeContract.BookingCols
 import com.example.bridge.DoriBridgeContract.ControlConfigCols
 import com.example.bridge.DoriBridgeContract.ProviderCols
 import com.example.bridge.DoriBridgeContract.SupportCols
+import com.example.bridge.DoriBridgeContract.SupportMessageCols
 import com.example.bridge.DoriBridgeContract.VenueCols
 import com.example.data.local.BookingEntity
 import com.example.data.local.ServiceProviderEntity
+import com.example.data.local.SupportMessageEntity
 import com.example.data.local.SupportTicketEntity
 import com.example.data.local.VenueEntity
 import com.example.data.model.BookingApprovalStatus
+import com.example.data.model.SupportRequestType
 import com.example.data.model.SupportTicketStatus
 import com.example.data.model.UserAppControlConfig
 
@@ -42,6 +45,8 @@ object DoriLocalBridgeClient {
         put(SupportCols.SENDER_NAME, ticket.senderName)
         put(SupportCols.SENDER_PHONE, ticket.senderPhone)
         put(SupportCols.CATEGORY, ticket.category)
+        put(SupportCols.REQUEST_TYPE, ticket.requestType)
+        put(SupportCols.RELATED_VENUE_NAME, ticket.relatedVenueName)
         put(SupportCols.SUBJECT, ticket.subject)
         put(SupportCols.MESSAGE, ticket.message)
         put(SupportCols.STATUS, ticket.status)
@@ -50,6 +55,16 @@ object DoriLocalBridgeClient {
         put(SupportCols.SYNCED_TO_CONTROL, if (ticket.syncedToControl) 1 else 0)
         put(SupportCols.CREATED_AT, ticket.createdAt)
         put(SupportCols.UPDATED_AT, ticket.updatedAt)
+    }
+
+    fun supportMessageToContentValues(message: SupportMessageEntity): ContentValues = ContentValues().apply {
+        put(SupportMessageCols.EXTERNAL_MESSAGE_ID, message.externalMessageId)
+        put(SupportMessageCols.TICKET_EXTERNAL_ID, message.ticketExternalId)
+        put(SupportMessageCols.IS_FROM_ADMIN, if (message.isFromAdmin) 1 else 0)
+        put(SupportMessageCols.SENDER_NAME, message.senderName)
+        put(SupportMessageCols.BODY, message.body)
+        put(SupportMessageCols.SYNCED_TO_PEER, 1)
+        put(SupportMessageCols.CREATED_AT, message.createdAt)
     }
 
     fun bookingToContentValues(booking: BookingEntity): ContentValues = ContentValues().apply {
@@ -168,6 +183,37 @@ object DoriLocalBridgeClient {
             context.contentResolver.query(targetUri, null, null, null, null)?.use { cursor ->
                 while (cursor.moveToNext()) {
                     list.add(readSupportTicketFromCursor(cursor))
+                }
+            }
+            list
+        }.getOrDefault(emptyList())
+    }
+
+    fun pushSupportMessageToControl(context: Context, message: SupportMessageEntity): Boolean {
+        return runCatching {
+            val values = supportMessageToContentValues(message)
+            context.contentResolver.insert(DoriBridgeContract.CONTROL_SUPPORT_MESSAGES_URI, values) != null
+        }.getOrDefault(false)
+    }
+
+    fun pushSupportMessageToUser(context: Context, message: SupportMessageEntity): Boolean {
+        return runCatching {
+            val values = supportMessageToContentValues(message)
+            context.contentResolver.insert(DoriBridgeContract.USER_SUPPORT_MESSAGES_URI, values) != null
+        }.getOrDefault(false)
+    }
+
+    fun pullSupportMessagesFromPeer(context: Context, isControlApp: Boolean): List<SupportMessageEntity> {
+        val targetUri = if (isControlApp) {
+            DoriBridgeContract.USER_SUPPORT_MESSAGES_URI
+        } else {
+            DoriBridgeContract.CONTROL_SUPPORT_MESSAGES_URI
+        }
+        return runCatching {
+            val list = mutableListOf<SupportMessageEntity>()
+            context.contentResolver.query(targetUri, null, null, null, null)?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    list.add(readSupportMessageFromCursor(cursor))
                 }
             }
             list
@@ -403,6 +449,8 @@ object DoriLocalBridgeClient {
         senderName = c.getStringOrEmpty(SupportCols.SENDER_NAME),
         senderPhone = c.getStringOrEmpty(SupportCols.SENDER_PHONE),
         category = c.getStringOrEmpty(SupportCols.CATEGORY),
+        requestType = c.getStringOrEmpty(SupportCols.REQUEST_TYPE).ifBlank { SupportRequestType.CHAT.name },
+        relatedVenueName = c.getStringOrEmpty(SupportCols.RELATED_VENUE_NAME),
         subject = c.getStringOrEmpty(SupportCols.SUBJECT),
         message = c.getStringOrEmpty(SupportCols.MESSAGE),
         status = c.getStringOrEmpty(SupportCols.STATUS),
@@ -411,6 +459,16 @@ object DoriLocalBridgeClient {
         syncedToControl = c.getIntOrDefault(SupportCols.SYNCED_TO_CONTROL, 0) == 1,
         createdAt = c.getLongOrDefault(SupportCols.CREATED_AT, System.currentTimeMillis()),
         updatedAt = c.getLongOrDefault(SupportCols.UPDATED_AT, System.currentTimeMillis())
+    )
+
+    private fun readSupportMessageFromCursor(c: Cursor): SupportMessageEntity = SupportMessageEntity(
+        externalMessageId = c.getStringOrEmpty(SupportMessageCols.EXTERNAL_MESSAGE_ID),
+        ticketExternalId = c.getStringOrEmpty(SupportMessageCols.TICKET_EXTERNAL_ID),
+        isFromAdmin = c.getIntOrDefault(SupportMessageCols.IS_FROM_ADMIN, 0) == 1,
+        senderName = c.getStringOrEmpty(SupportMessageCols.SENDER_NAME),
+        body = c.getStringOrEmpty(SupportMessageCols.BODY),
+        syncedToPeer = true,
+        createdAt = c.getLongOrDefault(SupportMessageCols.CREATED_AT, System.currentTimeMillis())
     )
 
     private fun readBookingFromCursor(c: Cursor): BookingEntity = BookingEntity(

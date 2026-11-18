@@ -8,11 +8,14 @@ import android.database.MatrixCursor
 import android.net.Uri
 import com.example.bridge.DoriBridgeContract.BookingCols
 import com.example.bridge.DoriBridgeContract.SupportCols
+import com.example.bridge.DoriBridgeContract.SupportMessageCols
 import com.example.data.local.DoriDatabase
+import com.example.data.local.SupportMessageEntity
 import com.example.data.local.SupportTicketEntity
 import com.example.data.local.UserPreferencesDataStore
 import com.example.data.model.BookingApprovalStatus
 import com.example.data.model.BookingStatus
+import com.example.data.model.SupportRequestType
 import com.example.data.model.SupportTicketStatus
 import com.example.data.repository.DoriRepository
 import com.example.util.DoriNotificationHelper
@@ -22,6 +25,7 @@ class UserBridgeProvider : ContentProvider() {
 
     private val matcher = UriMatcher(UriMatcher.NO_MATCH).apply {
         addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_SUPPORT_TICKETS, CODE_SUPPORT)
+        addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_SUPPORT_MESSAGES, CODE_SUPPORT_MESSAGES)
         addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_BOOKINGS, CODE_BOOKINGS)
         addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_BOOKING_DECISIONS, CODE_DECISIONS)
         addURI(DoriBridgeContract.USER_AUTHORITY, DoriBridgeContract.PATH_CONTROL_CONFIG, CODE_CONTROL_CONFIG)
@@ -48,6 +52,8 @@ class UserBridgeProvider : ContentProvider() {
                     SupportCols.SENDER_NAME,
                     SupportCols.SENDER_PHONE,
                     SupportCols.CATEGORY,
+                    SupportCols.REQUEST_TYPE,
+                    SupportCols.RELATED_VENUE_NAME,
                     SupportCols.SUBJECT,
                     SupportCols.MESSAGE,
                     SupportCols.STATUS,
@@ -66,6 +72,8 @@ class UserBridgeProvider : ContentProvider() {
                                 t.senderName,
                                 t.senderPhone,
                                 t.category,
+                                t.requestType,
+                                t.relatedVenueName,
                                 t.subject,
                                 t.message,
                                 t.status,
@@ -74,6 +82,34 @@ class UserBridgeProvider : ContentProvider() {
                                 if (t.syncedToControl) 1 else 0,
                                 t.createdAt,
                                 t.updatedAt
+                            )
+                        )
+                    }
+                }
+            }
+
+            CODE_SUPPORT_MESSAGES -> {
+                val cols = arrayOf(
+                    SupportMessageCols.EXTERNAL_MESSAGE_ID,
+                    SupportMessageCols.TICKET_EXTERNAL_ID,
+                    SupportMessageCols.IS_FROM_ADMIN,
+                    SupportMessageCols.SENDER_NAME,
+                    SupportMessageCols.BODY,
+                    SupportMessageCols.SYNCED_TO_PEER,
+                    SupportMessageCols.CREATED_AT
+                )
+                MatrixCursor(cols).apply {
+                    val messages = runBlocking { dao.getAllSupportMessagesOnce() }
+                    messages.forEach { m ->
+                        addRow(
+                            arrayOf<Any?>(
+                                m.externalMessageId,
+                                m.ticketExternalId,
+                                if (m.isFromAdmin) 1 else 0,
+                                m.senderName,
+                                m.body,
+                                if (m.syncedToPeer) 1 else 0,
+                                m.createdAt
                             )
                         )
                     }
@@ -154,26 +190,36 @@ class UserBridgeProvider : ContentProvider() {
                 val incomingStatus = v.getAsString(SupportCols.STATUS).orEmpty()
                     .ifBlank { SupportTicketStatus.REPLIED.name }
                 val updatedAt = v.getAsLong(SupportCols.UPDATED_AT) ?: System.currentTimeMillis()
+                val reqType = v.getAsString(SupportCols.REQUEST_TYPE).orEmpty().ifBlank { SupportRequestType.CHAT.name }
+                val venueName = v.getAsString(SupportCols.RELATED_VENUE_NAME).orEmpty()
 
+                var shouldNotifyReply = false
                 runBlocking {
                     val existing = dao.getSupportTicketByExternalId(externalId)
                     if (existing != null) {
+                        shouldNotifyReply = adminReply.isNotBlank() &&
+                            (adminReply != existing.adminReply || updatedAt > existing.updatedAt)
                         dao.updateSupportTicket(
                             existing.copy(
                                 status = incomingStatus,
+                                requestType = reqType.ifBlank { existing.requestType },
+                                relatedVenueName = venueName.ifBlank { existing.relatedVenueName },
                                 adminReply = adminReply.ifBlank { existing.adminReply },
                                 repliedByAdmin = repliedBy.ifBlank { existing.repliedByAdmin },
                                 syncedToControl = true,
-                                updatedAt = updatedAt
+                                updatedAt = maxOf(existing.updatedAt, updatedAt)
                             )
                         )
                     } else {
+                        shouldNotifyReply = adminReply.isNotBlank()
                         dao.insertSupportTicket(
                             SupportTicketEntity(
                                 externalId = externalId,
                                 senderName = v.getAsString(SupportCols.SENDER_NAME).orEmpty(),
                                 senderPhone = v.getAsString(SupportCols.SENDER_PHONE).orEmpty(),
                                 category = v.getAsString(SupportCols.CATEGORY).orEmpty(),
+                                requestType = reqType,
+                                relatedVenueName = venueName,
                                 subject = v.getAsString(SupportCols.SUBJECT).orEmpty(),
                                 message = v.getAsString(SupportCols.MESSAGE).orEmpty(),
                                 status = incomingStatus,
@@ -186,7 +232,7 @@ class UserBridgeProvider : ContentProvider() {
                         )
                     }
                 }
-                if (adminReply.isNotBlank()) {
+                if (shouldNotifyReply) {
                     DoriNotificationHelper.showSupportMessageNotification(
                         context = ctx,
                         title = "💬 رد جديد من الدعم الفني",
@@ -195,6 +241,43 @@ class UserBridgeProvider : ContentProvider() {
                     )
                 }
                 Uri.withAppendedPath(DoriBridgeContract.USER_SUPPORT_URI, externalId)
+            }
+
+            CODE_SUPPORT_MESSAGES -> {
+                val extMsgId = v.getAsString(SupportMessageCols.EXTERNAL_MESSAGE_ID)?.takeIf { it.isNotBlank() }
+                    ?: return null
+                val ticketExtId = v.getAsString(SupportMessageCols.TICKET_EXTERNAL_ID)?.takeIf { it.isNotBlank() }
+                    ?: return null
+                val isFromAdmin = (v.getAsInteger(SupportMessageCols.IS_FROM_ADMIN) ?: 0) == 1
+                val senderName = v.getAsString(SupportMessageCols.SENDER_NAME).orEmpty()
+                val body = v.getAsString(SupportMessageCols.BODY).orEmpty()
+                val createdAt = v.getAsLong(SupportMessageCols.CREATED_AT) ?: System.currentTimeMillis()
+                var insertedNew = false
+                runBlocking {
+                    if (dao.getSupportMessageByExternalId(extMsgId) == null) {
+                        dao.insertSupportMessage(
+                            SupportMessageEntity(
+                                externalMessageId = extMsgId,
+                                ticketExternalId = ticketExtId,
+                                isFromAdmin = isFromAdmin,
+                                senderName = senderName,
+                                body = body,
+                                syncedToPeer = true,
+                                createdAt = createdAt
+                            )
+                        )
+                        insertedNew = true
+                    }
+                }
+                if (insertedNew && isFromAdmin && body.isNotBlank()) {
+                    DoriNotificationHelper.showSupportMessageNotification(
+                        context = ctx,
+                        title = "💬 رسالة جديدة من الدعم الفني",
+                        body = if (senderName.isNotBlank()) "$senderName: $body" else body,
+                        idSeed = kotlin.math.abs(extMsgId.hashCode() % 3000) + 3150
+                    )
+                }
+                Uri.withAppendedPath(DoriBridgeContract.USER_SUPPORT_MESSAGES_URI, extMsgId)
             }
 
             CODE_DECISIONS -> {
@@ -329,5 +412,6 @@ class UserBridgeProvider : ContentProvider() {
         const val CODE_CONTROL_CONFIG = 4
         const val CODE_VENUES = 5
         const val CODE_PROVIDERS = 6
+        const val CODE_SUPPORT_MESSAGES = 7
     }
 }

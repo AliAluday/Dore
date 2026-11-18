@@ -8,6 +8,7 @@ import com.example.data.model.BookingStatus
 import com.example.data.model.ProviderRole
 import com.example.data.model.QueueItemStatus
 import com.example.data.model.SupportCategory
+import com.example.data.model.SupportRequestType
 import com.example.data.model.SupportTicketStatus
 import com.example.data.model.TicketStage
 
@@ -109,6 +110,8 @@ data class SupportTicketEntity(
     val senderName: String,
     val senderPhone: String,
     val category: String = SupportCategory.GENERAL.name,
+    val requestType: String = SupportRequestType.CHAT.name,
+    val relatedVenueName: String = "",
     val subject: String,
     val message: String,
     val status: String = SupportTicketStatus.SENT.name,
@@ -117,6 +120,18 @@ data class SupportTicketEntity(
     val syncedToControl: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "support_messages")
+data class SupportMessageEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val externalMessageId: String,
+    val ticketExternalId: String,
+    val isFromAdmin: Boolean,
+    val senderName: String,
+    val body: String,
+    val syncedToPeer: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 @Entity(tableName = "admin_accounts")

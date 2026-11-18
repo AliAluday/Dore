@@ -537,4 +537,79 @@ class ExampleRobolectricTest {
                 db.close()
             }
         }
+
+    @Test
+    fun `two-way live support chat and complaint request workflow work end-to-end across bridge`() =
+        kotlinx.coroutines.runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val db = androidx.room.Room.inMemoryDatabaseBuilder(
+                context,
+                com.example.data.local.DoriDatabase::class.java
+            ).allowMainThreadQueries().build()
+            try {
+                val prefs = com.example.data.local.UserPreferencesDataStore(context)
+                val repo = com.example.data.repository.DoriRepository(db.doriDao(), prefs)
+                repo.ensureSeeded()
+
+                // 1. User opens direct live chat and sends first message
+                val chatTicket = repo.createSupportTicket(
+                    senderName = "علي الموصلي",
+                    senderPhone = "07701234567",
+                    category = com.example.data.model.SupportCategory.GENERAL,
+                    subject = "محادثة دعم مباشر",
+                    message = "السلام عليكم، أحتاج متابعة لدوري",
+                    requestType = com.example.data.model.SupportRequestType.CHAT
+                ).getOrThrow()
+                assertEquals(com.example.data.model.SupportRequestType.CHAT.name, chatTicket.requestType)
+
+                // 2. Admin replies, user sends follow-up, admin replies again
+                repo.replyToSupportTicket(chatTicket.id, "وعليكم السلام، أهلاً بك! ما رقم تذكرتك؟", "أحمد الموصلي").getOrThrow()
+                val (updatedTicket, followUpMsg) = repo.sendUserSupportFollowUp(
+                    ticketExternalId = chatTicket.externalId,
+                    senderName = "علي الموصلي",
+                    messageBody = "رقم التذكرة NIN-1-3"
+                ).getOrThrow()
+                assertEquals(com.example.data.model.SupportTicketStatus.SENT.name, updatedTicket.status)
+                assertFalse(followUpMsg.isFromAdmin)
+
+                repo.replyToSupportTicket(chatTicket.id, "تم التحقق، دورك بعد شخص واحد فقط", "أحمد الموصلي").getOrThrow()
+
+                val thread = db.doriDao().getMessagesForTicketOnce(chatTicket.externalId)
+                assertEquals(4, thread.size)
+                assertFalse(thread[0].isFromAdmin)
+                assertTrue(thread[1].isFromAdmin)
+                assertFalse(thread[2].isFromAdmin)
+                assertEquals("رقم التذكرة NIN-1-3", thread[2].body)
+                assertTrue(thread[3].isFromAdmin)
+
+                // 3. User submits formal complaint attached to a specific venue
+                val complaint = repo.createSupportTicket(
+                    senderName = "علي الموصلي",
+                    senderPhone = "07701234567",
+                    category = com.example.data.model.SupportCategory.COMPLAINT,
+                    subject = "تأخر غير مبرر",
+                    message = "تأخر الدور أكثر من 45 دقيقة دون إشعار",
+                    requestType = com.example.data.model.SupportRequestType.COMPLAINT,
+                    relatedVenueName = "عيادة الحدباء التخصصية للأسنان"
+                ).getOrThrow()
+                assertTrue(complaint.externalId.startsWith("CMP-"))
+                assertEquals(com.example.data.model.SupportRequestType.COMPLAINT.name, complaint.requestType)
+                assertEquals("عيادة الحدباء التخصصية للأسنان", complaint.relatedVenueName)
+
+                // 4. Bridge merge handles incoming support messages deduplication cleanly
+                val extraMsg = com.example.data.local.SupportMessageEntity(
+                    externalMessageId = "MSG-REMOTE-999",
+                    ticketExternalId = complaint.externalId,
+                    isFromAdmin = true,
+                    senderName = "سارة الجبوري",
+                    body = "نعتذر عن التأخير، تمت متابعة العيادة.",
+                    createdAt = System.currentTimeMillis()
+                )
+                assertEquals(1, repo.mergePulledSupportMessages(listOf(extraMsg)))
+                assertEquals(0, repo.mergePulledSupportMessages(listOf(extraMsg)))
+                assertEquals(2, db.doriDao().getMessagesForTicketOnce(complaint.externalId).size)
+            } finally {
+                db.close()
+            }
+        }
 }

@@ -22,12 +22,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.SupportAgent
@@ -45,10 +48,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,6 +91,7 @@ fun ProfileScreen(
     onToggleDarkMode: () -> Unit,
     onSetMuteSound: (Boolean) -> Unit,
     onSetMuteVibration: (Boolean) -> Unit,
+    onUpdateProfile: (name: String, phone: String, district: NinevehDistrict) -> Unit = { _, _, _ -> },
     onOpenSupport: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -100,6 +106,7 @@ fun ProfileScreen(
     val animatedProgress by animateFloatAsState(targetValue = rawProgress, label = "loyaltyProgress")
     var districtMenuExpanded by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
+    var showEditAccountDialog by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier.fillMaxSize(),
@@ -115,64 +122,134 @@ fun ProfileScreen(
             item {
                 ProfileSectionLabel("الوضع التجريبي والحساب")
             }
-            // Local Trial Mode Card
+            // Account Info & Local Trial Mode Card
             item {
+                val accountNameDisplay = prefs.userName.ifBlank {
+                    state.activeBookings.firstOrNull()?.customerName
+                        ?: state.historyBookings.firstOrNull()?.customerName
+                        ?: "مستخدم دوري"
+                }
+                val accountPhoneDisplay = prefs.userPhone.ifBlank {
+                    state.activeBookings.firstOrNull()?.customerPhone
+                        ?: state.historyBookings.firstOrNull()?.customerPhone
+                        ?: ""
+                }
                 Card(
                     shape = RoundedCornerShape(15.dp),
                     border = BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.35f)),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(11.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Row(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.PhoneAndroid,
-                                contentDescription = null,
-                                tint = EmeraldPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Column {
-                                Text(
-                                    text = "نسخة تجريبية محلية • دوري",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(EmeraldPrimary.copy(alpha = 0.14f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = EmeraldPrimary,
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = accountNameDisplay,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = if (accountPhoneDisplay.isNotBlank()) accountPhoneDisplay else "اسم حسابك المعتمد في الحجز والمراسلات",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            OutlinedButton(
+                                onClick = { showEditAccountDialog = true },
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier
+                                    .height(34.dp)
+                                    .testTag("profile_edit_account_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "تعديل اسم الحساب",
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("تعديل الاسم", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PhoneAndroid,
+                                    contentDescription = null,
+                                    tint = EmeraldPrimary,
+                                    modifier = Modifier.size(18.dp)
                                 )
                                 Text(
-                                    text = "تعمل مباشرة بدون تسجيل دخول • البيانات محفوظة محلياً",
+                                    text = "وضع محلي بدون تسجيل دخول • البيانات محفوظة محلياً",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2,
+                                    maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        OutlinedButton(
-                            onClick = { showResetDialog = true },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier
-                                .height(34.dp)
-                                .testTag("profile_reset_demo_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.RestartAlt,
-                                contentDescription = "تصفير التجربة",
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text("تصفير", style = MaterialTheme.typography.labelSmall)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            OutlinedButton(
+                                onClick = { showResetDialog = true },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier
+                                    .height(32.dp)
+                                    .testTag("profile_reset_demo_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.RestartAlt,
+                                    contentDescription = "تصفير التجربة",
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("تصفير", style = MaterialTheme.typography.labelSmall)
+                            }
                         }
                     }
                 }
@@ -583,6 +660,60 @@ fun ProfileScreen(
             dismissButton = {
                 TextButton(onClick = { showResetDialog = false }) {
                     Text("تراجع")
+                }
+            }
+        )
+    }
+
+    if (showEditAccountDialog) {
+        var nameDraft by remember(prefs.userName) { mutableStateOf(prefs.userName) }
+        var phoneDraft by remember(prefs.userPhone) { mutableStateOf(prefs.userPhone) }
+        AlertDialog(
+            onDismissRequest = { showEditAccountDialog = false },
+            title = { Text("بيانات الحساب") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "سيتم اعتماد هذا الاسم تلقائياً في محادثات الدعم الفني والحجوزات.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = nameDraft,
+                        onValueChange = { nameDraft = it },
+                        label = { Text("اسم الحساب") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("profile_account_name_input")
+                    )
+                    OutlinedTextField(
+                        value = phoneDraft,
+                        onValueChange = { phoneDraft = it },
+                        label = { Text("رقم الهاتف (اختياري)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("profile_account_phone_input")
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onUpdateProfile(nameDraft.trim(), phoneDraft.trim(), prefs.selectedDistrict)
+                        showEditAccountDialog = false
+                    },
+                    enabled = nameDraft.trim().length >= 2,
+                    modifier = Modifier.testTag("profile_save_account_button")
+                ) {
+                    Text("حفظ")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditAccountDialog = false }) {
+                    Text("إلغاء")
                 }
             }
         )

@@ -232,6 +232,26 @@ class UserBridgeProvider : ContentProvider() {
                             )
                         )
                     }
+                    if (adminReply.isNotBlank()) {
+                        val msgs = dao.getMessagesForTicketOnce(externalId)
+                        val hasAdminMsg = msgs.any { it.isFromAdmin && it.body.trim() == adminReply.trim() }
+                        if (!hasAdminMsg) {
+                            val synthId = "PUSH-A-$externalId-${adminReply.hashCode()}"
+                            if (dao.getSupportMessageByExternalId(synthId) == null) {
+                                dao.insertSupportMessage(
+                                    SupportMessageEntity(
+                                        externalMessageId = synthId,
+                                        ticketExternalId = externalId,
+                                        isFromAdmin = true,
+                                        senderName = "فريق الدعم الفني",
+                                        body = adminReply,
+                                        syncedToPeer = true,
+                                        createdAt = updatedAt
+                                    )
+                                )
+                            }
+                        }
+                    }
                 }
                 if (shouldNotifyReply) {
                     DoriNotificationHelper.showSupportMessageNotification(
@@ -269,6 +289,20 @@ class UserBridgeProvider : ContentProvider() {
                             )
                         )
                         insertedNew = true
+                    }
+                    if (isFromAdmin && body.isNotBlank()) {
+                        val parent = dao.getSupportTicketByExternalId(ticketExtId)
+                        if (parent != null && parent.status != SupportTicketStatus.CLOSED.name) {
+                            dao.updateSupportTicket(
+                                parent.copy(
+                                    status = SupportTicketStatus.REPLIED.name,
+                                    adminReply = body,
+                                    repliedByAdmin = "فريق الدعم الفني",
+                                    syncedToControl = true,
+                                    updatedAt = maxOf(parent.updatedAt, createdAt)
+                                )
+                            )
+                        }
                     }
                 }
                 if (insertedNew && isFromAdmin && body.isNotBlank()) {

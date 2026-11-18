@@ -153,23 +153,28 @@ fun SupportCenterSheet(
     }
 
     var currentTab by remember { mutableStateOf(SupportSheetTab.LIVE_CHAT) }
+    var startedNewChatExplicitly by remember { mutableStateOf(false) }
     var selectedTicketExtId by remember {
-        mutableStateOf(
-            tickets.firstOrNull {
-                SupportRequestType.fromName(it.requestType) == SupportRequestType.CHAT &&
-                    it.status != SupportTicketStatus.CLOSED.name
-            }?.externalId
-                ?: tickets.firstOrNull { it.status != SupportTicketStatus.CLOSED.name }?.externalId
-                ?: tickets.firstOrNull()?.externalId
-        )
+        mutableStateOf(pickDefaultSupportTicketId(tickets))
     }
     var awaitNewTicketSwitch by remember { mutableStateOf(false) }
     var previousTicketsCount by remember { mutableStateOf(tickets.size) }
 
-    LaunchedEffect(tickets.size, awaitNewTicketSwitch) {
+    LaunchedEffect(Unit) {
+        onSyncReplies()
+    }
+
+    LaunchedEffect(tickets, awaitNewTicketSwitch, startedNewChatExplicitly) {
         if (awaitNewTicketSwitch && tickets.size > previousTicketsCount) {
-            selectedTicketExtId = tickets.firstOrNull()?.externalId
+            selectedTicketExtId = tickets.maxByOrNull { it.updatedAt }?.externalId
             awaitNewTicketSwitch = false
+            startedNewChatExplicitly = false
+        } else if (
+            !startedNewChatExplicitly &&
+            tickets.isNotEmpty() &&
+            (selectedTicketExtId == null || tickets.none { it.externalId == selectedTicketExtId })
+        ) {
+            selectedTicketExtId = pickDefaultSupportTicketId(tickets)
         }
         previousTicketsCount = tickets.size
     }
@@ -374,21 +379,30 @@ fun SupportCenterSheet(
                                 activeTicket = activeTicket,
                                 messages = threadMessages,
                                 senderName = senderName,
-                                onNameChange = { senderName = it },
-                                onSelectTicket = { extId -> selectedTicketExtId = extId },
-                                onStartNewChat = { selectedTicketExtId = null },
+                                onSelectTicket = { extId ->
+                                    startedNewChatExplicitly = false
+                                    selectedTicketExtId = extId
+                                },
+                                onStartNewChat = {
+                                    startedNewChatExplicitly = true
+                                    selectedTicketExtId = null
+                                },
                                 onSendMessage = { text ->
+                                    val accountDisplayName = senderName.ifBlank {
+                                        activeTicket?.senderName?.ifBlank { "مستخدم دوري" } ?: "مستخدم دوري"
+                                    }
                                     if (activeTicket != null) {
                                         onSendFollowUp(
                                             activeTicket.externalId,
-                                            senderName.ifBlank { activeTicket.senderName.ifBlank { "مستخدم دوري" } },
+                                            accountDisplayName,
                                             text
                                         )
                                     } else {
                                         previousTicketsCount = tickets.size
                                         awaitNewTicketSwitch = true
+                                        startedNewChatExplicitly = false
                                         onSendTicket(
-                                            senderName.ifBlank { "مستخدم دوري" },
+                                            accountDisplayName,
                                             senderPhone,
                                             SupportCategory.GENERAL,
                                             "محادثة دعم مباشر",
@@ -411,6 +425,7 @@ fun SupportCenterSheet(
                                 onSubmitComplaint = { category, venueName, subject, details ->
                                     previousTicketsCount = tickets.size
                                     awaitNewTicketSwitch = true
+                                    startedNewChatExplicitly = false
                                     onSendTicket(
                                         senderName.ifBlank { "مستخدم دوري" },
                                         senderPhone,
@@ -430,6 +445,7 @@ fun SupportCenterSheet(
                                 tickets = tickets,
                                 messagesByTicket = messagesByTicket,
                                 onOpenThread = { extId ->
+                                    startedNewChatExplicitly = false
                                     selectedTicketExtId = extId
                                     currentTab = SupportSheetTab.LIVE_CHAT
                                 },
@@ -444,18 +460,21 @@ fun SupportCenterSheet(
     }
 }
 
+private fun pickDefaultSupportTicketId(tickets: List<SupportTicketEntity>): String? {
+    val sorted = tickets.sortedByDescending { it.updatedAt }
+    return sorted.firstOrNull { it.status != SupportTicketStatus.CLOSED.name }?.externalId
+        ?: sorted.firstOrNull()?.externalId
+}
+
 private fun buildThreadMessages(
     ticket: SupportTicketEntity?,
     messagesByTicket: Map<String, List<SupportMessageEntity>>
 ): List<SupportMessageEntity> {
     if (ticket == null) return emptyList()
-    val stored = messagesByTicket[ticket.externalId].orEmpty()
-    if (stored.isNotEmpty()) return stored
+    val stored = messagesByTicket[ticket.externalId].orEmpty().toMutableList()
 
-    // Graceful fallback if legacy ticket has no SupportMessageEntity rows
-    val synthetic = mutableListOf<SupportMessageEntity>()
-    if (ticket.message.isNotBlank()) {
-        synthetic.add(
+    if (stored.isEmpty() && ticket.message.isNotBlank()) {
+        stored.add(
             SupportMessageEntity(
                 externalMessageId = "LEGACY-U-${ticket.externalId}",
                 ticketExternalId = ticket.externalId,
@@ -467,20 +486,25 @@ private fun buildThreadMessages(
             )
         )
     }
-    if (ticket.adminReply.isNotBlank()) {
-        synthetic.add(
+
+    // Always surface ticket.adminReply even if its SupportMessageEntity was not synced yet
+    if (ticket.adminReply.isNotBlank() &&
+        stored.none { it.isFromAdmin && it.body.trim() == ticket.adminReply.trim() }
+    ) {
+        stored.add(
             SupportMessageEntity(
-                externalMessageId = "LEGACY-A-${ticket.externalId}",
+                externalMessageId = "LEGACY-A-${ticket.externalId}-${ticket.adminReply.hashCode()}",
                 ticketExternalId = ticket.externalId,
                 isFromAdmin = true,
                 senderName = "فريق الدعم الفني",
                 body = ticket.adminReply,
                 syncedToPeer = true,
-                createdAt = ticket.updatedAt
+                createdAt = maxOf(ticket.updatedAt, (stored.lastOrNull()?.createdAt ?: 0L) + 1L)
             )
         )
     }
-    return synthetic
+
+    return stored.sortedBy { it.createdAt }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -490,13 +514,11 @@ private fun LiveSupportChatTab(
     activeTicket: SupportTicketEntity?,
     messages: List<SupportMessageEntity>,
     senderName: String,
-    onNameChange: (String) -> Unit,
     onSelectTicket: (String) -> Unit,
     onStartNewChat: () -> Unit,
     onSendMessage: (String) -> Unit
 ) {
     var messageDraft by remember { mutableStateOf("") }
-    var showNameField by remember { mutableStateOf(senderName.isBlank()) }
     val listState = rememberLazyListState()
 
     val quickStarters = listOf(
@@ -563,21 +585,6 @@ private fun LiveSupportChatTab(
             }
         }
 
-        if (showNameField && activeTicket == null) {
-            OutlinedTextField(
-                value = senderName,
-                onValueChange = onNameChange,
-                label = { Text("اسمك في المحادثة (اختياري)") },
-                placeholder = { Text("اكتب اسمك ليظهر في المحادثة") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                    .testTag("support_chat_sender_name")
-            )
-        }
-
         if (activeTicket != null) {
             val isComplaint = SupportRequestType.fromName(activeTicket.requestType) == SupportRequestType.COMPLAINT
             val statusEnum = SupportTicketStatus.fromName(activeTicket.status)
@@ -628,9 +635,10 @@ private fun LiveSupportChatTab(
         ) {
             if (messages.isEmpty()) {
                 item {
+                    val hasRealName = senderName.isNotBlank() && senderName != "مستخدم دوري"
                     ChatMessageBubble(
                         senderLabel = "فريق الدعم الفني",
-                        body = "أهلاً بك${if (senderName.isNotBlank()) " يا $senderName" else ""} 👋 اكتب رسالتك بالأسفل وسيرد عليك فريق الدعم الفني مباشرة في هذه المحادثة.",
+                        body = "أهلاً بك${if (hasRealName) " يا $senderName" else ""} 👋 اكتب رسالتك بالأسفل وسيرد عليك فريق الدعم الفني مباشرة في هذه المحادثة.",
                         isFromAdmin = true,
                         timestamp = System.currentTimeMillis(),
                         isDelivered = true
@@ -1116,7 +1124,7 @@ private fun SupportRequestsListTab(
             }
         } else {
             items(tickets, key = { it.id }) { ticket ->
-                val thread = messagesByTicket[ticket.externalId].orEmpty()
+                val thread = buildThreadMessages(ticket, messagesByTicket)
                 val msgCount = maxOf(1, thread.size)
                 val lastMsg = thread.lastOrNull()
                 val previewText = when {

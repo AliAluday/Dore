@@ -278,6 +278,7 @@ fun DoriAppRoot(
                             onToggleDarkMode = viewModel::toggleDarkMode,
                             onSetMuteSound = viewModel::setMuteSound,
                             onSetMuteVibration = viewModel::setMuteVibration,
+                            onUpdateProfile = viewModel::updateProfile,
                             onOpenSupport = {
                                 viewModel.syncLocalBridge(silent = true)
                                 showSupportSheet = true
@@ -351,12 +352,22 @@ fun DoriAppRoot(
             }
 
             if (showSupportSheet) {
+                val accountName = state.preferences.userName.ifBlank {
+                    state.activeBookings.firstOrNull()?.customerName
+                        ?: state.historyBookings.firstOrNull()?.customerName
+                        ?: "مستخدم دوري"
+                }
+                val accountPhone = state.preferences.userPhone.ifBlank {
+                    state.activeBookings.firstOrNull()?.customerPhone
+                        ?: state.historyBookings.firstOrNull()?.customerPhone
+                        ?: ""
+                }
                 SupportCenterSheet(
                     tickets = state.supportTickets,
                     messagesByTicket = state.supportMessagesByTicket,
                     venues = state.allVenues,
-                    defaultName = state.preferences.userName,
-                    defaultPhone = state.preferences.userPhone,
+                    defaultName = accountName,
+                    defaultPhone = accountPhone,
                     onSendTicket = viewModel::sendSupportMessage,
                     onSendFollowUp = viewModel::sendUserChatFollowUp,
                     onSyncReplies = { viewModel.syncLocalBridge(silent = false) },

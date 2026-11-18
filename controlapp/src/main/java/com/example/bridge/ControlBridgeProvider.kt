@@ -406,6 +406,19 @@ class ControlBridgeProvider : ContentProvider() {
                         )
                         insertedNew = true
                     }
+                    if (!isFromAdmin && body.isNotBlank()) {
+                        val parent = dao.getSupportTicketByExternalId(ticketExtId)
+                        if (parent != null && parent.status != SupportTicketStatus.CLOSED.name) {
+                            dao.updateSupportTicket(
+                                parent.copy(
+                                    senderName = senderName.ifBlank { parent.senderName },
+                                    status = SupportTicketStatus.DELIVERED.name,
+                                    syncedToControl = true,
+                                    updatedAt = maxOf(parent.updatedAt, createdAt)
+                                )
+                            )
+                        }
+                    }
                 }
                 if (insertedNew && !isFromAdmin && body.isNotBlank()) {
                     DoriNotificationHelper.showSupportMessageNotification(

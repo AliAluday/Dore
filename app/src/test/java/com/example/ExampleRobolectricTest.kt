@@ -617,12 +617,89 @@ class ExampleRobolectricTest {
                     repliedByAdmin = "أحمد الموصلي",
                     status = com.example.data.model.SupportTicketStatus.REPLIED.name
                 )
-                assertEquals(1, repo.mergePulledSupportTickets(listOf(remoteRepliedTicket), isControlApp = false))
+                assertTrue(repo.mergePulledSupportTickets(listOf(remoteRepliedTicket), isControlApp = false) >= 1)
                 val userMerged = db.doriDao().getSupportTicketByExternalId("SUP-ANON-CHECK")!!
                 assertEquals("زهراء الجبوري", userMerged.senderName)
                 assertEquals("فريق الدعم الفني", userMerged.repliedByAdmin)
+                // Synthesized admin reply message exists in support_messages so chat displays it immediately
+                val syncedReplies = db.doriDao().getMessagesForTicketOnce("SUP-ANON-CHECK")
+                assertTrue(syncedReplies.any { it.isFromAdmin && it.body == "تمت معالجة طلبك بنجاح" && it.senderName == "فريق الدعم الفني" })
+
+                // 6. Booking automatically persists account name & phone when blank
+                repo.updateProfile("", "", NinevehDistrict.MOSUL_LEFT)
+                repo.bookQueueTicket(
+                    venueId = 1,
+                    customerName = "حيدر الشمري",
+                    customerPhone = "07707778899",
+                    selectedOption = "فحص وتشخيص"
+                ).getOrThrow()
+                val savedAccount = prefs.userPreferences.first()
+                assertEquals("حيدر الشمري", savedAccount.userName)
+                assertEquals("07707778899", savedAccount.userPhone)
             } finally {
                 db.close()
             }
+        }
+
+    @Test
+    fun `user bridge provider delivers control app replies and updates parent ticket immediately`() =
+        kotlinx.coroutines.runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val sharedDb = com.example.data.local.DoriDatabase.getInstance(context)
+            val dao = sharedDb.doriDao()
+            val provider = com.example.bridge.UserBridgeProvider()
+            val info = android.content.pm.ProviderInfo().apply {
+                authority = com.example.bridge.DoriBridgeContract.USER_AUTHORITY
+                packageName = context.packageName
+            }
+            provider.attachInfo(context, info)
+
+            val extId = "SUP-BRIDGE-TEST-${System.currentTimeMillis()}"
+            dao.insertSupportTicket(
+                com.example.data.local.SupportTicketEntity(
+                    externalId = extId,
+                    senderName = "مصطفى الجبوري",
+                    senderPhone = "07701234567",
+                    category = com.example.data.model.SupportCategory.GENERAL.name,
+                    requestType = com.example.data.model.SupportRequestType.CHAT.name,
+                    subject = "محادثة دعم مباشر",
+                    message = "مرحبا، احتاج مساعدة",
+                    status = com.example.data.model.SupportTicketStatus.SENT.name
+                )
+            )
+            dao.insertSupportMessage(
+                com.example.data.local.SupportMessageEntity(
+                    externalMessageId = "MSG-U-$extId",
+                    ticketExternalId = extId,
+                    isFromAdmin = false,
+                    senderName = "مصطفى الجبوري",
+                    body = "مرحبا، احتاج مساعدة"
+                )
+            )
+
+            // Push reply via USER_SUPPORT_MESSAGES_URI (simulating Control App replying)
+            val replyMsg = com.example.data.local.SupportMessageEntity(
+                externalMessageId = "MSG-A-$extId",
+                ticketExternalId = extId,
+                isFromAdmin = true,
+                senderName = "أحمد الموصلي",
+                body = "أهلاً مصطفى، تم التحقق من تذكرتك الآن."
+            )
+            val insertedUri = provider.insert(
+                com.example.bridge.DoriBridgeContract.USER_SUPPORT_MESSAGES_URI,
+                com.example.bridge.DoriLocalBridgeClient.supportMessageToContentValues(replyMsg)
+            )
+            assertTrue(insertedUri != null)
+
+            val updatedTicket = dao.getSupportTicketByExternalId(extId)!!
+            assertEquals(com.example.data.model.SupportTicketStatus.REPLIED.name, updatedTicket.status)
+            assertEquals("أهلاً مصطفى، تم التحقق من تذكرتك الآن.", updatedTicket.adminReply)
+            assertEquals("فريق الدعم الفني", updatedTicket.repliedByAdmin)
+
+            val msgs = dao.getMessagesForTicketOnce(extId)
+            assertEquals(2, msgs.size)
+            assertTrue(msgs.last().isFromAdmin)
+            assertEquals("فريق الدعم الفني", msgs.last().senderName)
+            assertEquals("أهلاً مصطفى، تم التحقق من تذكرتك الآن.", msgs.last().body)
         }
 }

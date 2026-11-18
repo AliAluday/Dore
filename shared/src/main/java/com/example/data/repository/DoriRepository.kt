@@ -188,6 +188,16 @@ class DoriRepository(
         )
         dao.updateVenue(updatedVenue)
 
+        if (currentPrefs.userName.isBlank() || currentPrefs.userPhone.isBlank()) {
+            prefs.updateProfile(
+                name = currentPrefs.userName.ifBlank { cleanName },
+                phone = currentPrefs.userPhone.ifBlank { cleanPhone },
+                district = currentPrefs.selectedDistrict,
+                age = currentPrefs.userAge,
+                optionalNote = currentPrefs.optionalNote
+            )
+        }
+
         return Result.success(savedBooking)
     }
 
@@ -924,8 +934,7 @@ class DoriRepository(
         dao.updateSupportTicket(
             existing.copy(
                 status = nextStatus,
-                syncedToControl = true,
-                updatedAt = System.currentTimeMillis()
+                syncedToControl = true
             )
         )
     }
@@ -1001,6 +1010,7 @@ class DoriRepository(
                 changed++
             } else if (remote.updatedAt > local.updatedAt ||
                 (remote.adminReply.isNotBlank() && local.adminReply != remote.adminReply) ||
+                (remote.status != local.status && remote.status == SupportTicketStatus.REPLIED.name) ||
                 (isControlApp && remote.senderName.isNotBlank() && local.senderName != remote.senderName)
             ) {
                 val resolvedStatus = when {
@@ -1028,6 +1038,33 @@ class DoriRepository(
                 )
                 changed++
             }
+            if (remote.adminReply.isNotBlank()) {
+                val existingMsgs = dao.getMessagesForTicketOnce(remote.externalId)
+                val alreadyHasReply = existingMsgs.any {
+                    it.isFromAdmin && it.body.trim() == remote.adminReply.trim()
+                }
+                if (!alreadyHasReply) {
+                    val synthId = "SYNC-A-${remote.externalId}-${remote.adminReply.hashCode()}"
+                    if (dao.getSupportMessageByExternalId(synthId) == null) {
+                        dao.insertSupportMessage(
+                            SupportMessageEntity(
+                                externalMessageId = synthId,
+                                ticketExternalId = remote.externalId,
+                                isFromAdmin = true,
+                                senderName = if (isControlApp) {
+                                    remote.repliedByAdmin.ifBlank { "فريق الدعم الفني" }
+                                } else {
+                                    "فريق الدعم الفني"
+                                },
+                                body = remote.adminReply,
+                                syncedToPeer = true,
+                                createdAt = remote.updatedAt
+                            )
+                        )
+                        changed++
+                    }
+                }
+            }
         }
         return changed
     }
@@ -1044,6 +1081,19 @@ class DoriRepository(
                     )
                 )
                 added++
+                if (remote.isFromAdmin && remote.body.isNotBlank()) {
+                    val parent = dao.getSupportTicketByExternalId(remote.ticketExternalId)
+                    if (parent != null && parent.status != SupportTicketStatus.CLOSED.name) {
+                        dao.updateSupportTicket(
+                            parent.copy(
+                                status = SupportTicketStatus.REPLIED.name,
+                                adminReply = remote.body,
+                                repliedByAdmin = parent.repliedByAdmin.ifBlank { "فريق الدعم الفني" },
+                                updatedAt = maxOf(parent.updatedAt, remote.createdAt)
+                            )
+                        )
+                    }
+                }
             }
         }
         return added

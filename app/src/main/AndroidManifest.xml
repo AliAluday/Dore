@@ -8,6 +8,7 @@
 
     <queries>
         <package android:name="com.aistudio.dori.control.qrxmzk" />
+        <provider android:authorities="com.aistudio.dori.control.bridge" />
     </queries>
 
     <application

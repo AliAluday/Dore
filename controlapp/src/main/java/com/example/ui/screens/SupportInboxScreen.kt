@@ -304,7 +304,10 @@ fun SupportInboxScreen(
                 }
             } else {
                 items(filteredConversations, key = { it.id }) { ticket ->
-                    val threadMsgs = state.supportMessagesByTicket[ticket.externalId].orEmpty()
+                    val threadMsgs = buildControlThreadMessages(
+                        ticket = ticket,
+                        stored = state.supportMessagesByTicket[ticket.externalId].orEmpty()
+                    )
                     ConversationUserRow(
                         ticket = ticket,
                         threadMessages = threadMsgs,
@@ -335,9 +338,8 @@ private fun buildControlThreadMessages(
     ticket: SupportTicketEntity,
     stored: List<SupportMessageEntity>
 ): List<SupportMessageEntity> {
-    if (stored.isNotEmpty()) return stored
-    val list = mutableListOf<SupportMessageEntity>()
-    if (ticket.message.isNotBlank()) {
+    val list = stored.toMutableList()
+    if (list.isEmpty() && ticket.message.isNotBlank()) {
         list.add(
             SupportMessageEntity(
                 externalMessageId = "LEGACY-U-${ticket.externalId}",
@@ -349,19 +351,21 @@ private fun buildControlThreadMessages(
             )
         )
     }
-    if (ticket.adminReply.isNotBlank()) {
+    if (ticket.adminReply.isNotBlank() &&
+        list.none { it.isFromAdmin && it.body.trim() == ticket.adminReply.trim() }
+    ) {
         list.add(
             SupportMessageEntity(
-                externalMessageId = "LEGACY-A-${ticket.externalId}",
+                externalMessageId = "LEGACY-A-${ticket.externalId}-${ticket.adminReply.hashCode()}",
                 ticketExternalId = ticket.externalId,
                 isFromAdmin = true,
                 senderName = ticket.repliedByAdmin.ifBlank { "فريق الدعم الفني" },
                 body = ticket.adminReply,
-                createdAt = ticket.updatedAt
+                createdAt = maxOf(ticket.updatedAt, (list.lastOrNull()?.createdAt ?: 0L) + 1L)
             )
         )
     }
-    return list
+    return list.sortedBy { it.createdAt }
 }
 
 @Composable

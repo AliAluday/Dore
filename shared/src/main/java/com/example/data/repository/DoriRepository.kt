@@ -116,7 +116,7 @@ class DoriRepository(
         }
 
         val cleanName = customerName.trim()
-        val cleanPhone = customerPhone.trim()
+        val cleanPhone = UserProfileSettings.normalizeDigits(customerPhone.trim())
         if (!UserProfileSettings.isValidFullName(cleanName)) {
             return Result.failure(IllegalArgumentException("الاسم الكامل إلزامي (3 أحرف على الأقل)"))
         }
@@ -126,15 +126,20 @@ class DoriRepository(
 
         val venue = dao.getVenueById(venueId)
             ?: return Result.failure(IllegalStateException("المكان غير موجود"))
+        if (venue.category in ctrl.disabledCategories) {
+            return Result.failure(IllegalStateException("هذا القسم غير متاح للحجز حالياً"))
+        }
         if (!venue.isOpen || !venue.isAcceptingBookings) {
             return Result.failure(IllegalStateException("هذا المكان متوقف عن استقبال الحجوزات حالياً"))
         }
 
         val queueItems = dao.getQueueItemsForVenueOnce(venueId)
+        val existingBookings = dao.getBookingsForVenueOnce(venueId)
         val activeWaiting = queueItems.count { it.status == QueueItemStatus.WAITING.name }
         val activeServing = queueItems.count { it.status == QueueItemStatus.SERVING.name }
-        val maxExistingTicket = queueItems.maxOfOrNull { it.ticketNumber } ?: 0
-        val ticketNum = maxOf(1, maxExistingTicket + 1)
+        val maxQueueTicket = queueItems.maxOfOrNull { it.ticketNumber } ?: 0
+        val maxBookingTicket = existingBookings.maxOfOrNull { it.queueNumber } ?: 0
+        val ticketNum = maxOf(1, maxOf(maxQueueTicket, maxBookingTicket) + 1)
         val ticketCode = "NIN-${venue.id}-$ticketNum"
         val peopleAhead = activeWaiting + activeServing
         val stage = when {
@@ -325,10 +330,24 @@ class DoriRepository(
         prefs.bumpControlRevision()
     }
 
+    suspend fun getBookingById(bookingId: Long): BookingEntity? = dao.getBookingById(bookingId)
+
+    suspend fun clearStaleLocalActiveBookingsBefore(cutoffTimestamp: Long) {
+        if (cutoffTimestamp > 0L) {
+            dao.deleteActiveBookingsCreatedAtOrBefore(cutoffTimestamp)
+            dao.deleteAllQueueItems()
+        }
+    }
+
     suspend fun addWalkInCustomer(venueId: Int, name: String, option: String) {
         val venue = dao.getVenueById(venueId) ?: return
         val existingItems = dao.getQueueItemsForVenueOnce(venueId)
-        val num = ((existingItems.maxOfOrNull { it.ticketNumber } ?: 0) + 1).coerceAtLeast(1)
+        val existingBookings = dao.getBookingsForVenueOnce(venueId)
+        val maxTicket = maxOf(
+            existingItems.maxOfOrNull { it.ticketNumber } ?: 0,
+            existingBookings.maxOfOrNull { it.queueNumber } ?: 0
+        )
+        val num = (maxTicket + 1).coerceAtLeast(1)
         val hasServing = existingItems.any { it.status == QueueItemStatus.SERVING.name }
         val newItem = MerchantQueueItemEntity(
             venueId = venueId,
@@ -642,6 +661,27 @@ class DoriRepository(
     }
 
     suspend fun deleteVenue(venueId: Int) {
+        val venueBookings = dao.getBookingsForVenueOnce(venueId)
+        val now = System.currentTimeMillis()
+        venueBookings.filter { it.status == BookingStatus.ACTIVE.name }.forEach { b ->
+            dao.updateBooking(
+                b.copy(
+                    status = BookingStatus.CANCELLED.name,
+                    approvalStatus = BookingApprovalStatus.REJECTED.name,
+                    approvalNote = "تم إلغاء الحجز بسبب إزالة المركز",
+                    completedAt = now
+                )
+            )
+        }
+        val activeProviderId = prefs.userPreferences.first().activeProviderId
+        dao.getProvidersForVenueOnce(venueId).forEach { prov ->
+            if (prov.isActive) {
+                dao.updateProvider(prov.copy(isActive = false))
+            }
+            if (prov.id == activeProviderId) {
+                prefs.setActiveProviderId(0L)
+            }
+        }
         dao.deleteQueueItemsForVenue(venueId)
         dao.deleteVenueById(venueId)
         prefs.bumpControlRevision()
@@ -771,20 +811,21 @@ class DoriRepository(
             if (local == null || queueResetChanged) {
                 remote.copy(isFavorite = keepLocalFav)
             } else {
-                val hasLocalActive = remote.id in activeBookingVenueIds
+                val hasLocalUnpushedBooking = remote.id in activeBookingVenueIds &&
+                    local.nextTicketNumber > remote.nextTicketNumber
                 remote.copy(
                     isFavorite = keepLocalFav,
-                    currentServingNumber = if (hasLocalActive) {
+                    currentServingNumber = if (hasLocalUnpushedBooking) {
                         maxOf(local.currentServingNumber, remote.currentServingNumber)
                     } else {
                         remote.currentServingNumber
                     },
-                    nextTicketNumber = if (hasLocalActive) {
+                    nextTicketNumber = if (hasLocalUnpushedBooking) {
                         maxOf(local.nextTicketNumber, remote.nextTicketNumber)
                     } else {
                         remote.nextTicketNumber
                     },
-                    waitingCount = if (hasLocalActive) {
+                    waitingCount = if (hasLocalUnpushedBooking) {
                         maxOf(local.waitingCount, remote.waitingCount)
                     } else {
                         remote.waitingCount
@@ -1014,7 +1055,15 @@ class DoriRepository(
                 (isControlApp && remote.senderName.isNotBlank() && local.senderName != remote.senderName)
             ) {
                 val resolvedStatus = when {
+                    local.status == SupportTicketStatus.CLOSED.name && remote.updatedAt <= local.updatedAt ->
+                        SupportTicketStatus.CLOSED.name
+                    isControlApp && (local.status == SupportTicketStatus.REPLIED.name || local.status == SupportTicketStatus.CLOSED.name) &&
+                        (remote.status == SupportTicketStatus.SENT.name || remote.status == SupportTicketStatus.DELIVERED.name) &&
+                        remote.updatedAt <= local.updatedAt -> local.status
                     isControlApp && remote.status == SupportTicketStatus.SENT.name -> SupportTicketStatus.DELIVERED.name
+                    !isControlApp && local.status == SupportTicketStatus.CLOSED.name &&
+                        (remote.status == SupportTicketStatus.SENT.name || remote.status == SupportTicketStatus.DELIVERED.name) ->
+                        local.status
                     remote.status.isNotBlank() -> remote.status
                     else -> local.status
                 }
@@ -1069,27 +1118,51 @@ class DoriRepository(
         return changed
     }
 
-    suspend fun mergePulledSupportMessages(incoming: List<SupportMessageEntity>): Int {
+    suspend fun mergePulledSupportMessages(
+        incoming: List<SupportMessageEntity>,
+        isControlApp: Boolean = false
+    ): Int {
         var added = 0
         for (remote in incoming) {
             if (remote.externalMessageId.isBlank() || remote.ticketExternalId.isBlank()) continue
             if (dao.getSupportMessageByExternalId(remote.externalMessageId) == null) {
+                val sanitizedSender = if (!isControlApp && remote.isFromAdmin) {
+                    "فريق الدعم الفني"
+                } else {
+                    remote.senderName
+                }
                 dao.insertSupportMessage(
                     remote.copy(
                         id = 0L,
+                        senderName = sanitizedSender,
                         syncedToPeer = true
                     )
                 )
                 added++
+                val parent = dao.getSupportTicketByExternalId(remote.ticketExternalId)
                 if (remote.isFromAdmin && remote.body.isNotBlank()) {
-                    val parent = dao.getSupportTicketByExternalId(remote.ticketExternalId)
                     if (parent != null && parent.status != SupportTicketStatus.CLOSED.name) {
                         dao.updateSupportTicket(
                             parent.copy(
                                 status = SupportTicketStatus.REPLIED.name,
                                 adminReply = remote.body,
-                                repliedByAdmin = parent.repliedByAdmin.ifBlank { "فريق الدعم الفني" },
+                                repliedByAdmin = if (isControlApp) {
+                                    parent.repliedByAdmin.ifBlank { remote.senderName.ifBlank { "فريق الدعم الفني" } }
+                                } else {
+                                    "فريق الدعم الفني"
+                                },
                                 updatedAt = maxOf(parent.updatedAt, remote.createdAt)
+                            )
+                        )
+                    }
+                } else if (isControlApp && !remote.isFromAdmin && remote.body.isNotBlank()) {
+                    if (parent != null && parent.status != SupportTicketStatus.CLOSED.name && remote.createdAt > parent.updatedAt) {
+                        dao.updateSupportTicket(
+                            parent.copy(
+                                senderName = remote.senderName.ifBlank { parent.senderName },
+                                status = SupportTicketStatus.DELIVERED.name,
+                                syncedToControl = true,
+                                updatedAt = remote.createdAt
                             )
                         )
                     }
@@ -1214,7 +1287,12 @@ class DoriRepository(
     }
 
     suspend fun updateAdminAccount(admin: AdminAccountEntity) {
-        dao.updateAdmin(admin)
+        val guarded = if (admin.isSuperAdmin) {
+            admin.copy(isActive = true, canManageAdmins = true)
+        } else {
+            admin
+        }
+        dao.updateAdmin(guarded)
     }
 
     suspend fun deleteAdminAccount(adminId: Long): Result<Unit> {
@@ -1273,6 +1351,10 @@ class DoriRepository(
 
     suspend fun updateServiceProvider(provider: ServiceProviderEntity) {
         dao.updateProvider(provider)
+        val current = prefs.userPreferences.first().activeProviderId
+        if (current == provider.id && !provider.isActive) {
+            prefs.setActiveProviderId(0L)
+        }
         prefs.bumpControlRevision()
     }
 
@@ -1292,6 +1374,7 @@ class DoriRepository(
         providerId: Long? = null
     ): BookingEntity? {
         val booking = dao.getBookingById(bookingId) ?: return null
+        if (booking.status != BookingStatus.ACTIVE.name) return null
         val updated = booking.copy(
             approvalStatus = BookingApprovalStatus.ACCEPTED.name,
             handledByProvider = actorName,

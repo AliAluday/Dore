@@ -95,6 +95,12 @@ interface DoriDao {
     @Update
     suspend fun updateBooking(booking: BookingEntity)
 
+    @Query("SELECT * FROM bookings WHERE venueId = :venueId")
+    suspend fun getBookingsForVenueOnce(venueId: Int): List<BookingEntity>
+
+    @Query("DELETE FROM bookings WHERE status = 'ACTIVE' AND createdAt <= :cutoffTimestamp")
+    suspend fun deleteActiveBookingsCreatedAtOrBefore(cutoffTimestamp: Long)
+
     @Query("DELETE FROM bookings")
     suspend fun deleteAllBookings()
 
@@ -213,6 +219,9 @@ interface DoriDao {
 
     @Query("SELECT * FROM service_providers ORDER BY createdAt DESC")
     suspend fun getAllProvidersOnce(): List<ServiceProviderEntity>
+
+    @Query("SELECT * FROM service_providers WHERE venueId = :venueId")
+    suspend fun getProvidersForVenueOnce(venueId: Int): List<ServiceProviderEntity>
 
     @Query("SELECT * FROM service_providers WHERE id = :id LIMIT 1")
     suspend fun getProviderById(id: Long): ServiceProviderEntity?

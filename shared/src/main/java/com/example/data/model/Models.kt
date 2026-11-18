@@ -318,10 +318,20 @@ data class UserProfileSettings(
         get() = isValidFullName(userName) && isValidPhone(userPhone)
 
     companion object {
+        fun normalizeDigits(input: String): String = buildString(input.length) {
+            input.forEach { ch ->
+                when (ch) {
+                    in '٠'..'٩' -> append(('0'.code + (ch.code - '٠'.code)).toChar())
+                    in '۰'..'۹' -> append(('0'.code + (ch.code - '۰'.code)).toChar())
+                    else -> append(ch)
+                }
+            }
+        }
+
         fun isValidFullName(name: String): Boolean = name.trim().length >= 3
 
         fun isValidPhone(phone: String): Boolean {
-            val digits = phone.filter { it.isDigit() }
+            val digits = normalizeDigits(phone).filter { it.isDigit() }
             return digits.length in 10..14
         }
     }

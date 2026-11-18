@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -49,7 +50,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.data.local.BookingEntity
 import com.example.data.model.BookingApprovalStatus
 import com.example.data.model.TicketStage
@@ -72,8 +75,8 @@ fun QrCodeCanvas(
     val matrix = remember(payload) { QrCodeGenerator.generateMatrix(payload) }
     Canvas(
         modifier = modifier
-            .background(lightColor, RoundedCornerShape(14.dp))
-            .padding(6.dp)
+            .background(lightColor, RoundedCornerShape(10.dp))
+            .padding(4.dp)
     ) {
         drawRect(color = lightColor)
         val count = matrix.size
@@ -99,9 +102,9 @@ fun QrCodeCanvas(
     }
 }
 
-fun perforatedTicketShape(cutoutRatio: Float = 0.56f) = GenericShape { size, _ ->
-    val corner = 46f
-    val notchR = 26f
+fun perforatedTicketShape(cutoutRatio: Float = 0.62f) = GenericShape { size, _ ->
+    val corner = 28f
+    val notchR = 16f
     val notchY = size.height * cutoutRatio
 
     moveTo(corner, 0f)
@@ -170,251 +173,219 @@ fun PerforatedTicketCard(
         label = "stageColor"
     )
 
-    val ticketShape = remember { perforatedTicketShape(0.55f) }
+    val ticketShape = remember { perforatedTicketShape(0.62f) }
+    val approval = BookingApprovalStatus.fromName(booking.approvalStatus)
+    val approvalColor = when (approval) {
+        BookingApprovalStatus.ACCEPTED -> StatusOpen
+        BookingApprovalStatus.REJECTED -> StatusUrgent
+        BookingApprovalStatus.PENDING -> AmberGold
+    }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = ticketShape,
-        tonalElevation = 6.dp,
-        shadowElevation = 10.dp,
+        tonalElevation = 4.dp,
+        shadowElevation = 6.dp,
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Futuristic Gradient Ticket Top
+            // Compact Gradient Ticket Top
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                stageColor.copy(alpha = 0.18f),
+                                stageColor.copy(alpha = 0.16f),
                                 MaterialTheme.colorScheme.surface
                             )
                         )
                     )
-                    .padding(12.dp)
+                    .padding(horizontal = 11.dp, vertical = 9.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Top
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = stageColor.copy(alpha = 0.16f),
-                                border = BorderStroke(1.dp, stageColor.copy(alpha = 0.45f))
-                            ) {
-                                Text(
-                                    text = "${booking.venueCategory} • ${booking.venueCity}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = stageColor,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                )
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = StatusOpen.copy(alpha = 0.14f)
-                            ) {
-                                Text(
-                                    text = "نفس اليوم",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = StatusOpen,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(5.dp))
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
                         Text(
                             text = booking.venueName,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "الخدمة: ${booking.selectedOption}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "${booking.venueCategory} • ${booking.venueCity} • ${booking.selectedOption}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        val approval = BookingApprovalStatus.fromName(booking.approvalStatus)
-                        val approvalColor = when (approval) {
-                            BookingApprovalStatus.ACCEPTED -> StatusOpen
-                            BookingApprovalStatus.REJECTED -> StatusUrgent
-                            BookingApprovalStatus.PENDING -> AmberGold
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = approvalColor.copy(alpha = 0.14f),
-                            border = BorderStroke(1.dp, approvalColor.copy(alpha = 0.4f))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = approvalColor.copy(alpha = 0.14f),
+                                border = BorderStroke(0.8.dp, approvalColor.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = when (approval) {
+                                        BookingApprovalStatus.ACCEPTED ->
+                                            "✓ مقبولة${if (booking.handledByProvider.isNotBlank()) " (${booking.handledByProvider})" else ""}"
+                                        BookingApprovalStatus.REJECTED ->
+                                            "✕ مرفوضة${if (booking.handledByProvider.isNotBlank()) " (${booking.handledByProvider})" else ""}"
+                                        BookingApprovalStatus.PENDING -> "⏳ بانتظار القبول"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = approvalColor,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                )
+                            }
                             Text(
-                                text = when (approval) {
-                                    BookingApprovalStatus.ACCEPTED ->
-                                        "✓ تم القبول${if (booking.handledByProvider.isNotBlank()) " من ${booking.handledByProvider}" else ""}"
-                                    BookingApprovalStatus.REJECTED ->
-                                        "✕ مرفوضة${if (booking.handledByProvider.isNotBlank()) " من ${booking.handledByProvider}" else ""}"
-                                    BookingApprovalStatus.PENDING -> "⏳ بانتظار قبول مقدم الخدمة"
-                                },
+                                text = IntentHelpers.formatDinar(booking.priceDinar),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = approvalColor,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
 
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Compact Queue Number + Ticket Code Pill
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = stageColor
                     ) {
                         Column(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "ترتيب التذكرة",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.85f)
-                            )
-                            Text(
                                 text = "#${booking.queueNumber}",
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleMedium,
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = booking.ticketCode,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.8f)
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                color = Color.White.copy(alpha = 0.88f)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 ThreeStageProgressIndicator(currentStage = stage, activeColor = stageColor)
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                // Interactive QR + ETA Pod
+                // Inline Metrics + Compact 58dp Clickable Mini-QR
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                        border = BorderStroke(0.8.dp, stageColor.copy(alpha = 0.3f)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "قبلك",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "${booking.peopleAhead}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = stageColor
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                        border = BorderStroke(0.8.dp, stageColor.copy(alpha = 0.3f)),
+                        modifier = Modifier.weight(1.15f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "الانتظار",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.AccessTime,
+                                    contentDescription = null,
+                                    tint = stageColor,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = if (booking.estimatedMinutes <= 0) "الآن!" else "${booking.estimatedMinutes} د",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = stageColor
+                                )
+                            }
+                        }
+                    }
+
                     if (controlConfig.enableQrCode) {
                         Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            border = BorderStroke(1.5.dp, stageColor.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.2.dp, stageColor.copy(alpha = 0.55f)),
                             modifier = Modifier
-                                .clip(RoundedCornerShape(14.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable { onZoomQr() }
                                 .testTag("ticket_qr_button")
                         ) {
                             Box {
                                 QrCodeCanvas(
                                     payload = QrCodeGenerator.buildTicketPayload(booking),
-                                    modifier = Modifier.size(90.dp)
+                                    modifier = Modifier.size(58.dp)
                                 )
                                 Surface(
                                     shape = CircleShape,
                                     color = stageColor,
                                     modifier = Modifier
                                         .align(Alignment.BottomEnd)
-                                        .padding(4.dp)
+                                        .padding(2.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.ZoomIn,
                                         contentDescription = "تكبير رمز QR",
                                         tint = Color.White,
                                         modifier = Modifier
-                                            .padding(3.dp)
-                                            .size(12.dp)
+                                            .padding(2.dp)
+                                            .size(10.dp)
                                     )
                                 }
                             }
-                        }
-                    }
-
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                                border = BorderStroke(1.dp, stageColor.copy(alpha = 0.35f)),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "الأشخاص قبلك",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = "${booking.peopleAhead}",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = stageColor
-                                    )
-                                }
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                                border = BorderStroke(1.dp, stageColor.copy(alpha = 0.35f)),
-                                modifier = Modifier.weight(1.2f)
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "الوقت التقديري",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.AccessTime,
-                                            contentDescription = null,
-                                            tint = stageColor,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text(
-                                            text = if (booking.estimatedMinutes <= 0) "الآن!" else "${booking.estimatedMinutes} دقيقة",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = stageColor
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        if (controlConfig.enableQrCode) {
-                            Text(
-                                text = "اضغط على رمز QR للتكبير والمسح الضوئي",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                     }
                 }
@@ -426,41 +397,46 @@ fun PerforatedTicketCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(2.dp)
-                    .padding(horizontal = 24.dp)
+                    .padding(horizontal = 18.dp)
             ) {
                 drawLine(
                     color = outlineColor,
                     start = Offset(0f, size.height / 2),
                     end = Offset(size.width, size.height / 2),
-                    strokeWidth = 3f,
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f), 0f)
+                    strokeWidth = 2.5f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f), 0f)
                 )
             }
 
-            // Bottom Ticket Stub
+            // Compact Bottom Ticket Stub
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 11.dp, vertical = 7.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Person,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(14.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = booking.customerName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -468,42 +444,28 @@ fun PerforatedTicketCard(
                             imageVector = Icons.Default.Phone,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(13.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = booking.customerPhone,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "التكلفة: ${IntentHelpers.formatDinar(booking.priceDinar)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (booking.notes.isNotBlank()) {
-                            Text(
-                                text = booking.notes,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    if (booking.optionalInfo.isNotBlank()) {
-                        Text(
-                            text = "معلومات اختيارية: ${booking.optionalInfo}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
+                if (booking.notes.isNotBlank() || booking.optionalInfo.isNotBlank()) {
+                    val combinedNotes = listOf(booking.notes, booking.optionalInfo)
+                        .filter { it.isNotBlank() }
+                        .joinToString(" • ")
+                    Text(
+                        text = combinedNotes,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
                 Row(
@@ -514,15 +476,17 @@ fun PerforatedTicketCard(
                     Button(
                         onClick = onCompleteClick,
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(38.dp)
+                            .height(34.dp)
                             .testTag("complete_ticket_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = null,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
@@ -531,7 +495,8 @@ fun PerforatedTicketCard(
                             } else {
                                 "إتمام الخدمة"
                             },
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
                             maxLines = 1
                         )
                     }
@@ -539,30 +504,32 @@ fun PerforatedTicketCard(
                     OutlinedButton(
                         onClick = onCancelClick,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
-                            .height(38.dp)
+                            .height(34.dp)
                             .testTag("cancel_ticket_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Cancel,
                             contentDescription = null,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(3.dp))
-                        Text("إلغاء", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                        Text("إلغاء", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     }
 
                     if (controlConfig.enableWhatsAppShare) {
                         FilledTonalIconButton(
                             onClick = onShareWhatsApp,
                             modifier = Modifier
-                                .size(38.dp)
+                                .size(34.dp)
                                 .testTag("share_whatsapp_button")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Share,
                                 contentDescription = "مشاركة عبر واتساب",
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                         }
                     }
@@ -595,7 +562,7 @@ private fun ThreeStageProgressIndicator(currentStage: TicketStage, activeColor: 
             ) {
                 Box(
                     modifier = Modifier
-                        .size(24.dp)
+                        .size(18.dp)
                         .clip(CircleShape)
                         .background(if (reached) dotColor else MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
@@ -605,20 +572,20 @@ private fun ThreeStageProgressIndicator(currentStage: TicketStage, activeColor: 
                             imageVector = Icons.Default.Check,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(13.dp)
+                            modifier = Modifier.size(11.dp)
                         )
                     } else {
                         Text(
                             text = "${index + 1}",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(1.dp))
                 Text(
                     text = stage.label,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
                     color = if (reached) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
@@ -628,8 +595,8 @@ private fun ThreeStageProgressIndicator(currentStage: TicketStage, activeColor: 
             if (index < stages.lastIndex) {
                 Box(
                     modifier = Modifier
-                        .width(18.dp)
-                        .height(2.5.dp)
+                        .width(14.dp)
+                        .height(2.dp)
                         .background(
                             if (index < currentStage.stepIndex) activeColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
                             RoundedCornerShape(2.dp)

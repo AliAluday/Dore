@@ -695,9 +695,10 @@ private fun LiveSupportChatTab(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "هذه المحادثة مغلقة حالياً",
+                        text = "تم إغلاق المحادثة — يمكنك بدء محادثة جديدة إذا احتجت",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
                     )
                     Button(
                         onClick = onStartNewChat,
@@ -1413,6 +1414,12 @@ private fun ProblemTicketCardUser(
                         }
                     }
                 }
+            } else {
+                Text(
+                    text = "تم إغلاق هذه البطاقة بعد المعالجة.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = StatusPaused
+                )
             }
         }
     }

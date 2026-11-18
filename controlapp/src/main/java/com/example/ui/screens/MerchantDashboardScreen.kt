@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonOff
@@ -63,6 +64,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -119,6 +121,8 @@ fun MerchantDashboardScreen(
 
     val activeProvider = state.activeProvider
     val activeProviders = remember(state.providers) { state.providers.filter { it.isActive } }
+    val canCallNext = activeProvider?.canCallNext ?: true
+    val canPauseVenue = activeProvider?.canPauseVenue ?: true
 
     Box(
         modifier = modifier.fillMaxSize(),
@@ -324,6 +328,32 @@ fun MerchantDashboardScreen(
                                 ProviderCapTag("قبول التذاكر", activeProvider.canAcceptTickets)
                                 ProviderCapTag("استدعاء الدور", activeProvider.canCallNext)
                                 ProviderCapTag("إيقاف المركز", activeProvider.canPauseVenue)
+                            }
+                            val restricted = listOfNotNull(
+                                if (!activeProvider.canAcceptTickets) "قبول التذاكر" else null,
+                                if (!activeProvider.canCallNext) "استدعاء الدور" else null,
+                                if (!activeProvider.canPauseVenue) "إيقاف المركز" else null
+                            )
+                            if (restricted.isNotEmpty()) {
+                                Surface(
+                                    shape = RoundedCornerShape(9.dp),
+                                    color = StatusUrgent.copy(alpha = 0.09f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(Icons.Default.Lock, contentDescription = null, tint = StatusUrgent, modifier = Modifier.size(14.dp))
+                                        Text(
+                                            text = "صلاحيات مقيدة لهذا الحساب: ${restricted.joinToString("، ")}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = StatusUrgent,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -610,6 +640,7 @@ fun MerchantDashboardScreen(
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                 modifier = Modifier
                                     .height(34.dp)
+                                    .alpha(if (canCallNext) 1f else 0.55f)
                                     .testTag("add_walkin_button")
                             ) {
                                 Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(15.dp))
@@ -629,6 +660,7 @@ fun MerchantDashboardScreen(
                                 modifier = Modifier
                                     .weight(1.2f)
                                     .height(38.dp)
+                                    .alpha(if (canCallNext) 1f else 0.55f)
                                     .testTag("call_next_button")
                             ) {
                                 Icon(Icons.Default.Campaign, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -643,6 +675,7 @@ fun MerchantDashboardScreen(
                                 modifier = Modifier
                                     .weight(0.8f)
                                     .height(38.dp)
+                                    .alpha(if (canCallNext) 1f else 0.55f)
                                     .testTag("skip_customer_button")
                             ) {
                                 Icon(Icons.Default.SkipNext, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -652,7 +685,9 @@ fun MerchantDashboardScreen(
                         }
 
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .alpha(if (canPauseVenue) 1f else 0.55f),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -665,7 +700,9 @@ fun MerchantDashboardScreen(
                         }
 
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .alpha(if (canPauseVenue) 1f else 0.55f),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -682,11 +719,23 @@ fun MerchantDashboardScreen(
 
             // Waiting Queue List
             item {
-                Text(
-                    text = "طابور الانتظار (${waitingItems.size})",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "طابور الانتظار (${waitingItems.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "الانتظار المقدر: ${waitingItems.size * selectedVenue.avgMinutesPerPerson} د",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = EmeraldPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             if (waitingItems.isEmpty()) {
@@ -708,6 +757,7 @@ fun MerchantDashboardScreen(
                 items(waitingItems, key = { it.id }) { item ->
                     QueueWaitingRow(
                         item = item,
+                        canAct = canCallNext,
                         onCallByName = { onCallCustomerByName(selectedVenue.id, item.id, item.customerName) },
                         onMarkNoShow = { onMarkNoShow(selectedVenue.id, item.id, item.customerName) }
                     )
@@ -1037,6 +1087,7 @@ private fun MerchantStatCard(
 @Composable
 private fun QueueWaitingRow(
     item: MerchantQueueItemEntity,
+    canAct: Boolean,
     onCallByName: () -> Unit,
     onMarkNoShow: () -> Unit
 ) {
@@ -1093,6 +1144,7 @@ private fun QueueWaitingRow(
                     modifier = Modifier
                         .weight(1f)
                         .height(34.dp)
+                        .alpha(if (canAct) 1f else 0.55f)
                         .testTag("call_by_name_${item.id}")
                 ) {
                     Icon(Icons.Default.Campaign, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -1107,6 +1159,7 @@ private fun QueueWaitingRow(
                     modifier = Modifier
                         .weight(1f)
                         .height(34.dp)
+                        .alpha(if (canAct) 1f else 0.55f)
                         .testTag("no_show_${item.id}")
                 ) {
                     Icon(Icons.Default.PersonOff, contentDescription = null, modifier = Modifier.size(14.dp))

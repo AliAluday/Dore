@@ -702,4 +702,165 @@ class ExampleRobolectricTest {
             assertEquals("فريق الدعم الفني", msgs.last().senderName)
             assertEquals("أهلاً مصطفى، تم التحقق من تذكرتك الآن.", msgs.last().body)
         }
+
+    @Test
+    fun `arabic digits phone validation and super admin plus venue deletion cascade safeguards`() =
+        kotlinx.coroutines.runBlocking {
+            // 1. Arabic-Indic and Eastern Arabic numerals pass validation
+            assertTrue(UserProfileSettings.isValidPhone("٠٧٧٠١٢٣٤٥٦٧"))
+            assertTrue(UserProfileSettings.isValidPhone("۰۷۷۰۱۲۳۴۵۶۷"))
+            assertEquals("07701234567", UserProfileSettings.normalizeDigits("٠٧٧٠١٢٣٤٥٦٧"))
+            assertFalse(UserProfileSettings.isValidPhone("٠٧٧٠١٢٣"))
+
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val db = androidx.room.Room.inMemoryDatabaseBuilder(
+                context,
+                com.example.data.local.DoriDatabase::class.java
+            ).allowMainThreadQueries().build()
+            try {
+                val prefs = com.example.data.local.UserPreferencesDataStore(context)
+                val repo = com.example.data.repository.DoriRepository(db.doriDao(), prefs)
+                repo.ensureSeeded()
+
+                // 2. Super admin cannot be deactivated or stripped of MANAGE_ADMINS
+                val superAdmin = db.doriDao().getAllAdminsOnce().first { it.isSuperAdmin }
+                repo.updateAdminAccount(
+                    superAdmin.copy(
+                        isActive = false,
+                        canManageAdmins = false
+                    )
+                )
+                val updatedSuper = db.doriDao().getAllAdminsOnce().first { it.id == superAdmin.id }
+                assertTrue(updatedSuper.isActive)
+                assertTrue(updatedSuper.hasPermission(com.example.data.model.AdminPermissionType.MANAGE_ADMINS))
+
+                // 3. Deleting a venue cancels active bookings and deactivates linked providers
+                val newVenueId = repo.addCustomVenue(
+                    name = "مركز الاختبار",
+                    district = NinevehDistrict.MOSUL_LEFT,
+                    area = "المثنى",
+                    category = ServiceCategory.CLINICS,
+                    specialty = "أسنان",
+                    priceDinar = 20000,
+                    avgMinutes = 10,
+                    phone = "07701234567"
+                ).getOrThrow().id
+                val booking = repo.bookQueueTicket(
+                    venueId = newVenueId,
+                    customerName = "مريم العلي",
+                    customerPhone = "٠٧٧٠١٢٣٤٥٦٧",
+                    selectedOption = "فحص"
+                ).getOrThrow()
+                assertEquals("07701234567", booking.customerPhone)
+
+                val provId = repo.addServiceProvider(
+                    name = "د. طارق",
+                    role = com.example.data.model.ProviderRole.DOCTOR,
+                    customTitle = "طبيب",
+                    phone = "07709998877",
+                    venueId = newVenueId,
+                    canAcceptTickets = true,
+                    canCallNext = true,
+                    canPauseVenue = true
+                ).getOrThrow().id
+                prefs.setActiveProviderId(provId)
+
+                repo.deleteVenue(newVenueId)
+
+                val cancelledBooking = db.doriDao().getBookingById(booking.id)!!
+                assertEquals(com.example.data.model.BookingStatus.CANCELLED.name, cancelledBooking.status)
+                val deactivatedProvider = db.doriDao().getAllProvidersOnce().first { it.id == provId }
+                assertFalse(deactivatedProvider.isActive)
+                assertEquals(0L, prefs.userPreferences.first().activeProviderId)
+            } finally {
+                db.close()
+            }
+        }
+
+    @Test
+    fun `ticket codes avoid collisions and control queue advancement plus closed support protection hold`() =
+        kotlinx.coroutines.runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val db = androidx.room.Room.inMemoryDatabaseBuilder(
+                context,
+                com.example.data.local.DoriDatabase::class.java
+            ).allowMainThreadQueries().build()
+            try {
+                val prefs = com.example.data.local.UserPreferencesDataStore(context)
+                val repo = com.example.data.repository.DoriRepository(db.doriDao(), prefs)
+                repo.ensureSeeded()
+
+                // Simulate booking when existing higher booking ticket exists -> must increment beyond it cleanly
+                val v1 = db.doriDao().getVenueById(1)!!
+                val first = repo.bookQueueTicket(
+                    venueId = 1,
+                    customerName = "زيد",
+                    customerPhone = "07701112233",
+                    selectedOption = "كشف"
+                ).getOrThrow()
+                val second = repo.bookQueueTicket(
+                    venueId = 1,
+                    customerName = "سعد",
+                    customerPhone = "07704445566",
+                    selectedOption = "كشف"
+                ).getOrThrow()
+                assertTrue(second.queueNumber > first.queueNumber)
+                assertTrue(first.ticketCode != second.ticketCode)
+
+                // Control App pushes lower waitingCount on active venue when queue advanced remotely
+                val updatedRemote = v1.copy(
+                    waitingCount = 0,
+                    currentServingNumber = second.queueNumber,
+                    nextTicketNumber = second.queueNumber + 1
+                )
+                repo.mergeSyncedVenuesFromControl(listOf(updatedRemote))
+                val mergedLocal = db.doriDao().getVenueById(1)!!
+                assertEquals(0, mergedLocal.waitingCount)
+                assertEquals(second.queueNumber, mergedLocal.currentServingNumber)
+
+                // Support CLOSED status is not downgraded by stale SENT/DELIVERED message/ticket pulls
+                val closedTicket = com.example.data.local.SupportTicketEntity(
+                    externalId = "SUP-CLOSED-GUARD",
+                    senderName = "هبة",
+                    senderPhone = "07701234567",
+                    category = com.example.data.model.SupportCategory.GENERAL.name,
+                    requestType = com.example.data.model.SupportRequestType.CHAT.name,
+                    subject = "استفسار",
+                    message = "سؤال",
+                    status = com.example.data.model.SupportTicketStatus.CLOSED.name,
+                    updatedAt = 2000L
+                )
+                repo.mergePulledSupportTickets(listOf(closedTicket), isControlApp = false)
+                repo.mergePulledSupportTickets(
+                    listOf(
+                        closedTicket.copy(
+                            status = com.example.data.model.SupportTicketStatus.SENT.name,
+                            updatedAt = 2500L
+                        )
+                    ),
+                    isControlApp = false
+                )
+                val afterStaleTicket = db.doriDao().getSupportTicketByExternalId("SUP-CLOSED-GUARD")!!
+                assertEquals(com.example.data.model.SupportTicketStatus.CLOSED.name, afterStaleTicket.status)
+
+                // Support message merge masks admin personal name in User App while keeping it in Control App
+                val adminMsg = com.example.data.local.SupportMessageEntity(
+                    externalMessageId = "MSG-ANON-1",
+                    ticketExternalId = "SUP-CLOSED-GUARD",
+                    isFromAdmin = true,
+                    senderName = "الموظف الشخصي",
+                    body = "تم الرد",
+                    createdAt = 1500L
+                )
+                repo.mergePulledSupportMessages(listOf(adminMsg), isControlApp = false)
+                val userSideMsg = db.doriDao().getMessagesForTicketOnce("SUP-CLOSED-GUARD").first()
+                assertEquals("فريق الدعم الفني", userSideMsg.senderName)
+                assertEquals(
+                    com.example.data.model.SupportTicketStatus.CLOSED.name,
+                    db.doriDao().getSupportTicketByExternalId("SUP-CLOSED-GUARD")!!.status
+                )
+            } finally {
+                db.close()
+            }
+        }
 }

@@ -429,6 +429,7 @@ fun SupportInboxScreen(
                         onSendReply = { text -> onReplyTicket(ticket.id, text) },
                         onMarkInReview = { onUpdateStatus(ticket.id, SupportTicketStatus.IN_REVIEW) },
                         onCloseTicket = { onUpdateStatus(ticket.id, SupportTicketStatus.CLOSED) },
+                        onReopenTicket = { onUpdateStatus(ticket.id, SupportTicketStatus.IN_REVIEW) },
                         onOpenFullView = { onOpenChatTicket(ticket.id) }
                     )
                 }
@@ -445,6 +446,7 @@ private fun ControlProblemTicketCard(
     onSendReply: (String) -> Unit,
     onMarkInReview: () -> Unit,
     onCloseTicket: () -> Unit,
+    onReopenTicket: () -> Unit,
     onOpenFullView: () -> Unit
 ) {
     val statusEnum = SupportTicketStatus.fromName(ticket.status)
@@ -615,6 +617,17 @@ private fun ControlProblemTicketCard(
                         modifier = Modifier.height(32.dp)
                     ) {
                         Text("تم الحل / إغلاق", style = MaterialTheme.typography.labelSmall)
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = onReopenTicket,
+                        enabled = canReply,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        modifier = Modifier
+                            .height(32.dp)
+                            .testTag("ctrl_support_reopen_${ticket.id}")
+                    ) {
+                        Text("إعادة فتح", style = MaterialTheme.typography.labelSmall)
                     }
                 }
                 Spacer(modifier = Modifier.weight(1f))
@@ -958,6 +971,7 @@ fun ControlSupportChatOverlay(
     onSendReply: (String) -> Unit,
     onMarkInReview: () -> Unit,
     onCloseTicket: () -> Unit,
+    onReopenTicket: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val density = LocalDensity.current
@@ -1106,6 +1120,17 @@ fun ControlSupportChatOverlay(
                                 ) {
                                     Text("إغلاق", style = MaterialTheme.typography.labelSmall, color = MintPrimaryDark)
                                 }
+                            } else {
+                                OutlinedButton(
+                                    onClick = onReopenTicket,
+                                    enabled = canReply,
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    modifier = Modifier
+                                        .height(30.dp)
+                                        .testTag("ctrl_support_overlay_reopen_${ticket.id}")
+                                ) {
+                                    Text("إعادة فتح", style = MaterialTheme.typography.labelSmall, color = MintPrimaryDark)
+                                }
                             }
                             IconButton(
                                 onClick = handleExitAttempt,
@@ -1231,63 +1256,98 @@ fun ControlSupportChatOverlay(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
 
-                // Chat Composer Bar (always prominent above keyboard)
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 4.dp,
-                    shadowElevation = 6.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Chat Composer Bar or Closed Reopen Bar
+                val isClosed = ticket.status == SupportTicketStatus.CLOSED.name
+                if (isClosed) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        OutlinedTextField(
-                            value = replyDraft,
-                            onValueChange = { replyDraft = it },
-                            placeholder = {
-                                Text(
-                                    "اكتب رسالتك إلى $displayUserName...",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            },
-                            enabled = canReply,
-                            minLines = 1,
-                            maxLines = 3,
-                            shape = RoundedCornerShape(16.dp),
+                        Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 48.dp)
-                                .testTag("ctrl_support_reply_input_${ticket.id}")
-                        )
-                        IconButton(
-                            onClick = {
-                                val txt = replyDraft.trim()
-                                if (txt.isNotEmpty()) {
-                                    onSendReply(txt)
-                                    replyDraft = ""
-                                }
-                            },
-                            enabled = canReply && replyDraft.trim().isNotEmpty(),
-                            modifier = Modifier
-                                .size(46.dp)
-                                .minimumInteractiveComponentSize()
-                                .clip(CircleShape)
-                                .background(
-                                    if (canReply && replyDraft.trim().isNotEmpty()) EmeraldPrimary
-                                    else MaterialTheme.colorScheme.surfaceVariant
-                                )
-                                .testTag("ctrl_support_send_reply_${ticket.id}")
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "إرسال الرد",
-                                tint = if (canReply && replyDraft.trim().isNotEmpty()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(19.dp)
+                            Text(
+                                text = "المحادثة مغلقة — أعد فتحها للرد على المستخدم",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = onReopenTicket,
+                                enabled = canReply,
+                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier
+                                    .height(34.dp)
+                                    .testTag("ctrl_support_composer_reopen_${ticket.id}")
+                            ) {
+                                Text("إعادة فتح", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                } else {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 4.dp,
+                        shadowElevation = 6.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = replyDraft,
+                                onValueChange = { replyDraft = it },
+                                placeholder = {
+                                    Text(
+                                        "اكتب رسالتك إلى $displayUserName...",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                },
+                                enabled = canReply,
+                                minLines = 1,
+                                maxLines = 3,
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp)
+                                    .testTag("ctrl_support_reply_input_${ticket.id}")
+                            )
+                            IconButton(
+                                onClick = {
+                                    val txt = replyDraft.trim()
+                                    if (txt.isNotEmpty()) {
+                                        onSendReply(txt)
+                                        replyDraft = ""
+                                    }
+                                },
+                                enabled = canReply && replyDraft.trim().isNotEmpty(),
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .minimumInteractiveComponentSize()
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (canReply && replyDraft.trim().isNotEmpty()) EmeraldPrimary
+                                        else MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                    .testTag("ctrl_support_send_reply_${ticket.id}")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "إرسال الرد",
+                                    tint = if (canReply && replyDraft.trim().isNotEmpty()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
                         }
                     }
                 }

@@ -286,6 +286,7 @@ private fun ControlAppRoot(
                     onSendReply = { text -> viewModel.replyToSupportTicket(openSupportTicket.id, text) },
                     onMarkInReview = { viewModel.updateSupportTicketStatus(openSupportTicket.id, SupportTicketStatus.IN_REVIEW) },
                     onCloseTicket = { viewModel.updateSupportTicketStatus(openSupportTicket.id, SupportTicketStatus.CLOSED) },
+                    onReopenTicket = { viewModel.updateSupportTicketStatus(openSupportTicket.id, SupportTicketStatus.IN_REVIEW) },
                     onDismiss = { openSupportTicketId = null }
                 )
             }

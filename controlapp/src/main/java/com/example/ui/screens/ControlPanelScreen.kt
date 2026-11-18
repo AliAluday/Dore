@@ -70,6 +70,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -78,6 +79,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -142,6 +144,7 @@ fun ControlPanelScreen(
     var broadcastInput by remember(ctrl.broadcastMessage) { mutableStateOf(ctrl.broadcastMessage) }
     var showAddVenueDialog by remember { mutableStateOf(false) }
     var showFactoryResetConfirm by remember { mutableStateOf(false) }
+    var deletingVenue by remember { mutableStateOf<VenueEntity?>(null) }
     var featuresSubTab by remember { mutableIntStateOf(0) }
     var venueSearchQuery by remember { mutableStateOf("") }
     var venueFilterCategory by remember { mutableStateOf(ServiceCategory.ALL) }
@@ -410,7 +413,8 @@ fun ControlPanelScreen(
                             Card(
                                 shape = RoundedCornerShape(15.dp),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                modifier = Modifier.alpha(if (canManageFeatures) 1f else 0.65f)
                             ) {
                                 Column(
                                     modifier = Modifier.padding(11.dp),
@@ -780,10 +784,17 @@ fun ControlPanelScreen(
                             ControlVenueCard(
                                 venue = venue,
                                 linkedProviders = providersByVenue[venue.id].orEmpty(),
+                                canManageVenues = canManageVenues,
                                 onToggleOpen = { onToggleVenueOpen(venue.id) },
                                 onAdjustPrice = { delta -> onAdjustVenuePrice(venue.id, delta) },
                                 onAdjustWait = { delta -> onAdjustVenueWait(venue.id, delta) },
-                                onDelete = { onDeleteVenue(venue.id) }
+                                onDelete = {
+                                    if (canManageVenues) {
+                                        deletingVenue = venue
+                                    } else {
+                                        onDeleteVenue(venue.id)
+                                    }
+                                }
                             )
                         }
                     }
@@ -829,6 +840,32 @@ fun ControlPanelScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showFactoryResetConfirm = false }) {
+                    Text("تراجع")
+                }
+            }
+        )
+    }
+
+    deletingVenue?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deletingVenue = null },
+            title = { Text("تأكيد حذف المركز") },
+            text = {
+                Text("هل أنت متأكد من حذف «${target.name}»؟ سيتم إلغاء أي حجوزات نشطة مرتبطة به وتعطيل حسابات المزودين التابعة له.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteVenue(target.id)
+                        deletingVenue = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatusUrgent)
+                ) {
+                    Text("حذف المركز")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingVenue = null }) {
                     Text("تراجع")
                 }
             }
@@ -909,6 +946,7 @@ private fun PermissionLockedBanner(
 private fun ControlVenueCard(
     venue: VenueEntity,
     linkedProviders: List<ServiceProviderEntity>,
+    canManageVenues: Boolean,
     onToggleOpen: () -> Unit,
     onAdjustPrice: (Int) -> Unit,
     onAdjustWait: (Int) -> Unit,
@@ -922,7 +960,9 @@ private fun ControlVenueCard(
             else StatusUrgent.copy(alpha = 0.45f)
         ),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (canManageVenues) 1f else 0.65f)
     ) {
         Column(
             modifier = Modifier.padding(10.dp),
@@ -966,14 +1006,15 @@ private fun ControlVenueCard(
                     IconButton(
                         onClick = onDelete,
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(36.dp)
+                            .minimumInteractiveComponentSize()
                             .testTag("ctrl_venue_delete_${venue.id}")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "حذف المركز",
                             tint = StatusUrgent,
-                            modifier = Modifier.size(17.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -989,8 +1030,13 @@ private fun ControlVenueCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { onAdjustPrice(-5000) }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Remove, contentDescription = "إنقاص السعر", modifier = Modifier.size(15.dp))
+                    IconButton(
+                        onClick = { onAdjustPrice(-5000) },
+                        modifier = Modifier
+                            .size(34.dp)
+                            .minimumInteractiveComponentSize()
+                    ) {
+                        Icon(Icons.Default.Remove, contentDescription = "إنقاص السعر", modifier = Modifier.size(16.dp))
                     }
                     Text(
                         text = IntentHelpers.formatDinar(venue.priceDinar),
@@ -998,22 +1044,37 @@ private fun ControlVenueCard(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    IconButton(onClick = { onAdjustPrice(5000) }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Add, contentDescription = "زيادة السعر", modifier = Modifier.size(15.dp))
+                    IconButton(
+                        onClick = { onAdjustPrice(5000) },
+                        modifier = Modifier
+                            .size(34.dp)
+                            .minimumInteractiveComponentSize()
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "زيادة السعر", modifier = Modifier.size(16.dp))
                     }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { onAdjustWait(-2) }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Remove, contentDescription = "تقليل وقت الانتظار", modifier = Modifier.size(15.dp))
+                    IconButton(
+                        onClick = { onAdjustWait(-2) },
+                        modifier = Modifier
+                            .size(34.dp)
+                            .minimumInteractiveComponentSize()
+                    ) {
+                        Icon(Icons.Default.Remove, contentDescription = "تقليل وقت الانتظار", modifier = Modifier.size(16.dp))
                     }
                     Text(
                         text = "${venue.avgMinutesPerPerson} د/دور",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold
                     )
-                    IconButton(onClick = { onAdjustWait(2) }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Add, contentDescription = "زيادة وقت الانتظار", modifier = Modifier.size(15.dp))
+                    IconButton(
+                        onClick = { onAdjustWait(2) },
+                        modifier = Modifier
+                            .size(34.dp)
+                            .minimumInteractiveComponentSize()
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "زيادة وقت الانتظار", modifier = Modifier.size(16.dp))
                     }
                 }
             }

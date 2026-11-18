@@ -198,11 +198,19 @@ class UserBridgeProvider : ContentProvider() {
                 runBlocking {
                     val existing = dao.getSupportTicketByExternalId(externalId)
                     if (existing != null) {
+                        val effectiveStatus = if (existing.status == SupportTicketStatus.CLOSED.name &&
+                            (incomingStatus == SupportTicketStatus.SENT.name || incomingStatus == SupportTicketStatus.DELIVERED.name) &&
+                            updatedAt <= existing.updatedAt
+                        ) {
+                            existing.status
+                        } else {
+                            incomingStatus
+                        }
                         shouldNotifyReply = adminReply.isNotBlank() &&
                             (adminReply != existing.adminReply || updatedAt > existing.updatedAt)
                         dao.updateSupportTicket(
                             existing.copy(
-                                status = incomingStatus,
+                                status = effectiveStatus,
                                 requestType = reqType.ifBlank { existing.requestType },
                                 relatedVenueName = venueName.ifBlank { existing.relatedVenueName },
                                 adminReply = adminReply.ifBlank { existing.adminReply },

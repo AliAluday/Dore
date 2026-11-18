@@ -19,6 +19,7 @@ import com.example.data.local.SupportMessageEntity
 import com.example.data.local.SupportTicketEntity
 import com.example.data.local.UserPreferencesDataStore
 import com.example.data.model.BookingApprovalStatus
+import com.example.data.model.BookingStatus
 import com.example.data.model.QueueItemStatus
 import com.example.data.model.SupportRequestType
 import com.example.data.model.SupportTicketStatus
@@ -322,14 +323,17 @@ class ControlBridgeProvider : ContentProvider() {
                 runBlocking {
                     val existing = dao.getSupportTicketByExternalId(externalId)
                     if (existing != null) {
-                        val nextStatus = if (incomingStatus == SupportTicketStatus.SENT.name ||
+                        val isStaleBasicStatus = incomingStatus == SupportTicketStatus.SENT.name ||
                             incomingStatus == SupportTicketStatus.DELIVERED.name
-                        ) {
-                            SupportTicketStatus.DELIVERED.name
-                        } else {
-                            incomingStatus.ifBlank { existing.status }
+                        val nextStatus = when {
+                            existing.status == SupportTicketStatus.CLOSED.name && now <= existing.updatedAt ->
+                                SupportTicketStatus.CLOSED.name
+                            (existing.status == SupportTicketStatus.REPLIED.name || existing.status == SupportTicketStatus.CLOSED.name) &&
+                                isStaleBasicStatus && now <= existing.updatedAt -> existing.status
+                            isStaleBasicStatus -> SupportTicketStatus.DELIVERED.name
+                            else -> incomingStatus.ifBlank { existing.status }
                         }
-                        shouldNotify = now > existing.updatedAt
+                        shouldNotify = now > existing.updatedAt && existing.status != SupportTicketStatus.CLOSED.name
                         dao.updateSupportTicket(
                             existing.copy(
                                 senderName = senderName,
@@ -441,9 +445,14 @@ class ControlBridgeProvider : ContentProvider() {
                 val selectedOption = v.getAsString(BookingCols.SELECTED_OPTION).orEmpty()
                 val peopleAhead = v.getAsInteger(BookingCols.PEOPLE_AHEAD) ?: 0
 
+                val incomingBookingStatus = v.getAsString(BookingCols.STATUS).orEmpty()
+                var notifyNewBooking = false
+
                 runBlocking {
                     val existing = dao.getBookingByTicketCode(ticketCode)
                     if (existing == null) {
+                        notifyNewBooking = incomingBookingStatus.isBlank() ||
+                            incomingBookingStatus == BookingStatus.ACTIVE.name
                         val bId = dao.insertBooking(
                             BookingEntity(
                                 ticketCode = ticketCode,
@@ -459,7 +468,7 @@ class ControlBridgeProvider : ContentProvider() {
                                 notes = v.getAsString(BookingCols.NOTES).orEmpty(),
                                 optionalInfo = v.getAsString(BookingCols.OPTIONAL_INFO).orEmpty(),
                                 priceDinar = v.getAsInteger(BookingCols.PRICE_DINAR) ?: 0,
-                                status = v.getAsString(BookingCols.STATUS).orEmpty(),
+                                status = incomingBookingStatus.ifBlank { BookingStatus.ACTIVE.name },
                                 stage = v.getAsString(BookingCols.STAGE).orEmpty(),
                                 approvalStatus = v.getAsString(BookingCols.APPROVAL_STATUS).orEmpty()
                                     .ifBlank { BookingApprovalStatus.PENDING.name },
@@ -478,7 +487,11 @@ class ControlBridgeProvider : ContentProvider() {
                                 customerName = customerName,
                                 customerPhone = customerPhone,
                                 selectedOption = selectedOption,
-                                status = if (peopleAhead == 0) QueueItemStatus.SERVING.name else QueueItemStatus.WAITING.name,
+                                status = when (incomingBookingStatus) {
+                                    BookingStatus.COMPLETED.name -> QueueItemStatus.DONE.name
+                                    BookingStatus.CANCELLED.name -> QueueItemStatus.SKIPPED.name
+                                    else -> if (peopleAhead == 0) QueueItemStatus.SERVING.name else QueueItemStatus.WAITING.name
+                                },
                                 bookingId = bId
                             )
                         )
@@ -486,8 +499,8 @@ class ControlBridgeProvider : ContentProvider() {
                             dao.updateVenue(
                                 venue.copy(
                                     nextTicketNumber = maxOf(venue.nextTicketNumber, queueNumber + 1),
-                                    waitingCount = if (peopleAhead > 0) venue.waitingCount + 1 else venue.waitingCount,
-                                    currentServingNumber = if (peopleAhead == 0 && venue.currentServingNumber == 0) {
+                                    waitingCount = if (notifyNewBooking && peopleAhead > 0) venue.waitingCount + 1 else venue.waitingCount,
+                                    currentServingNumber = if (notifyNewBooking && peopleAhead == 0 && venue.currentServingNumber == 0) {
                                         queueNumber
                                     } else {
                                         venue.currentServingNumber
@@ -495,14 +508,46 @@ class ControlBridgeProvider : ContentProvider() {
                                 )
                             )
                         }
+                    } else if (existing.status == BookingStatus.ACTIVE.name &&
+                        (incomingBookingStatus == BookingStatus.CANCELLED.name ||
+                            incomingBookingStatus == BookingStatus.COMPLETED.name)
+                    ) {
+                        dao.updateBooking(
+                            existing.copy(
+                                status = incomingBookingStatus,
+                                completedAt = existing.completedAt ?: System.currentTimeMillis()
+                            )
+                        )
+                        val qItems = dao.getQueueItemsForVenueOnce(existing.venueId)
+                        qItems.find { it.bookingId == existing.id || it.ticketCode == existing.ticketCode }?.let { item ->
+                            val nextItemStatus = if (incomingBookingStatus == BookingStatus.COMPLETED.name) {
+                                QueueItemStatus.DONE.name
+                            } else {
+                                QueueItemStatus.SKIPPED.name
+                            }
+                            dao.updateQueueItem(item.copy(status = nextItemStatus))
+                        }
+                        val refreshedItems = dao.getQueueItemsForVenueOnce(existing.venueId)
+                        val waitingCount = refreshedItems.count { it.status == QueueItemStatus.WAITING.name }
+                        val servingNum = refreshedItems.firstOrNull { it.status == QueueItemStatus.SERVING.name }?.ticketNumber ?: 0
+                        dao.getVenueById(existing.venueId)?.let { venue ->
+                            dao.updateVenue(
+                                venue.copy(
+                                    waitingCount = waitingCount,
+                                    currentServingNumber = servingNum
+                                )
+                            )
+                        }
                     }
                 }
-                DoriNotificationHelper.showSupportMessageNotification(
-                    context = ctx,
-                    title = "🎫 حجز وارد جديد ($ticketCode)",
-                    body = "$customerName — بانتظار قبول مقدم الخدمة",
-                    idSeed = kotlin.math.abs(ticketCode.hashCode() % 3000) + 5000
-                )
+                if (notifyNewBooking) {
+                    DoriNotificationHelper.showSupportMessageNotification(
+                        context = ctx,
+                        title = "🎫 حجز وارد جديد ($ticketCode)",
+                        body = "$customerName — بانتظار قبول مقدم الخدمة",
+                        idSeed = kotlin.math.abs(ticketCode.hashCode() % 3000) + 5000
+                    )
+                }
                 Uri.withAppendedPath(DoriBridgeContract.CONTROL_BOOKINGS_URI, ticketCode)
             }
 

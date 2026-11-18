@@ -166,20 +166,20 @@ fun TicketsScreen(
                         ?: state.activeBookings.first()
 
                     LazyColumn(
-                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 80.dp),
-                        verticalArrangement = Arrangement.spacedBy(9.dp)
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 80.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (!hasNotificationPermission) {
                             item {
                                 Surface(
-                                    shape = RoundedCornerShape(13.dp),
+                                    shape = RoundedCornerShape(11.dp),
                                     color = MaterialTheme.colorScheme.secondaryContainer,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                            .padding(horizontal = 10.dp, vertical = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
@@ -190,20 +190,24 @@ fun TicketsScreen(
                                             Icon(
                                                 imageVector = Icons.Default.NotificationsActive,
                                                 contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                modifier = Modifier.size(16.dp)
                                             )
-                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = "فعّل إذن الإشعارات لتنبيهك عند اقتراب وحلول دورك",
-                                                style = MaterialTheme.typography.bodySmall,
+                                                text = "فعّل الإشعارات لتنبيهك عند حلول دورك",
+                                                style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSecondaryContainer
                                             )
                                         }
                                         TextButton(
                                             onClick = onRequestNotificationPermission,
-                                            modifier = Modifier.testTag("tickets_enable_notifications_button")
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                            modifier = Modifier
+                                                .height(30.dp)
+                                                .testTag("tickets_enable_notifications_button")
                                         ) {
-                                            Text("تفعيل", fontWeight = FontWeight.Bold)
+                                            Text("تفعيل", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
@@ -212,21 +216,22 @@ fun TicketsScreen(
 
                         if (state.activeBookings.size > 1) {
                             item {
-                                Text(
-                                    text = "حجوزاتك النشطة (${state.activeBookings.size}) — تنقّل بسهولة:",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
                                 LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     items(state.activeBookings, key = { it.id }) { item ->
                                         FilterChip(
                                             selected = item.id == selectedBooking.id,
                                             onClick = { onSelectActiveBooking(item.id) },
-                                            label = { Text("#${item.queueNumber} • ${item.venueName}") },
-                                            modifier = Modifier.testTag("multi_booking_chip_${item.id}")
+                                            label = {
+                                                Text(
+                                                    "#${item.queueNumber} • ${item.venueName}",
+                                                    style = MaterialTheme.typography.labelSmall
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .height(30.dp)
+                                                .testTag("multi_booking_chip_${item.id}")
                                         )
                                     }
                                 }
@@ -253,54 +258,36 @@ fun TicketsScreen(
                         }
 
                         item {
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
-                                modifier = Modifier.fillMaxWidth()
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                OutlinedButton(
+                                    onClick = onSyncBridge,
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(36.dp)
+                                        .testTag("tickets_sync_approval_button")
                                 ) {
-                                    Text(
-                                        text = "التحديث والمساعدة",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        OutlinedButton(
-                                            onClick = onSyncBridge,
-                                            shape = RoundedCornerShape(10.dp),
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(36.dp)
-                                                .testTag("tickets_sync_approval_button")
-                                        ) {
-                                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("تحديث الحالة", style = MaterialTheme.typography.labelSmall)
-                                        }
-                                        Button(
-                                            onClick = onOpenSupport,
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                                            shape = RoundedCornerShape(10.dp),
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(36.dp)
-                                                .testTag("tickets_support_button")
-                                        ) {
-                                            Icon(Icons.Default.SupportAgent, contentDescription = null, modifier = Modifier.size(15.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("الدعم الفني", style = MaterialTheme.typography.labelSmall)
-                                        }
-                                    }
+                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("تحديث الحالة", style = MaterialTheme.typography.labelSmall)
+                                }
+                                Button(
+                                    onClick = onOpenSupport,
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(36.dp)
+                                        .testTag("tickets_support_button")
+                                ) {
+                                    Icon(Icons.Default.SupportAgent, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("الدعم الفني", style = MaterialTheme.typography.labelSmall)
                                 }
                             }
                         }
@@ -367,7 +354,7 @@ fun TicketsScreen(
                 Column(
                     modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         text = b.venueName,
@@ -375,14 +362,19 @@ fun TicketsScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "رمز التذكرة: ${b.ticketCode}",
+                        text = "#${b.queueNumber} • ${b.ticketCode}",
                         style = MaterialTheme.typography.titleMedium,
                         color = EmeraldPrimary,
                         fontWeight = FontWeight.Bold
                     )
+                    Text(
+                        text = "${b.customerName} • ${b.selectedOption}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     QrCodeCanvas(
                         payload = com.example.util.QrCodeGenerator.buildTicketPayload(b),
-                        modifier = Modifier.size(200.dp)
+                        modifier = Modifier.size(190.dp)
                     )
                     Text(
                         text = "اعرض هذا الرمز لموظف الاستقبال لمسح الدور",
@@ -393,7 +385,7 @@ fun TicketsScreen(
                         onClick = { zoomedBooking = null },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(40.dp)
+                            .height(38.dp)
                     ) {
                         Text("إغلاق")
                     }

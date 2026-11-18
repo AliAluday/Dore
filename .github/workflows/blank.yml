@@ -76,29 +76,27 @@ jobs:
       - name: Build User Debug APK (:app)
         shell: bash
         env:
-          GRADLE_OPTS: "-Xmx512m -Dfile.encoding=UTF-8"
+          GRADLE_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
         run: |
           set -o pipefail
           ./gradlew :app:assembleDebug \
-            --no-daemon \
             --no-parallel \
             --no-configuration-cache \
             --max-workers=1 \
-            -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" \
+            --console=plain \
             --stacktrace 2>&1 | tee gradle-build.log
 
       - name: Build Control Debug APK (:controlapp)
         shell: bash
         env:
-          GRADLE_OPTS: "-Xmx512m -Dfile.encoding=UTF-8"
+          GRADLE_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
         run: |
           set -o pipefail
           ./gradlew :controlapp:assembleDebug \
-            --no-daemon \
             --no-parallel \
             --no-configuration-cache \
             --max-workers=1 \
-            -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" \
+            --console=plain \
             --stacktrace 2>&1 | tee -a gradle-build.log
 
       - name: Print Gradle failure details

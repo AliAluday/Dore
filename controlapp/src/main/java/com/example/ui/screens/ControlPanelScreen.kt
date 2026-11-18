@@ -26,20 +26,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RestartAlt
@@ -102,9 +100,6 @@ import com.example.util.IntentHelpers
 fun ControlPanelScreen(
     state: DoriUiState,
     activeTab: AppTab,
-    signedInName: String?,
-    signedInEmail: String?,
-    onSignOut: () -> Unit,
     onUpdateControlConfig: ((UserAppControlConfig) -> UserAppControlConfig) -> Unit,
     onToggleCategoryEnabled: (ServiceCategory) -> Unit,
     onSetBroadcastMessage: (String) -> Unit,
@@ -187,7 +182,7 @@ fun ControlPanelScreen(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "مزامنة سحابية مباشرة • ${state.allVenues.size} مركز • ${state.activeBookings.size} تذكرة نشطة",
+                                        text = "وضع تجريبي محلي • ${state.allVenues.size} مركز • ${state.activeBookings.size} تذكرة نشطة",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color.White.copy(alpha = 0.85f)
                                     )
@@ -208,33 +203,6 @@ fun ControlPanelScreen(
                             }
                         }
                     }
-
-                    state.cloudSyncError?.let { syncErr ->
-                        Surface(
-                            color = StatusUrgent.copy(alpha = 0.14f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ErrorOutline,
-                                    contentDescription = null,
-                                    tint = StatusUrgent,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = syncErr,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = StatusUrgent,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
                 }
             }
 
@@ -244,7 +212,7 @@ fun ControlPanelScreen(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Cloud Sync Account Card
+                        // Local Trial Status Card
                         item {
                             Card(
                                 shape = RoundedCornerShape(18.dp),
@@ -264,39 +232,38 @@ fun ControlPanelScreen(
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.CloudDone,
+                                            imageVector = Icons.Default.PhoneAndroid,
                                             contentDescription = null,
                                             tint = EmeraldPrimary,
                                             modifier = Modifier.size(22.dp)
                                         )
                                         Column {
                                             Text(
-                                                text = signedInName?.takeIf { it.isNotBlank() } ?: "حساب التحكم السحابي",
+                                                text = "نسخة تجريبية محلية • بدون تسجيل دخول",
                                                 style = MaterialTheme.typography.titleSmall,
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Text(
-                                                text = signedInEmail?.takeIf { it.isNotBlank() } ?: "متصل بالمزامنة الفورية مع تطبيق المستخدم",
+                                                text = "تدير بيانات نينوى محلياً على الجهاز عبر قاعدة Room",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                maxLines = 1,
+                                                maxLines = 2,
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                         }
                                     }
-                                    OutlinedButton(
-                                        onClick = onSignOut,
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Surface(
                                         shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier.testTag("control_sign_out_button")
+                                        color = EmeraldPrimary.copy(alpha = 0.14f)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.Logout,
-                                            contentDescription = "تسجيل الخروج",
-                                            modifier = Modifier.size(16.dp)
+                                        Text(
+                                            text = "تجريبي",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = EmeraldPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("خروج", style = MaterialTheme.typography.labelMedium)
                                     }
                                 }
                             }

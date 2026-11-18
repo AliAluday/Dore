@@ -20,13 +20,9 @@ import com.example.data.model.SortOption
 import com.example.data.model.TicketStage
 import com.example.data.model.UserAppControlConfig
 import com.example.data.model.UserProfileSettings
-import com.example.data.remote.DoriCloudSyncRepository
 import com.example.data.repository.DoriRepository
 import com.example.util.AlertNotifier
 import com.example.util.DoriNotificationHelper
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreException
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -34,8 +30,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -89,8 +83,7 @@ data class DoriUiState(
     val activeTurnAlert: LiveTurnAlert? = null,
     val selectedVenueForDetails: VenueEntity? = null,
     val bookingSessionId: Long = 0L,
-    val newlyBookedTicket: BookingEntity? = null,
-    val cloudSyncError: String? = null
+    val newlyBookedTicket: BookingEntity? = null
 )
 
 private data class FilterState(
@@ -107,21 +100,17 @@ private data class FilterState(
     val activeTurnAlert: LiveTurnAlert? = null,
     val selectedVenueIdForDetails: Int? = null,
     val bookingSessionId: Long = 0L,
-    val newlyBookedTicket: BookingEntity? = null,
-    val cloudSyncError: String? = null
+    val newlyBookedTicket: BookingEntity? = null
 )
 
 class DoriViewModel(
     application: Application,
-    private val appMode: DoriAppMode = DoriAppMode.USER_APP,
-    firestore: FirebaseFirestore? = null,
-    private val enableCloudSync: Boolean = firestore != null
+    private val appMode: DoriAppMode = DoriAppMode.USER_APP
 ) : AndroidViewModel(application) {
 
     private val database = DoriDatabase.getInstance(application)
     private val prefs = UserPreferencesDataStore(application)
-    private val cloudSync = firestore?.let { DoriCloudSyncRepository(it) }
-    private val repository = DoriRepository(database.doriDao(), prefs, cloudSync)
+    private val repository = DoriRepository(database.doriDao(), prefs)
 
     private val initialTab = if (appMode == DoriAppMode.CONTROL_APP) {
         AppTab.CONTROL_FEATURES
@@ -134,90 +123,14 @@ class DoriViewModel(
     val toastMessage = _toastMessage.asSharedFlow()
 
     private var simulationJob: Job? = null
-    private var cloudSyncJobs: List<Job> = emptyList()
 
     init {
         viewModelScope.launch {
             repository.ensureSeeded()
-            if (enableCloudSync && cloudSync != null) {
-                repository.bootstrapInitialCloudIfEmpty()
-                startCloudSyncListeners()
-            }
         }
-    }
-
-    private fun startCloudSyncListeners() {
-        stopCloudSyncListeners()
-        val jobs = mutableListOf<Job>()
-
-        repository.observeRemoteConfig()?.let { flow ->
-            jobs += viewModelScope.launch {
-                flow.catch { error -> handleCloudFlowError(error) }
-                    .collect { remoteSettings ->
-                        if (remoteSettings != null) {
-                            repository.applyRemoteConfig(remoteSettings)
-                        }
-                    }
-            }
-        }
-
-        repository.observeRemoteVenues()?.let { flow ->
-            jobs += viewModelScope.launch {
-                flow.catch { error -> handleCloudFlowError(error) }
-                    .collect { remoteVenues ->
-                        repository.applyRemoteVenues(remoteVenues)
-                    }
-            }
-        }
-
-        repository.observeRemoteBookings()?.let { flow ->
-            jobs += viewModelScope.launch {
-                flow.catch { error -> handleCloudFlowError(error) }
-                    .collect { remoteBookings ->
-                        repository.applyRemoteBookings(remoteBookings)
-                    }
-            }
-        }
-
-        repository.observeRemoteQueueItems()?.let { flow ->
-            jobs += viewModelScope.launch {
-                flow.catch { error -> handleCloudFlowError(error) }
-                    .collect { remoteItems ->
-                        repository.applyRemoteQueueItems(remoteItems)
-                    }
-            }
-        }
-
-        repository.observeReviewsOrNull()?.let { flow ->
-            jobs += viewModelScope.launch {
-                flow.catch { error -> handleCloudFlowError(error) }
-                    .collect { remoteReviews ->
-                        repository.applyRemoteReviews(remoteReviews)
-                    }
-            }
-        }
-
-        cloudSyncJobs = jobs
-    }
-
-    private fun DoriRepository.observeReviewsOrNull() = observeRemoteReviews()
-
-    private fun handleCloudFlowError(error: Throwable) {
-        val firestoreError = generateSequence(error) { it.cause }
-            .filterIsInstance<FirebaseFirestoreException>()
-            .firstOrNull()
-        if (firestoreError == null && error is CancellationException) throw error
-        val message = (firestoreError ?: error).localizedMessage ?: "تعذرت المزامنة مع السحابة"
-        filterState.update { it.copy(cloudSyncError = message) }
-    }
-
-    fun stopCloudSyncListeners() {
-        cloudSyncJobs.forEach { it.cancel() }
-        cloudSyncJobs = emptyList()
     }
 
     override fun onCleared() {
-        stopCloudSyncListeners()
         simulationJob?.cancel()
         super.onCleared()
     }
@@ -337,8 +250,7 @@ class DoriViewModel(
             activeTurnAlert = filters.activeTurnAlert,
             selectedVenueForDetails = detailVenue,
             bookingSessionId = filters.bookingSessionId,
-            newlyBookedTicket = filters.newlyBookedTicket,
-            cloudSyncError = filters.cloudSyncError
+            newlyBookedTicket = filters.newlyBookedTicket
         )
     }.stateIn(
         scope = viewModelScope,
@@ -793,17 +705,14 @@ class DoriViewModel(
 
 class DoriViewModelFactory(
     private val application: Application,
-    private val appMode: DoriAppMode,
-    private val firestore: FirebaseFirestore?
+    private val appMode: DoriAppMode
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(DoriViewModel::class.java)) {
             return DoriViewModel(
                 application = application,
-                appMode = appMode,
-                firestore = firestore,
-                enableCloudSync = firestore != null
+                appMode = appMode
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

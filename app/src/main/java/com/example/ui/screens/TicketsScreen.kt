@@ -264,7 +264,7 @@ fun TicketsScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Text(
-                                        text = "المزامنة والمساعدة",
+                                        text = "التحديث والمساعدة",
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontWeight = FontWeight.Bold
@@ -282,7 +282,7 @@ fun TicketsScreen(
                                         ) {
                                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
-                                            Text("تحديث القبول", style = MaterialTheme.typography.labelMedium)
+                                            Text("تحديث الحالة", style = MaterialTheme.typography.labelMedium)
                                         }
                                         Button(
                                             onClick = onOpenSupport,

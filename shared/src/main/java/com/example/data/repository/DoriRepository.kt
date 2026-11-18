@@ -109,7 +109,7 @@ class DoriRepository(
         val currentPrefs = prefs.userPreferences.first()
         val ctrl = currentPrefs.controlConfig
         if (!ctrl.allowNewBookings) {
-            return Result.failure(IllegalStateException("تم إيقاف الحجوزات مؤقتاً من لوحة التحكم"))
+            return Result.failure(IllegalStateException("الحجوزات متوقفة مؤقتاً حالياً"))
         }
 
         val cleanName = customerName.trim()
@@ -613,7 +613,7 @@ class DoriRepository(
             whatsapp = cleanPhone,
             latitude = 36.3489,
             longitude = 43.1577,
-            description = "مركز مضاف عبر لوحة التحكم في ${district.displayName}",
+            description = "مركز خدمة معتمد في ${district.displayName} • حجز بنفس اليوم",
             customOptionsCsv = defaultOptions,
             isOpen = true,
             isAcceptingBookings = true,

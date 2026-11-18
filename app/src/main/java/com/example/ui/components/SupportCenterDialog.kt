@@ -25,7 +25,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MarkChatRead
@@ -164,7 +163,7 @@ fun SupportCenterSheet(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "تصل رسالتك فوراً إلى تطبيق دوري تحكم",
+                                text = "تواصل مباشر مع فريق خدمة العملاء",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.White.copy(alpha = 0.85f)
                             )
@@ -291,7 +290,7 @@ fun SupportCenterSheet(
                     validationError = null
                 },
                 label = { Text("تفاصيل رسالتك *") },
-                placeholder = { Text("اكتب مشكلتك أو سؤالك ليصل للإدارة...") },
+                placeholder = { Text("اكتب مشكلتك أو سؤالك هنا...") },
                 minLines = 3,
                 maxLines = 5,
                 isError = validationError != null,
@@ -328,7 +327,7 @@ fun SupportCenterSheet(
             ) {
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("إرسال الرسالة إلى الإدارة", fontWeight = FontWeight.Bold)
+                Text("إرسال إلى الدعم الفني", fontWeight = FontWeight.Bold)
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
@@ -362,7 +361,7 @@ fun SupportCenterSheet(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "لم ترسل أي رسائل دعم فني بعد — أرسل رسالتك بالأعلى وسيرد عليك فريق دوري تحكم.",
+                        text = "لم ترسل أي رسائل دعم فني بعد — أرسل رسالتك بالأعلى وسيرد عليك فريق الدعم.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(14.dp)
@@ -440,7 +439,7 @@ private fun SupportHistoryCard(ticket: SupportTicketEntity) {
                     ) {
                         Icon(statusIcon, contentDescription = null, tint = statusColor, modifier = Modifier.size(13.dp))
                         Text(
-                            text = if (ticket.syncedToControl && statusEnum == SupportTicketStatus.SENT) "وصلت للتحكم" else statusEnum.label,
+                            text = if (ticket.syncedToControl && statusEnum == SupportTicketStatus.SENT) "تم الاستلام" else statusEnum.label,
                             style = MaterialTheme.typography.labelSmall,
                             color = statusColor,
                             fontWeight = FontWeight.Bold
@@ -474,14 +473,14 @@ private fun SupportHistoryCard(ticket: SupportTicketEntity) {
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = Icons.Default.AdminPanelSettings,
+                                imageVector = Icons.Default.SupportAgent,
                                 contentDescription = null,
                                 tint = StatusOpen,
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "رد الإدارة (${ticket.repliedByAdmin.ifBlank { "الدعم الفني" }}):",
+                                text = "رد الدعم الفني (${ticket.repliedByAdmin.ifBlank { "فريق الخدمة" }}):",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = StatusOpen,
                                 fontWeight = FontWeight.Bold

@@ -594,7 +594,7 @@ fun VenueDetailsSheet(
             ) {
                 Text(
                     text = if (!controlConfig.allowNewBookings) {
-                        "الحجز متوقف من لوحة التحكم"
+                        "الحجز متوقف مؤقتاً"
                     } else if (!venue.isOpen || !venue.isAcceptingBookings) {
                         "الاستقبال متوقف مؤقتاً"
                     } else if (isField) {

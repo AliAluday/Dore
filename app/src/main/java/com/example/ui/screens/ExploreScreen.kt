@@ -149,7 +149,7 @@ fun ExploreScreen(
                             )
                             Text(
                                 text = if (!ctrl.allowNewBookings) {
-                                    "الحجوزات متوقفة مؤقتاً من لوحة التحكم"
+                                    "الحجوزات متوقفة مؤقتاً حالياً"
                                 } else {
                                     ctrl.broadcastMessage
                                 },

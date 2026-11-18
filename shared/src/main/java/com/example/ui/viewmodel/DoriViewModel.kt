@@ -455,7 +455,7 @@ class DoriViewModel(
         }
         if (!silent) {
             _toastMessage.emit(
-                if (changedCount > 0) "تمت المزامنة بنجاح ($changedCount تحديث جديد)"
+                if (changedCount > 0) "تم تحديث البيانات ($changedCount تحديث جديد)"
                 else "البيانات محدّثة بالفعل"
             )
         }
@@ -533,7 +533,7 @@ class DoriViewModel(
     fun quickBookVenue(venue: VenueEntity) {
         viewModelScope.launch {
             if (!uiState.value.preferences.controlConfig.allowNewBookings) {
-                _toastMessage.emit("تم إيقاف الحجوزات مؤقتاً من لوحة التحكم")
+                _toastMessage.emit("الحجوزات متوقفة مؤقتاً حالياً")
                 return@launch
             }
             if (!venue.isOpen || !venue.isAcceptingBookings) {
@@ -590,7 +590,7 @@ class DoriViewModel(
         viewModelScope.launch {
             val ctrl = uiState.value.preferences.controlConfig
             if (!ctrl.allowNewBookings) {
-                _toastMessage.emit("تم إيقاف الحجوزات مؤقتاً من لوحة التحكم")
+                _toastMessage.emit("الحجوزات متوقفة مؤقتاً حالياً")
                 return@launch
             }
             val district = uiState.value.preferences.selectedDistrict
@@ -667,9 +667,9 @@ class DoriViewModel(
                 }
                 if (pushed) {
                     repository.markSupportTicketDelivered(ticket.id)
-                    _toastMessage.emit("تم إرسال رسالتك إلى تطبيق دوري تحكم بنجاح ✓")
+                    _toastMessage.emit("تم إرسال رسالتك إلى الدعم الفني بنجاح ✓")
                 } else {
-                    _toastMessage.emit("تم حفظ الرسالة محلياً — ستصل فور فتح دوري تحكم")
+                    _toastMessage.emit("تم تسجيل رسالتك بنجاح — ستصلك الإجابة في سجل الدعم ✓")
                 }
             }.onFailure { err ->
                 _toastMessage.emit(err.message ?: "تعذر إرسال رسالة الدعم")
@@ -681,7 +681,7 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.REPLY_SUPPORT)) return@launch
             val admin = uiState.value.activeAdmin
-            val adminLabel = if (admin != null) "${admin.name} (${admin.roleTitle})" else "إدارة الدعم الفني"
+            val adminLabel = admin?.name?.takeIf { it.isNotBlank() } ?: "فريق الدعم الفني"
             repository.replyToSupportTicket(ticketId, replyText, adminLabel)
                 .onSuccess { updated ->
                     val pushed = withContext(Dispatchers.IO) {
@@ -878,7 +878,7 @@ class DoriViewModel(
             }
             val actorName = prov?.let { "${it.name} (${it.customTitle})" }
                 ?: uiState.value.activeAdmin?.name
-                ?: "إدارة المركز"
+                ?: "استقبال المركز"
             val updated = repository.acceptBookingTicket(
                 bookingId = bookingId,
                 actorName = actorName,
@@ -916,7 +916,7 @@ class DoriViewModel(
             }
             val actorName = prov?.let { "${it.name} (${it.customTitle})" }
                 ?: uiState.value.activeAdmin?.name
-                ?: "إدارة المركز"
+                ?: "استقبال المركز"
             val updated = repository.rejectBookingTicket(
                 bookingId = bookingId,
                 actorName = actorName,

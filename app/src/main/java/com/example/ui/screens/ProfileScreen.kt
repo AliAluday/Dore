@@ -240,7 +240,7 @@ fun ProfileScreen(
                                     }
                                 }
                                 Text(
-                                    text = "أرسل رسالتك مباشرة إلى تطبيق دوري تحكم وتابع الردود",
+                                    text = "أرسل استفسارك مباشرة إلى فريق الدعم وتابع الردود",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

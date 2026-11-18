@@ -213,7 +213,7 @@ enum class SupportCategory(val displayName: String) {
 
 enum class SupportTicketStatus(val label: String) {
     SENT("مرسلة"),
-    DELIVERED("وصلت للتحكم"),
+    DELIVERED("تم الاستلام"),
     IN_REVIEW("قيد المراجعة"),
     REPLIED("تم الرد"),
     CLOSED("مغلقة");

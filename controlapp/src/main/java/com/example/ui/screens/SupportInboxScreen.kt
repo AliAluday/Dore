@@ -34,12 +34,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AdminPanelSettings
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.MarkChatUnread
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ReportProblem
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -85,9 +86,9 @@ import com.example.ui.theme.AmberGold
 import com.example.ui.theme.EmeraldPrimary
 import com.example.ui.theme.IndigoAccentLight
 import com.example.ui.theme.MintPrimaryDark
-import com.example.ui.theme.StatusUrgent
 import com.example.ui.theme.StatusOpen
 import com.example.ui.theme.StatusPaused
+import com.example.ui.theme.StatusUrgent
 import com.example.ui.viewmodel.DoriUiState
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -102,26 +103,40 @@ fun SupportInboxScreen(
     modifier: Modifier = Modifier
 ) {
     var filterIndex by remember { mutableIntStateOf(0) }
+    var searchQuery by remember { mutableStateOf("") }
     var openChatTicketId by remember { mutableStateOf<Long?>(null) }
     val canReply = state.activeAdmin?.hasPermission(AdminPermissionType.REPLY_SUPPORT) ?: true
 
-    val filteredTickets = remember(state.supportTickets, filterIndex) {
-        when (filterIndex) {
-            1 -> state.supportTickets.filter {
-                SupportRequestType.fromName(it.requestType) == SupportRequestType.CHAT
+    val filteredConversations = remember(
+        state.supportTickets,
+        state.supportMessagesByTicket,
+        filterIndex,
+        searchQuery
+    ) {
+        val q = searchQuery.trim()
+        state.supportTickets
+            .sortedByDescending { it.updatedAt }
+            .filter { ticket ->
+                val matchesFilter = when (filterIndex) {
+                    1 -> ticket.status == SupportTicketStatus.SENT.name ||
+                        ticket.status == SupportTicketStatus.DELIVERED.name ||
+                        ticket.status == SupportTicketStatus.IN_REVIEW.name
+                    2 -> SupportRequestType.fromName(ticket.requestType) == SupportRequestType.CHAT
+                    3 -> SupportRequestType.fromName(ticket.requestType) == SupportRequestType.COMPLAINT
+                    4 -> ticket.status == SupportTicketStatus.REPLIED.name
+                    5 -> ticket.status == SupportTicketStatus.CLOSED.name
+                    else -> true
+                }
+                if (!matchesFilter) return@filter false
+                if (q.isEmpty()) return@filter true
+                val latestBody = state.supportMessagesByTicket[ticket.externalId]?.lastOrNull()?.body.orEmpty()
+                ticket.senderName.contains(q, ignoreCase = true) ||
+                    ticket.senderPhone.contains(q, ignoreCase = true) ||
+                    ticket.relatedVenueName.contains(q, ignoreCase = true) ||
+                    ticket.subject.contains(q, ignoreCase = true) ||
+                    ticket.message.contains(q, ignoreCase = true) ||
+                    latestBody.contains(q, ignoreCase = true)
             }
-            2 -> state.supportTickets.filter {
-                SupportRequestType.fromName(it.requestType) == SupportRequestType.COMPLAINT
-            }
-            3 -> state.supportTickets.filter {
-                it.status == SupportTicketStatus.SENT.name ||
-                    it.status == SupportTicketStatus.DELIVERED.name ||
-                    it.status == SupportTicketStatus.IN_REVIEW.name
-            }
-            4 -> state.supportTickets.filter { it.status == SupportTicketStatus.REPLIED.name }
-            5 -> state.supportTickets.filter { it.status == SupportTicketStatus.CLOSED.name }
-            else -> state.supportTickets
-        }
     }
 
     val openChatTicket = openChatTicketId?.let { id -> state.supportTickets.find { it.id == id } }
@@ -137,7 +152,7 @@ fun SupportInboxScreen(
             contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Gradient Support Header
+            // Compact Gradient Conversations Header
             item {
                 Card(
                     shape = RoundedCornerShape(16.dp),
@@ -172,19 +187,21 @@ fun SupportInboxScreen(
                                 )
                                 Column {
                                     Text(
-                                        text = "صندوق الدعم والشكاوى (${state.supportTickets.size})",
+                                        text = "محادثات المستخدمين (${state.supportTickets.size})",
                                         style = MaterialTheme.typography.titleSmall,
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
                                         text = if (state.supportAlertCount > 0) {
-                                            "${state.supportAlertCount} محادثة/شكوى بانتظار الرد"
+                                            "${state.supportAlertCount} محادثة بانتظار الرد — اضغط لفتح الدردشة"
                                         } else {
-                                            "المحادثات المباشرة والشكاوى الواردة من تطبيق دوري"
+                                            "اضغط على اسم أي مستخدم لفتح المحادثة المباشرة"
                                         },
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White.copy(alpha = 0.85f)
+                                        color = Color.White.copy(alpha = 0.85f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -210,9 +227,34 @@ fun SupportInboxScreen(
                 }
             }
 
+            // Compact Search by User Name / Phone
+            item {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("ابحث باسم المستخدم أو رقم الهاتف...", style = MaterialTheme.typography.bodySmall) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { searchQuery = "" },
+                                modifier = Modifier.minimumInteractiveComponentSize()
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "مسح البحث", modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(13.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("ctrl_support_search")
+                )
+            }
+
             // Filter Pills
             item {
-                val filterLabels = listOf("الكل", "محادثات", "شكاوى", "بانتظار الرد", "تم الرد", "مغلقة")
+                val filterLabels = listOf("الكل", "بانتظار الرد", "محادثات", "شكاوى", "تم الرد", "مغلقة")
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(filterLabels.size) { idx ->
                         FilterChip(
@@ -229,7 +271,7 @@ fun SupportInboxScreen(
                 }
             }
 
-            if (filteredTickets.isEmpty()) {
+            if (filteredConversations.isEmpty()) {
                 item {
                     Surface(
                         shape = RoundedCornerShape(18.dp),
@@ -248,12 +290,12 @@ fun SupportInboxScreen(
                                 modifier = Modifier.size(40.dp)
                             )
                             Text(
-                                text = "لا توجد رسائل أو شكاوى في هذا القسم",
+                                text = "لا توجد محادثات مطابقة",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "عندما يرسل المستخدم رسالة أو شكوى من تطبيق دوري ستصل هنا تلقائياً أو عند الضغط على سحب.",
+                                text = "عندما يراسل المستخدم الدعم أو يرسل شكوى سيظهر اسمه هنا لبدء المحادثة المباشرة.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -261,16 +303,12 @@ fun SupportInboxScreen(
                     }
                 }
             } else {
-                items(filteredTickets, key = { it.id }) { ticket ->
+                items(filteredConversations, key = { it.id }) { ticket ->
                     val threadMsgs = state.supportMessagesByTicket[ticket.externalId].orEmpty()
-                    ControlSupportTicketCard(
+                    ConversationUserRow(
                         ticket = ticket,
                         threadMessages = threadMsgs,
-                        canReply = canReply,
-                        onOpenChat = { openChatTicketId = ticket.id },
-                        onReply = { text -> onReplyTicket(ticket.id, text) },
-                        onMarkInReview = { onUpdateStatus(ticket.id, SupportTicketStatus.IN_REVIEW) },
-                        onClose = { onUpdateStatus(ticket.id, SupportTicketStatus.CLOSED) }
+                        onClick = { openChatTicketId = ticket.id }
                     )
                 }
             }
@@ -327,216 +365,235 @@ private fun buildControlThreadMessages(
 }
 
 @Composable
-private fun ControlSupportTicketCard(
+private fun ConversationUserRow(
     ticket: SupportTicketEntity,
     threadMessages: List<SupportMessageEntity>,
-    canReply: Boolean,
-    onOpenChat: () -> Unit,
-    onReply: (String) -> Unit,
-    onMarkInReview: () -> Unit,
-    onClose: () -> Unit
+    onClick: () -> Unit
 ) {
-    var replyDraft by remember(ticket.id) { mutableStateOf("") }
     val statusEnum = SupportTicketStatus.fromName(ticket.status)
-    val catEnum = SupportCategory.fromName(ticket.category)
     val isComplaint = SupportRequestType.fromName(ticket.requestType) == SupportRequestType.COMPLAINT
+    val needsReply = statusEnum == SupportTicketStatus.SENT ||
+        statusEnum == SupportTicketStatus.DELIVERED ||
+        statusEnum == SupportTicketStatus.IN_REVIEW
     val statusColor = when (statusEnum) {
         SupportTicketStatus.REPLIED -> StatusOpen
         SupportTicketStatus.DELIVERED, SupportTicketStatus.SENT -> IndigoAccentLight
         SupportTicketStatus.IN_REVIEW -> AmberGold
         SupportTicketStatus.CLOSED -> StatusPaused
     }
-    val dateLabel = remember(ticket.updatedAt) {
+    val timeLabel = remember(ticket.updatedAt) {
         SimpleDateFormat("HH:mm • dd/MM", Locale("ar")).format(Date(ticket.updatedAt))
     }
     val latestMsg = threadMessages.lastOrNull()
+    val messageCount = maxOf(1, threadMessages.size)
+    val displayUserName = ticket.senderName.trim().ifBlank { "مستخدم دوري" }
+    val avatarInitial = displayUserName.firstOrNull()?.toString() ?: "م"
 
-    Card(
-        shape = RoundedCornerShape(15.dp),
-        border = BorderStroke(1.dp, statusColor.copy(alpha = 0.4f)),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = if (needsReply) EmeraldPrimary.copy(alpha = 0.06f) else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = if (needsReply) 1.2.dp else 1.dp,
+            color = if (needsReply) EmeraldPrimary.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+        ),
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
             .testTag("ctrl_support_card_${ticket.id}")
     ) {
-        Column(
-            modifier = Modifier.padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 11.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+            // User Avatar with unread indicator
+            Box(contentAlignment = Alignment.BottomEnd) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isComplaint) StatusUrgent.copy(alpha = 0.14f)
+                            else EmeraldPrimary.copy(alpha = 0.15f)
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .clip(CircleShape)
-                            .background(statusColor.copy(alpha = 0.14f)),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    if (isComplaint) {
                         Icon(
-                            imageVector = if (isComplaint) Icons.Default.ReportProblem else Icons.Default.Person,
+                            imageVector = Icons.Default.ReportProblem,
                             contentDescription = null,
-                            tint = if (isComplaint) StatusUrgent else statusColor,
-                            modifier = Modifier.size(16.dp)
+                            tint = StatusUrgent,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    } else {
+                        Text(
+                            text = avatarInitial,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = EmeraldPrimary
                         )
                     }
-                    Column {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
+                }
+                if (needsReply) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .padding(2.dp)
+                            .clip(CircleShape)
+                            .background(EmeraldPrimary)
+                    )
+                }
+            }
+
+            // User Name + Last Message Preview
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Text(
+                            text = displayUserName,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (ticket.senderPhone.isNotBlank()) {
                             Text(
-                                text = "${ticket.senderName}${if (ticket.senderPhone.isNotBlank()) " • ${ticket.senderPhone}" else ""}",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                text = ticket.senderPhone,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = timeLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (needsReply) EmeraldPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (needsReply) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+
+                // Request type + venue chip row (compact single line)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (isComplaint) StatusUrgent.copy(alpha = 0.14f) else EmeraldPrimary.copy(alpha = 0.12f)
+                    ) {
+                        Text(
+                            text = if (isComplaint) "شكوى" else "محادثة",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isComplaint) StatusUrgent else EmeraldPrimary,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                        )
+                    }
+                    if (ticket.relatedVenueName.isNotBlank()) {
+                        Text(
+                            text = ticket.relatedVenueName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                    } else if (isComplaint && ticket.subject.isNotBlank()) {
+                        Text(
+                            text = ticket.subject,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                    }
+                }
+
+                // Last message snippet + status/count
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (latestMsg?.isFromAdmin == true) {
+                            Icon(
+                                imageVector = Icons.Default.DoneAll,
+                                contentDescription = null,
+                                tint = StatusOpen,
+                                modifier = Modifier.size(13.dp)
                             )
                         }
                         Text(
-                            text = "${if (isComplaint) "طلب شكوى" else "محادثة مباشرة"} • ${catEnum.displayName} • $dateLabel",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = latestMsg?.let { msg ->
+                                if (msg.isFromAdmin) {
+                                    "الدعم (${msg.senderName.ifBlank { "الإدارة" }}): ${msg.body}"
+                                } else {
+                                    msg.body
+                                }
+                            } ?: ticket.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (needsReply) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (needsReply) FontWeight.Medium else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                }
 
-                Surface(
-                    shape = CircleShape,
-                    color = statusColor.copy(alpha = 0.16f)
-                ) {
-                    Text(
-                        text = statusEnum.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = statusColor,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                    )
-                }
-            }
+                    Spacer(modifier = Modifier.width(6.dp))
 
-            Surface(
-                shape = RoundedCornerShape(11.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(11.dp))
-                    .clickable(onClick = onOpenChat)
-            ) {
-                Column(
-                    modifier = Modifier.padding(9.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Text(
-                        text = buildString {
-                            append(ticket.subject)
-                            if (ticket.relatedVenueName.isNotBlank()) {
-                                append(" — ${ticket.relatedVenueName}")
-                            }
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = latestMsg?.let {
-                            val who = if (it.isFromAdmin) "رد الإدارة (${it.senderName}): " else "${ticket.senderName}: "
-                            "$who${it.body}"
-                        } ?: ticket.message,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "فتح المحادثة الكاملة (${maxOf(1, threadMessages.size)} رسائل) ←",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = EmeraldPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            OutlinedTextField(
-                value = replyDraft,
-                onValueChange = { replyDraft = it },
-                label = { Text("رد سريع على ${ticket.senderName}...") },
-                enabled = canReply,
-                minLines = 1,
-                maxLines = 2,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("ctrl_support_reply_input_${ticket.id}")
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                Button(
-                    onClick = {
-                        val txt = replyDraft.trim()
-                        if (txt.isNotEmpty()) {
-                            onReply(txt)
-                            replyDraft = ""
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = statusColor.copy(alpha = 0.16f)
+                        ) {
+                            Text(
+                                text = statusEnum.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = statusColor,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                            )
                         }
-                    },
-                    enabled = canReply && replyDraft.trim().isNotEmpty(),
-                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier
-                        .weight(1.1f)
-                        .height(34.dp)
-                        .testTag("ctrl_support_send_reply_${ticket.id}")
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(13.dp))
-                    Spacer(modifier = Modifier.width(3.dp))
-                    Text("إرسال", style = MaterialTheme.typography.labelSmall)
-                }
-
-                OutlinedButton(
-                    onClick = onOpenChat,
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier
-                        .weight(0.95f)
-                        .height(34.dp)
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(13.dp))
-                    Spacer(modifier = Modifier.width(3.dp))
-                    Text("المحادثة", style = MaterialTheme.typography.labelSmall)
-                }
-
-                if (statusEnum != SupportTicketStatus.CLOSED) {
-                    OutlinedButton(
-                        onClick = onMarkInReview,
-                        enabled = canReply,
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                        modifier = Modifier
-                            .weight(0.65f)
-                            .height(34.dp)
-                    ) {
-                        Text("مراجعة", style = MaterialTheme.typography.labelSmall)
-                    }
-                    OutlinedButton(
-                        onClick = onClose,
-                        enabled = canReply,
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
-                        modifier = Modifier
-                            .weight(0.4f)
-                            .height(34.dp)
-                    ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = "إغلاق", modifier = Modifier.size(14.dp))
+                        Surface(
+                            shape = CircleShape,
+                            color = if (needsReply) EmeraldPrimary else MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                text = "$messageCount",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (needsReply) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -572,9 +629,11 @@ private fun ControlSupportChatOverlay(
         handleExitAttempt()
     }
 
-    var replyDraft by remember { mutableStateOf("") }
+    var replyDraft by remember(ticket.id) { mutableStateOf("") }
     val listState = rememberLazyListState()
     val isComplaint = SupportRequestType.fromName(ticket.requestType) == SupportRequestType.COMPLAINT
+    val catEnum = SupportCategory.fromName(ticket.category)
+    val displayUserName = ticket.senderName.trim().ifBlank { "مستخدم دوري" }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -598,7 +657,7 @@ private fun ControlSupportChatOverlay(
             modifier = Modifier
                 .widthIn(max = 640.dp)
                 .fillMaxWidth()
-                .fillMaxHeight(0.9f)
+                .fillMaxHeight(0.92f)
                 .imePadding()
                 .clickable(
                     indication = null,
@@ -615,7 +674,7 @@ private fun ControlSupportChatOverlay(
                     .fillMaxSize()
                     .navigationBarsPadding()
             ) {
-                // Header
+                // Header showing User Name & Conversation Context
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -631,30 +690,57 @@ private fun ControlSupportChatOverlay(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "${if (isComplaint) "شكوى: " else "محادثة: "}${ticket.senderName}",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = buildString {
-                                    append(ticket.subject)
-                                    if (ticket.relatedVenueName.isNotBlank()) {
-                                        append(" • ${ticket.relatedVenueName}")
-                                    }
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.85f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(MintPrimaryDark.copy(alpha = 0.22f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (isComplaint) Icons.Default.ReportProblem else Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = if (isComplaint) Color(0xFFFCA5A5) else MintPrimaryDark,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = displayUserName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = buildString {
+                                        if (ticket.senderPhone.isNotBlank()) {
+                                            append(ticket.senderPhone)
+                                            append(" • ")
+                                        }
+                                        append(if (isComplaint) "شكوى (${catEnum.displayName})" else "محادثة مباشرة")
+                                        if (ticket.relatedVenueName.isNotBlank()) {
+                                            append(" • ${ticket.relatedVenueName}")
+                                        }
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             if (ticket.status != SupportTicketStatus.CLOSED.name) {
                                 OutlinedButton(
                                     onClick = onMarkInReview,
@@ -692,6 +778,30 @@ private fun ControlSupportChatOverlay(
                     }
                 }
 
+                // Complaint subject banner if complaint
+                if (isComplaint && ticket.subject.isNotBlank()) {
+                    Surface(
+                        color = StatusUrgent.copy(alpha = 0.08f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, tint = StatusUrgent, modifier = Modifier.size(14.dp))
+                            Text(
+                                text = "موضوع الشكوى: ${ticket.subject}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
                 // Messages Thread
                 LazyColumn(
                     state = listState,
@@ -710,7 +820,12 @@ private fun ControlSupportChatOverlay(
                             horizontalAlignment = if (msg.isFromAdmin) Alignment.Start else Alignment.End
                         ) {
                             Surface(
-                                shape = RoundedCornerShape(14.dp),
+                                shape = RoundedCornerShape(
+                                    topStart = 14.dp,
+                                    topEnd = 14.dp,
+                                    bottomStart = if (msg.isFromAdmin) 4.dp else 14.dp,
+                                    bottomEnd = if (msg.isFromAdmin) 14.dp else 4.dp
+                                ),
                                 color = if (msg.isFromAdmin) {
                                     EmeraldPrimary.copy(alpha = 0.16f)
                                 } else {
@@ -740,7 +855,11 @@ private fun ControlSupportChatOverlay(
                                             )
                                         }
                                         Text(
-                                            text = if (msg.isFromAdmin) msg.senderName.ifBlank { "الدعم" } else ticket.senderName,
+                                            text = if (msg.isFromAdmin) {
+                                                "أنت (${msg.senderName.ifBlank { "الدعم" }})"
+                                            } else {
+                                                displayUserName
+                                            },
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold,
                                             color = if (msg.isFromAdmin) EmeraldPrimary else MaterialTheme.colorScheme.primary
@@ -764,7 +883,7 @@ private fun ControlSupportChatOverlay(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                // Reply Bar
+                // Chat Composer Bar
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -776,12 +895,19 @@ private fun ControlSupportChatOverlay(
                     OutlinedTextField(
                         value = replyDraft,
                         onValueChange = { replyDraft = it },
-                        placeholder = { Text("اكتب ردك للمستخدم...", style = MaterialTheme.typography.bodySmall) },
+                        placeholder = {
+                            Text(
+                                "اكتب رسالتك إلى $displayUserName...",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
                         enabled = canReply,
                         minLines = 1,
                         maxLines = 3,
                         shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("ctrl_support_reply_input_${ticket.id}")
                     )
                     IconButton(
                         onClick = {
@@ -800,6 +926,7 @@ private fun ControlSupportChatOverlay(
                                 if (canReply && replyDraft.trim().isNotEmpty()) EmeraldPrimary
                                 else MaterialTheme.colorScheme.surfaceVariant
                             )
+                            .testTag("ctrl_support_send_reply_${ticket.id}")
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,

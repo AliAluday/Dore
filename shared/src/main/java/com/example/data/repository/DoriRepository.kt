@@ -905,6 +905,7 @@ class DoriRepository(
         )
         val msgId = dao.insertSupportMessage(msgEntity)
         val updatedTicket = existing.copy(
+            senderName = if (cleanName != "مستخدم دوري") cleanName else existing.senderName,
             status = SupportTicketStatus.SENT.name,
             syncedToControl = false,
             updatedAt = now
@@ -978,6 +979,11 @@ class DoriRepository(
         var changed = 0
         for (remote in incoming) {
             if (remote.externalId.isBlank()) continue
+            val sanitizedRepliedBy = if (!isControlApp && remote.repliedByAdmin.isNotBlank()) {
+                "فريق الدعم الفني"
+            } else {
+                remote.repliedByAdmin
+            }
             val local = dao.getSupportTicketByExternalId(remote.externalId)
             if (local == null) {
                 dao.insertSupportTicket(
@@ -988,12 +994,14 @@ class DoriRepository(
                         } else {
                             remote.status
                         },
+                        repliedByAdmin = sanitizedRepliedBy,
                         syncedToControl = true
                     )
                 )
                 changed++
             } else if (remote.updatedAt > local.updatedAt ||
-                (remote.adminReply.isNotBlank() && local.adminReply != remote.adminReply)
+                (remote.adminReply.isNotBlank() && local.adminReply != remote.adminReply) ||
+                (isControlApp && remote.senderName.isNotBlank() && local.senderName != remote.senderName)
             ) {
                 val resolvedStatus = when {
                     isControlApp && remote.status == SupportTicketStatus.SENT.name -> SupportTicketStatus.DELIVERED.name
@@ -1002,11 +1010,18 @@ class DoriRepository(
                 }
                 dao.updateSupportTicket(
                     local.copy(
+                        senderName = if (isControlApp && remote.senderName.isNotBlank()) remote.senderName else local.senderName,
                         status = resolvedStatus,
                         requestType = remote.requestType.ifBlank { local.requestType },
                         relatedVenueName = remote.relatedVenueName.ifBlank { local.relatedVenueName },
                         adminReply = remote.adminReply.ifBlank { local.adminReply },
-                        repliedByAdmin = remote.repliedByAdmin.ifBlank { local.repliedByAdmin },
+                        repliedByAdmin = if (isControlApp) {
+                            remote.repliedByAdmin.ifBlank { local.repliedByAdmin }
+                        } else if (sanitizedRepliedBy.isNotBlank() || local.repliedByAdmin.isNotBlank()) {
+                            "فريق الدعم الفني"
+                        } else {
+                            ""
+                        },
                         syncedToControl = true,
                         updatedAt = maxOf(local.updatedAt, remote.updatedAt)
                     )

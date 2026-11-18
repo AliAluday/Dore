@@ -186,7 +186,8 @@ class UserBridgeProvider : ContentProvider() {
                 val externalId = v.getAsString(SupportCols.EXTERNAL_ID)?.takeIf { it.isNotBlank() }
                     ?: return null
                 val adminReply = v.getAsString(SupportCols.ADMIN_REPLY).orEmpty()
-                val repliedBy = v.getAsString(SupportCols.REPLIED_BY_ADMIN).orEmpty()
+                val rawRepliedBy = v.getAsString(SupportCols.REPLIED_BY_ADMIN).orEmpty()
+                val repliedBy = if (rawRepliedBy.isNotBlank() || adminReply.isNotBlank()) "فريق الدعم الفني" else ""
                 val incomingStatus = v.getAsString(SupportCols.STATUS).orEmpty()
                     .ifBlank { SupportTicketStatus.REPLIED.name }
                 val updatedAt = v.getAsLong(SupportCols.UPDATED_AT) ?: System.currentTimeMillis()
@@ -205,7 +206,7 @@ class UserBridgeProvider : ContentProvider() {
                                 requestType = reqType.ifBlank { existing.requestType },
                                 relatedVenueName = venueName.ifBlank { existing.relatedVenueName },
                                 adminReply = adminReply.ifBlank { existing.adminReply },
-                                repliedByAdmin = repliedBy.ifBlank { existing.repliedByAdmin },
+                                repliedByAdmin = if (repliedBy.isNotBlank() || existing.repliedByAdmin.isNotBlank()) "فريق الدعم الفني" else "",
                                 syncedToControl = true,
                                 updatedAt = maxOf(existing.updatedAt, updatedAt)
                             )
@@ -236,7 +237,7 @@ class UserBridgeProvider : ContentProvider() {
                     DoriNotificationHelper.showSupportMessageNotification(
                         context = ctx,
                         title = "💬 رد جديد من الدعم الفني",
-                        body = if (repliedBy.isNotBlank()) "$repliedBy: $adminReply" else adminReply,
+                        body = adminReply,
                         idSeed = kotlin.math.abs(externalId.hashCode() % 3000) + 3100
                     )
                 }
@@ -249,7 +250,8 @@ class UserBridgeProvider : ContentProvider() {
                 val ticketExtId = v.getAsString(SupportMessageCols.TICKET_EXTERNAL_ID)?.takeIf { it.isNotBlank() }
                     ?: return null
                 val isFromAdmin = (v.getAsInteger(SupportMessageCols.IS_FROM_ADMIN) ?: 0) == 1
-                val senderName = v.getAsString(SupportMessageCols.SENDER_NAME).orEmpty()
+                val rawSenderName = v.getAsString(SupportMessageCols.SENDER_NAME).orEmpty()
+                val senderName = if (isFromAdmin) "فريق الدعم الفني" else rawSenderName
                 val body = v.getAsString(SupportMessageCols.BODY).orEmpty()
                 val createdAt = v.getAsLong(SupportMessageCols.CREATED_AT) ?: System.currentTimeMillis()
                 var insertedNew = false
@@ -273,7 +275,7 @@ class UserBridgeProvider : ContentProvider() {
                     DoriNotificationHelper.showSupportMessageNotification(
                         context = ctx,
                         title = "💬 رسالة جديدة من الدعم الفني",
-                        body = if (senderName.isNotBlank()) "$senderName: $body" else body,
+                        body = body,
                         idSeed = kotlin.math.abs(extMsgId.hashCode() % 3000) + 3150
                     )
                 }

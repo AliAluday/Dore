@@ -153,6 +153,22 @@ object DoriLocalBridgeClient {
         put(ProviderCols.CREATED_AT, provider.createdAt)
     }
 
+    private const val GENERIC_SUPPORT_TEAM_LABEL = "فريق الدعم الفني"
+
+    private fun sanitizeTicketForUser(ticket: SupportTicketEntity): SupportTicketEntity =
+        if (ticket.repliedByAdmin.isNotBlank()) {
+            ticket.copy(repliedByAdmin = GENERIC_SUPPORT_TEAM_LABEL)
+        } else {
+            ticket
+        }
+
+    private fun sanitizeMessageForUser(message: SupportMessageEntity): SupportMessageEntity =
+        if (message.isFromAdmin) {
+            message.copy(senderName = GENERIC_SUPPORT_TEAM_LABEL)
+        } else {
+            message
+        }
+
     fun pushSupportTicketToControl(context: Context, ticket: SupportTicketEntity): Boolean {
         return runCatching {
             val values = supportToContentValues(
@@ -167,7 +183,7 @@ object DoriLocalBridgeClient {
 
     fun pushSupportReplyToUser(context: Context, ticket: SupportTicketEntity): Boolean {
         return runCatching {
-            val values = supportToContentValues(ticket)
+            val values = supportToContentValues(sanitizeTicketForUser(ticket))
             context.contentResolver.insert(DoriBridgeContract.USER_SUPPORT_URI, values) != null
         }.getOrDefault(false)
     }
@@ -182,7 +198,8 @@ object DoriLocalBridgeClient {
             val list = mutableListOf<SupportTicketEntity>()
             context.contentResolver.query(targetUri, null, null, null, null)?.use { cursor ->
                 while (cursor.moveToNext()) {
-                    list.add(readSupportTicketFromCursor(cursor))
+                    val ticket = readSupportTicketFromCursor(cursor)
+                    list.add(if (isControlApp) ticket else sanitizeTicketForUser(ticket))
                 }
             }
             list
@@ -198,7 +215,7 @@ object DoriLocalBridgeClient {
 
     fun pushSupportMessageToUser(context: Context, message: SupportMessageEntity): Boolean {
         return runCatching {
-            val values = supportMessageToContentValues(message)
+            val values = supportMessageToContentValues(sanitizeMessageForUser(message))
             context.contentResolver.insert(DoriBridgeContract.USER_SUPPORT_MESSAGES_URI, values) != null
         }.getOrDefault(false)
     }
@@ -213,7 +230,8 @@ object DoriLocalBridgeClient {
             val list = mutableListOf<SupportMessageEntity>()
             context.contentResolver.query(targetUri, null, null, null, null)?.use { cursor ->
                 while (cursor.moveToNext()) {
-                    list.add(readSupportMessageFromCursor(cursor))
+                    val msg = readSupportMessageFromCursor(cursor)
+                    list.add(if (isControlApp) msg else sanitizeMessageForUser(msg))
                 }
             }
             list

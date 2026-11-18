@@ -608,6 +608,19 @@ class ExampleRobolectricTest {
                 assertEquals(1, repo.mergePulledSupportMessages(listOf(extraMsg)))
                 assertEquals(0, repo.mergePulledSupportMessages(listOf(extraMsg)))
                 assertEquals(2, db.doriDao().getMessagesForTicketOnce(complaint.externalId).size)
+
+                // 5. User-mode ticket merge anonymizes admin personal name while preserving user name
+                val remoteRepliedTicket = chatTicket.copy(
+                    externalId = "SUP-ANON-CHECK",
+                    senderName = "زهراء الجبوري",
+                    adminReply = "تمت معالجة طلبك بنجاح",
+                    repliedByAdmin = "أحمد الموصلي",
+                    status = com.example.data.model.SupportTicketStatus.REPLIED.name
+                )
+                assertEquals(1, repo.mergePulledSupportTickets(listOf(remoteRepliedTicket), isControlApp = false))
+                val userMerged = db.doriDao().getSupportTicketByExternalId("SUP-ANON-CHECK")!!
+                assertEquals("زهراء الجبوري", userMerged.senderName)
+                assertEquals("فريق الدعم الفني", userMerged.repliedByAdmin)
             } finally {
                 db.close()
             }

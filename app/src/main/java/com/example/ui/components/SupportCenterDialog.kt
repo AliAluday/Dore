@@ -155,7 +155,11 @@ fun SupportCenterSheet(
     var currentTab by remember { mutableStateOf(SupportSheetTab.LIVE_CHAT) }
     var selectedTicketExtId by remember {
         mutableStateOf(
-            tickets.firstOrNull { it.status != SupportTicketStatus.CLOSED.name }?.externalId
+            tickets.firstOrNull {
+                SupportRequestType.fromName(it.requestType) == SupportRequestType.CHAT &&
+                    it.status != SupportTicketStatus.CLOSED.name
+            }?.externalId
+                ?: tickets.firstOrNull { it.status != SupportTicketStatus.CLOSED.name }?.externalId
                 ?: tickets.firstOrNull()?.externalId
         )
     }
@@ -370,6 +374,7 @@ fun SupportCenterSheet(
                                 activeTicket = activeTicket,
                                 messages = threadMessages,
                                 senderName = senderName,
+                                onNameChange = { senderName = it },
                                 onSelectTicket = { extId -> selectedTicketExtId = extId },
                                 onStartNewChat = { selectedTicketExtId = null },
                                 onSendMessage = { text ->
@@ -468,7 +473,7 @@ private fun buildThreadMessages(
                 externalMessageId = "LEGACY-A-${ticket.externalId}",
                 ticketExternalId = ticket.externalId,
                 isFromAdmin = true,
-                senderName = ticket.repliedByAdmin.ifBlank { "فريق الدعم الفني" },
+                senderName = "فريق الدعم الفني",
                 body = ticket.adminReply,
                 syncedToPeer = true,
                 createdAt = ticket.updatedAt
@@ -485,11 +490,13 @@ private fun LiveSupportChatTab(
     activeTicket: SupportTicketEntity?,
     messages: List<SupportMessageEntity>,
     senderName: String,
+    onNameChange: (String) -> Unit,
     onSelectTicket: (String) -> Unit,
     onStartNewChat: () -> Unit,
     onSendMessage: (String) -> Unit
 ) {
     var messageDraft by remember { mutableStateOf("") }
+    var showNameField by remember { mutableStateOf(senderName.isBlank()) }
     val listState = rememberLazyListState()
 
     val quickStarters = listOf(
@@ -556,6 +563,21 @@ private fun LiveSupportChatTab(
             }
         }
 
+        if (showNameField && activeTicket == null) {
+            OutlinedTextField(
+                value = senderName,
+                onValueChange = onNameChange,
+                label = { Text("اسمك في المحادثة (اختياري)") },
+                placeholder = { Text("اكتب اسمك ليظهر في المحادثة") },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                    .testTag("support_chat_sender_name")
+            )
+        }
+
         if (activeTicket != null) {
             val isComplaint = SupportRequestType.fromName(activeTicket.requestType) == SupportRequestType.COMPLAINT
             val statusEnum = SupportTicketStatus.fromName(activeTicket.status)
@@ -608,7 +630,7 @@ private fun LiveSupportChatTab(
                 item {
                     ChatMessageBubble(
                         senderLabel = "فريق الدعم الفني",
-                        body = "أهلاً بك${if (senderName.isNotBlank()) " يا $senderName" else ""} 👋 اكتب رسالتك بالأسفل وسيرد عليك موظف الدعم مباشرة في هذه المحادثة.",
+                        body = "أهلاً بك${if (senderName.isNotBlank()) " يا $senderName" else ""} 👋 اكتب رسالتك بالأسفل وسيرد عليك فريق الدعم الفني مباشرة في هذه المحادثة.",
                         isFromAdmin = true,
                         timestamp = System.currentTimeMillis(),
                         isDelivered = true
@@ -630,7 +652,7 @@ private fun LiveSupportChatTab(
             } else {
                 items(messages, key = { it.externalMessageId }) { msg ->
                     ChatMessageBubble(
-                        senderLabel = if (msg.isFromAdmin) msg.senderName.ifBlank { "فريق الدعم الفني" } else "أنت",
+                        senderLabel = if (msg.isFromAdmin) "فريق الدعم الفني" else "أنت",
                         body = msg.body,
                         isFromAdmin = msg.isFromAdmin,
                         timestamp = msg.createdAt,
@@ -1094,10 +1116,19 @@ private fun SupportRequestsListTab(
             }
         } else {
             items(tickets, key = { it.id }) { ticket ->
-                val msgCount = messagesByTicket[ticket.externalId]?.size ?: 1
+                val thread = messagesByTicket[ticket.externalId].orEmpty()
+                val msgCount = maxOf(1, thread.size)
+                val lastMsg = thread.lastOrNull()
+                val previewText = when {
+                    lastMsg != null && lastMsg.isFromAdmin -> "فريق الدعم الفني: ${lastMsg.body}"
+                    lastMsg != null -> "أنت: ${lastMsg.body}"
+                    ticket.adminReply.isNotBlank() -> "فريق الدعم الفني: ${ticket.adminReply}"
+                    else -> ticket.message
+                }
                 SupportHistoryCard(
                     ticket = ticket,
                     messageCount = msgCount,
+                    previewText = previewText,
                     onClick = { onOpenThread(ticket.externalId) }
                 )
             }
@@ -1109,6 +1140,7 @@ private fun SupportRequestsListTab(
 private fun SupportHistoryCard(
     ticket: SupportTicketEntity,
     messageCount: Int,
+    previewText: String,
     onClick: () -> Unit
 ) {
     val statusEnum = SupportTicketStatus.fromName(ticket.status)
@@ -1204,7 +1236,7 @@ private fun SupportHistoryCard(
             }
 
             Text(
-                text = ticket.message,
+                text = previewText,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,

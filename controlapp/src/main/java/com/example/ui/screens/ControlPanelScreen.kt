@@ -190,7 +190,7 @@ fun ControlPanelScreen(
                                     colors = listOf(Color(0xFF0A1428), Color(0xFF064E3B), Color(0xFF1E1B4B))
                                 )
                             )
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -205,13 +205,13 @@ fun ControlPanelScreen(
                                     imageVector = Icons.Default.AdminPanelSettings,
                                     contentDescription = null,
                                     tint = MintPrimaryDark,
-                                    modifier = Modifier.size(26.dp)
+                                    modifier = Modifier.size(20.dp)
                                 )
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
                                         text = "دوري تحكم • ${activeAdmin?.name ?: "الإدارة العامة"}",
-                                        style = MaterialTheme.typography.titleMedium,
+                                        style = MaterialTheme.typography.titleSmall,
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,
@@ -236,7 +236,7 @@ fun ControlPanelScreen(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (ctrl.allowNewBookings) MintPrimaryDark else Color(0xFFFDA4AF),
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
                         }
@@ -247,59 +247,61 @@ fun ControlPanelScreen(
             when (activeTab) {
                 AppTab.CONTROL_FEATURES -> {
                     LazyColumn(
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 80.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         // Local Trial & Cross-App Sync Card
                         item {
                             Card(
-                                shape = RoundedCornerShape(18.dp),
+                                shape = RoundedCornerShape(14.dp),
                                 border = BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.35f)),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                             ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(14.dp),
+                                        .padding(10.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Row(
                                         modifier = Modifier.weight(1f),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.PhoneAndroid,
                                             contentDescription = null,
                                             tint = EmeraldPrimary,
-                                            modifier = Modifier.size(22.dp)
+                                            modifier = Modifier.size(19.dp)
                                         )
                                         Column {
                                             Text(
                                                 text = "وضع تجريبي محلي • الجسر مفعّل",
-                                                style = MaterialTheme.typography.titleSmall,
+                                                style = MaterialTheme.typography.labelLarge,
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Text(
-                                                text = "مزامنة رسائل الدعم وقبول التذاكر مباشرة مع نسخة المستخدم",
+                                                text = "مزامنة الدعم والتذاكر مباشرة مع نسخة المستخدم",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                maxLines = 2,
+                                                maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                         }
                                     }
-                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     OutlinedButton(
                                         onClick = onSyncBridge,
-                                        shape = RoundedCornerShape(12.dp),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                        modifier = Modifier.testTag("ctrl_sync_bridge_button")
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
+                                        modifier = Modifier
+                                            .height(34.dp)
+                                            .testTag("ctrl_sync_bridge_button")
                                     ) {
-                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("مزامنة", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text("مزامنة", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -308,7 +310,7 @@ fun ControlPanelScreen(
                         // Segmented Sub-tabs: Features vs Quick Commands
                         item {
                             Surface(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                             ) {
@@ -320,13 +322,13 @@ fun ControlPanelScreen(
                                     Tab(
                                         selected = featuresSubTab == 0,
                                         onClick = { featuresSubTab = 0 },
-                                        text = { Text("المميزات والإعلانات", fontWeight = FontWeight.Bold) },
+                                        text = { Text("المميزات والإعلانات", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) },
                                         modifier = Modifier.testTag("ctrl_subtab_features")
                                     )
                                     Tab(
                                         selected = featuresSubTab == 1,
                                         onClick = { featuresSubTab = 1 },
-                                        text = { Text("الأوامر السريعة", fontWeight = FontWeight.Bold) },
+                                        text = { Text("الأوامر السريعة", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) },
                                         modifier = Modifier.testTag("ctrl_subtab_commands")
                                     )
                                 }
@@ -346,41 +348,41 @@ fun ControlPanelScreen(
                         // Broadcast Message Card
                         item {
                             Card(
-                                shape = RoundedCornerShape(18.dp),
+                                shape = RoundedCornerShape(14.dp),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(14.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Campaign, contentDescription = null, tint = AmberGold, modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Icon(Icons.Default.Campaign, contentDescription = null, tint = AmberGold, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(5.dp))
                                         Text(
                                             text = "رسالة تنبيه / إعلان عام للمستخدمين",
-                                            style = MaterialTheme.typography.titleSmall,
+                                            style = MaterialTheme.typography.labelLarge,
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         OutlinedTextField(
                                             value = broadcastInput,
                                             onValueChange = { broadcastInput = it },
-                                            placeholder = { Text("اكتب إعلاناً يظهر في أعلى الاستكشاف...") },
+                                            placeholder = { Text("اكتب إعلاناً يظهر في أعلى الاستكشاف...", style = MaterialTheme.typography.bodySmall) },
                                             singleLine = true,
-                                            shape = RoundedCornerShape(14.dp),
+                                            shape = RoundedCornerShape(12.dp),
                                             trailingIcon = {
                                                 if (broadcastInput.isNotEmpty()) {
                                                     IconButton(onClick = {
                                                         broadcastInput = ""
                                                         onSetBroadcastMessage("")
                                                     }) {
-                                                        Icon(Icons.Default.Clear, contentDescription = "مسح")
+                                                        Icon(Icons.Default.Clear, contentDescription = "مسح", modifier = Modifier.size(17.dp))
                                                     }
                                                 }
                                             },
@@ -390,12 +392,13 @@ fun ControlPanelScreen(
                                         )
                                         Button(
                                             onClick = { onSetBroadcastMessage(broadcastInput) },
-                                            shape = RoundedCornerShape(14.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                             modifier = Modifier
-                                                .height(52.dp)
+                                                .height(46.dp)
                                                 .testTag("control_broadcast_send")
                                         ) {
-                                            Text("نشر")
+                                            Text("نشر", style = MaterialTheme.typography.labelMedium)
                                         }
                                     }
                                 }
@@ -405,17 +408,17 @@ fun ControlPanelScreen(
                         // Core Feature Switches
                         item {
                             Card(
-                                shape = RoundedCornerShape(20.dp),
+                                shape = RoundedCornerShape(15.dp),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    modifier = Modifier.padding(11.dp),
+                                    verticalArrangement = Arrangement.spacedBy(5.dp)
                                 ) {
                                     Text(
                                         text = "التحكم بمميزات نسخة المستخدم",
-                                        style = MaterialTheme.typography.titleMedium,
+                                        style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold
                                     )
 
@@ -531,22 +534,22 @@ fun ControlPanelScreen(
                         // Categories Visibility Control
                         item {
                             Card(
-                                shape = RoundedCornerShape(20.dp),
+                                shape = RoundedCornerShape(15.dp),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier.padding(11.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
                                         text = "الأقسام الظاهرة في الاستكشاف",
-                                        style = MaterialTheme.typography.titleSmall,
+                                        style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.Bold
                                     )
                                     FlowRow(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         ServiceCategory.fiveCategories.forEach { category ->
                                             val enabled = category.displayName !in ctrl.disabledCategories
@@ -683,8 +686,8 @@ fun ControlPanelScreen(
 
                 AppTab.CONTROL_VENUES -> {
                     LazyColumn(
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 80.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp)
                     ) {
                         if (!canManageVenues) {
                             item {
@@ -697,40 +700,48 @@ fun ControlPanelScreen(
                         item {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Button(
                                     onClick = { showAddVenueDialog = true },
                                     colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
-                                    shape = RoundedCornerShape(14.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                     modifier = Modifier
                                         .weight(1.2f)
+                                        .height(36.dp)
                                         .testTag("ctrl_add_venue_button")
                                 ) {
-                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("إضافة مركز")
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text("إضافة مركز", style = MaterialTheme.typography.labelMedium)
                                 }
                                 OutlinedButton(
                                     onClick = { onSetDistrictVenuesOpen(true) },
-                                    shape = RoundedCornerShape(14.dp),
-                                    modifier = Modifier.weight(0.9f)
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .weight(0.9f)
+                                        .height(36.dp)
                                 ) {
-                                    Text("فتح الكل", style = MaterialTheme.typography.labelMedium)
+                                    Text("فتح الكل", style = MaterialTheme.typography.labelSmall)
                                 }
                                 OutlinedButton(
                                     onClick = { onSetDistrictVenuesOpen(false) },
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
-                                    shape = RoundedCornerShape(14.dp),
-                                    modifier = Modifier.weight(0.9f)
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .weight(0.9f)
+                                        .height(36.dp)
                                 ) {
-                                    Text("إغلاق الكل", style = MaterialTheme.typography.labelMedium)
+                                    Text("إغلاق الكل", style = MaterialTheme.typography.labelSmall)
                                 }
                             }
                         }
 
                         item {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 OutlinedTextField(
                                     value = venueSearchQuery,
                                     onValueChange = { venueSearchQuery = it },
@@ -847,14 +858,14 @@ private fun ControlSwitchRow(
                 imageVector = icon,
                 contentDescription = null,
                 tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Column {
-                Text(text = title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(text = title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -904,7 +915,7 @@ private fun ControlVenueCard(
     onDelete: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(14.dp),
         border = BorderStroke(
             1.dp,
             if (venue.isOpen) MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
@@ -914,8 +925,8 @@ private fun ControlVenueCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -954,13 +965,15 @@ private fun ControlVenueCard(
                     )
                     IconButton(
                         onClick = onDelete,
-                        modifier = Modifier.testTag("ctrl_venue_delete_${venue.id}")
+                        modifier = Modifier
+                            .size(34.dp)
+                            .testTag("ctrl_venue_delete_${venue.id}")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "حذف المركز",
                             tint = StatusUrgent,
-                            modifier = Modifier.size(19.dp)
+                            modifier = Modifier.size(17.dp)
                         )
                     }
                 }
@@ -969,38 +982,38 @@ private fun ControlVenueCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { onAdjustPrice(-5000) }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Remove, contentDescription = "إنقاص السعر", modifier = Modifier.size(16.dp))
+                    IconButton(onClick = { onAdjustPrice(-5000) }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Remove, contentDescription = "إنقاص السعر", modifier = Modifier.size(15.dp))
                     }
                     Text(
                         text = IntentHelpers.formatDinar(venue.priceDinar),
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    IconButton(onClick = { onAdjustPrice(5000) }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Add, contentDescription = "زيادة السعر", modifier = Modifier.size(16.dp))
+                    IconButton(onClick = { onAdjustPrice(5000) }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Add, contentDescription = "زيادة السعر", modifier = Modifier.size(15.dp))
                     }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { onAdjustWait(-2) }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Remove, contentDescription = "تقليل وقت الانتظار", modifier = Modifier.size(16.dp))
+                    IconButton(onClick = { onAdjustWait(-2) }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Remove, contentDescription = "تقليل وقت الانتظار", modifier = Modifier.size(15.dp))
                     }
                     Text(
                         text = "${venue.avgMinutesPerPerson} د/دور",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold
                     )
-                    IconButton(onClick = { onAdjustWait(2) }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Add, contentDescription = "زيادة وقت الانتظار", modifier = Modifier.size(16.dp))
+                    IconButton(onClick = { onAdjustWait(2) }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Add, contentDescription = "زيادة وقت الانتظار", modifier = Modifier.size(15.dp))
                     }
                 }
             }
@@ -1019,7 +1032,7 @@ private fun CommandActionCard(
     onClick: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.35f)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.fillMaxWidth()
@@ -1027,7 +1040,7 @@ private fun CommandActionCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -1037,31 +1050,34 @@ private fun CommandActionCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(9.dp))
                         .background(accent.copy(alpha = 0.14f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(17.dp))
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Column {
-                    Text(text = title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(text = title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                     Text(
                         text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Button(
                 onClick = onClick,
                 colors = ButtonDefaults.buttonColors(containerColor = accent),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.testTag(testTag)
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                modifier = Modifier
+                    .height(34.dp)
+                    .testTag(testTag)
             ) {
-                Text(buttonLabel, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Text(buttonLabel, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
             }
         }
     }

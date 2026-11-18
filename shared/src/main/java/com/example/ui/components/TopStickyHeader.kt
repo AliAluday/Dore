@@ -112,8 +112,8 @@ fun TopStickyHeader(
                 .fillMaxWidth()
                 .background(headerGradient)
                 .statusBarsPadding()
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 12.dp, vertical = 5.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -122,36 +122,36 @@ fun TopStickyHeader(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(13.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = accentTint.copy(alpha = 0.16f),
                         border = BorderStroke(1.dp, accentTint.copy(alpha = 0.4f))
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Bolt,
                                 contentDescription = null,
                                 tint = accentTint,
-                                modifier = Modifier.size(17.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(
                                 text = brandTitle,
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold
                             )
                             if (isSimulationRunning) {
-                                Spacer(modifier = Modifier.width(5.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Box(
                                     modifier = Modifier
-                                        .size(7.dp)
+                                        .size(6.dp)
                                         .clip(CircleShape)
                                         .background(AmberGold)
                                 )
@@ -174,19 +174,19 @@ fun TopStickyHeader(
                                 .testTag("city_selector_button")
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.LocationOn,
                                     contentDescription = "اختر قضاء في نينوى",
                                     tint = if (isDarkMode) IndigoAccentDark else MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.size(15.dp)
+                                    modifier = Modifier.size(14.dp)
                                 )
-                                Spacer(modifier = Modifier.width(3.dp))
+                                Spacer(modifier = Modifier.width(2.dp))
                                 Text(
                                     text = selectedDistrict.displayName,
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
@@ -197,7 +197,7 @@ fun TopStickyHeader(
                                     imageVector = Icons.Default.KeyboardArrowDown,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                             }
                         }
@@ -234,11 +234,11 @@ fun TopStickyHeader(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(4.dp))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     if (showTicketsBadge && activeBookingCount > 0) {
                         Surface(
@@ -251,19 +251,19 @@ fun TopStickyHeader(
                                 .testTag("header_active_tickets_badge")
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.ConfirmationNumber,
                                     contentDescription = "التذاكر النشطة",
                                     tint = Color(0xFF1E1B08),
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(13.dp)
                                 )
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = "$activeBookingCount",
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = Color(0xFF1E1B08),
                                     fontWeight = FontWeight.Bold
                                 )
@@ -276,7 +276,7 @@ fun TopStickyHeader(
                         IconButton(
                             onClick = onToggleSearch,
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(36.dp)
                                 .minimumInteractiveComponentSize()
                                 .clip(CircleShape)
                                 .background(
@@ -289,7 +289,7 @@ fun TopStickyHeader(
                                 imageVector = if (isSearchExpanded) Icons.Default.Close else Icons.Default.Search,
                                 contentDescription = if (isSearchExpanded) "إغلاق البحث" else "بحث",
                                 tint = if (hasActiveSearch) accentTint else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(19.dp)
+                                modifier = Modifier.size(17.dp)
                             )
                         }
                     }
@@ -298,7 +298,7 @@ fun TopStickyHeader(
                         IconButton(
                             onClick = onOpenSupport,
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(36.dp)
                                 .minimumInteractiveComponentSize()
                                 .clip(CircleShape)
                                 .background(accentTint.copy(alpha = 0.16f))
@@ -310,7 +310,7 @@ fun TopStickyHeader(
                                         imageVector = Icons.Default.SupportAgent,
                                         contentDescription = "الدعم الفني",
                                         tint = accentTint,
-                                        modifier = Modifier.size(19.dp)
+                                        modifier = Modifier.size(17.dp)
                                     )
                                 }
                             } else {
@@ -318,7 +318,7 @@ fun TopStickyHeader(
                                     imageVector = Icons.Default.SupportAgent,
                                     contentDescription = "الدعم الفني",
                                     tint = accentTint,
-                                    modifier = Modifier.size(19.dp)
+                                    modifier = Modifier.size(17.dp)
                                 )
                             }
                         }
@@ -327,7 +327,7 @@ fun TopStickyHeader(
                     IconButton(
                         onClick = onToggleDarkMode,
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(36.dp)
                             .minimumInteractiveComponentSize()
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
@@ -337,7 +337,7 @@ fun TopStickyHeader(
                             imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
                             contentDescription = if (isDarkMode) "الوضع النهاري" else "الوضع الليلي",
                             tint = if (isDarkMode) AmberGold else MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(19.dp)
+                            modifier = Modifier.size(17.dp)
                         )
                     }
                 }
@@ -378,7 +378,7 @@ fun TopStickyHeader(
                             }
                         },
                         singleLine = true,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = accentTint,
                             unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),

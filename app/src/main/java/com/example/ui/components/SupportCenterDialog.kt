@@ -116,20 +116,20 @@ fun SupportCenterSheet(
                 .imePadding()
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Gradient Banner Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .background(
                         Brush.horizontalGradient(
                             colors = listOf(Color(0xFF0A1428), Color(0xFF064E3B), Color(0xFF1E1B4B))
                         )
                     )
-                    .padding(16.dp)
+                    .padding(11.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -139,11 +139,11 @@ fun SupportCenterSheet(
                     Row(
                         modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(MintPrimaryDark.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
@@ -152,13 +152,13 @@ fun SupportCenterSheet(
                                 imageVector = Icons.Default.SupportAgent,
                                 contentDescription = null,
                                 tint = MintPrimaryDark,
-                                modifier = Modifier.size(26.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                         Column {
                             Text(
                                 text = "مركز الدعم الفني المباشر",
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.titleSmall,
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold
                             )
@@ -174,6 +174,7 @@ fun SupportCenterSheet(
                         IconButton(
                             onClick = onSyncReplies,
                             modifier = Modifier
+                                .size(34.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.14f))
                                 .testTag("support_sync_button")
@@ -181,19 +182,22 @@ fun SupportCenterSheet(
                             Icon(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = "تحديث الردود",
-                                tint = MintPrimaryDark
+                                tint = MintPrimaryDark,
+                                modifier = Modifier.size(17.dp)
                             )
                         }
                         IconButton(
                             onClick = onDismiss,
                             modifier = Modifier
+                                .size(34.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.12f))
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "إغلاق",
-                                tint = Color.White
+                                tint = Color.White,
+                                modifier = Modifier.size(17.dp)
                             )
                         }
                     }
@@ -291,11 +295,11 @@ fun SupportCenterSheet(
                 },
                 label = { Text("تفاصيل رسالتك *") },
                 placeholder = { Text("اكتب مشكلتك أو سؤالك هنا...") },
-                minLines = 3,
-                maxLines = 5,
+                minLines = 2,
+                maxLines = 4,
                 isError = validationError != null,
                 supportingText = validationError?.let { err -> { Text(err) } },
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("support_message_input")
@@ -319,15 +323,16 @@ fun SupportCenterSheet(
                     validationError = null
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
-                shape = RoundedCornerShape(16.dp),
-                contentPadding = PaddingValues(vertical = 14.dp),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(vertical = 8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(42.dp)
                     .testTag("support_send_button")
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("إرسال إلى الدعم الفني", fontWeight = FontWeight.Bold)
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("إرسال إلى الدعم الفني", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
@@ -369,10 +374,10 @@ fun SupportCenterSheet(
                 }
             } else {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 320.dp)
+                        .heightIn(max = 240.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
                     tickets.forEach { ticket ->
@@ -380,7 +385,7 @@ fun SupportCenterSheet(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
         }
     }
 }
@@ -406,7 +411,7 @@ private fun SupportHistoryCard(ticket: SupportTicketEntity) {
     }
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(13.dp),
         border = BorderStroke(1.dp, statusColor.copy(alpha = 0.35f)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
@@ -414,8 +419,8 @@ private fun SupportHistoryCard(ticket: SupportTicketEntity) {
             .testTag("user_support_card_${ticket.id}")
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

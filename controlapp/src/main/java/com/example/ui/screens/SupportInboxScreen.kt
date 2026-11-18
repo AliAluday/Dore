@@ -101,14 +101,14 @@ fun SupportInboxScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 680.dp),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 104.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 80.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Gradient Support Header
             item {
                 Card(
-                    shape = RoundedCornerShape(22.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Box(
@@ -119,7 +119,7 @@ fun SupportInboxScreen(
                                     colors = listOf(Color(0xFF0A1428), Color(0xFF064E3B), Color(0xFF1E1B4B))
                                 )
                             )
-                            .padding(16.dp)
+                            .padding(11.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -129,18 +129,18 @@ fun SupportInboxScreen(
                             Row(
                                 modifier = Modifier.weight(1f),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.SupportAgent,
                                     contentDescription = null,
                                     tint = MintPrimaryDark,
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                                 Column {
                                     Text(
                                         text = "صندوق الدعم الفني (${state.supportTickets.size})",
-                                        style = MaterialTheme.typography.titleMedium,
+                                        style = MaterialTheme.typography.titleSmall,
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -162,13 +162,15 @@ fun SupportInboxScreen(
                                     containerColor = MintPrimaryDark,
                                     contentColor = Color(0xFF04221B)
                                 ),
-                                shape = RoundedCornerShape(14.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                                modifier = Modifier.testTag("ctrl_support_sync_button")
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier
+                                    .height(34.dp)
+                                    .testTag("ctrl_support_sync_button")
                             ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("سحب الرسائل", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("سحب", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -261,7 +263,7 @@ private fun ControlSupportTicketCard(
     }
 
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(15.dp),
         border = BorderStroke(1.dp, statusColor.copy(alpha = 0.4f)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
@@ -269,8 +271,8 @@ private fun ControlSupportTicketCard(
             .testTag("ctrl_support_card_${ticket.id}")
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -280,21 +282,21 @@ private fun ControlSupportTicketCard(
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(30.dp)
                             .clip(CircleShape)
                             .background(statusColor.copy(alpha = 0.14f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Person, contentDescription = null, tint = statusColor, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Person, contentDescription = null, tint = statusColor, modifier = Modifier.size(16.dp))
                     }
                     Column {
                         Text(
                             text = "${ticket.senderName}${if (ticket.senderPhone.isNotBlank()) " • ${ticket.senderPhone}" else ""}",
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
@@ -314,23 +316,23 @@ private fun ControlSupportTicketCard(
                         style = MaterialTheme.typography.labelSmall,
                         color = statusColor,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                     )
                 }
             }
 
             Surface(
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(11.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.padding(9.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
                         text = ticket.subject,
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -343,7 +345,7 @@ private fun ControlSupportTicketCard(
 
             if (ticket.adminReply.isNotBlank()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AdminPanelSettings, contentDescription = null, tint = StatusOpen, modifier = Modifier.size(15.dp))
+                    Icon(Icons.Default.AdminPanelSettings, contentDescription = null, tint = StatusOpen, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "آخر رد بواسطة ${ticket.repliedByAdmin}:",
@@ -359,9 +361,9 @@ private fun ControlSupportTicketCard(
                 onValueChange = { replyDraft = it },
                 label = { Text("اكتب الرد للمستخدم...") },
                 enabled = canReply,
-                minLines = 2,
-                maxLines = 4,
-                shape = RoundedCornerShape(14.dp),
+                minLines = 1,
+                maxLines = 3,
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("ctrl_support_reply_input_${ticket.id}")
@@ -369,38 +371,46 @@ private fun ControlSupportTicketCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Button(
                     onClick = { onReply(replyDraft) },
                     enabled = canReply && replyDraft.trim().length >= 2,
                     colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                     modifier = Modifier
                         .weight(1.2f)
+                        .height(35.dp)
                         .testTag("ctrl_support_send_reply_${ticket.id}")
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("إرسال الرد")
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("إرسال الرد", style = MaterialTheme.typography.labelSmall)
                 }
 
                 if (statusEnum != SupportTicketStatus.CLOSED) {
                     OutlinedButton(
                         onClick = onMarkInReview,
                         enabled = canReply,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(0.7f)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .weight(0.7f)
+                            .height(35.dp)
                     ) {
                         Text("مراجعة", style = MaterialTheme.typography.labelSmall)
                     }
                     OutlinedButton(
                         onClick = onClose,
                         enabled = canReply,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(0.6f)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .weight(0.5f)
+                            .height(35.dp)
                     ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = "إغلاق", modifier = Modifier.size(15.dp))
+                        Icon(Icons.Default.CheckCircle, contentDescription = "إغلاق", modifier = Modifier.size(14.dp))
                     }
                 }
             }

@@ -145,7 +145,7 @@ private fun ControlAppRoot(
                 snackbarHost = {
                     SnackbarHost(
                         hostState = snackbarHostState,
-                        modifier = Modifier.padding(bottom = 86.dp)
+                        modifier = Modifier.padding(bottom = 72.dp)
                     )
                 },
                 topBar = {
@@ -246,7 +246,7 @@ private fun ControlAppRoot(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
-                            .padding(horizontal = 12.dp, vertical = 12.dp)
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
                     )
                 }
             }
@@ -276,18 +276,18 @@ private fun ControlFloatingBottomDock(
 ) {
     Surface(
         modifier = modifier
-            .widthIn(max = 580.dp)
+            .widthIn(max = 560.dp)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(30.dp),
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-        shadowElevation = 14.dp,
-        tonalElevation = 8.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f))
+        shadowElevation = 10.dp,
+        tonalElevation = 6.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 6.dp),
+                .padding(horizontal = 4.dp, vertical = 3.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -323,26 +323,26 @@ private fun ControlFloatingBottomDock(
                         .clip(CircleShape)
                         .background(bgColor)
                         .clickable { onSelectTab(tab) }
-                        .padding(vertical = 8.dp, horizontal = 2.dp)
+                        .padding(vertical = 4.dp, horizontal = 2.dp)
                         .testTag("nav_tab_${tab.name.lowercase()}"),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                        verticalArrangement = Arrangement.spacedBy(1.dp)
                     ) {
                         if (badgeCount > 0) {
                             BadgedBox(
                                 badge = { Badge { Text("$badgeCount") } }
                             ) {
-                                Icon(icon, contentDescription = tab.label, tint = fgColor, modifier = Modifier.size(19.dp))
+                                Icon(icon, contentDescription = tab.label, tint = fgColor, modifier = Modifier.size(17.dp))
                             }
                         } else {
-                            Icon(icon, contentDescription = tab.label, tint = fgColor, modifier = Modifier.size(19.dp))
+                            Icon(icon, contentDescription = tab.label, tint = fgColor, modifier = Modifier.size(17.dp))
                         }
                         Text(
                             text = tab.label,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                             color = fgColor,
                             maxLines = 1,

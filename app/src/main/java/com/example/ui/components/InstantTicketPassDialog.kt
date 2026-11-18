@@ -64,10 +64,10 @@ fun InstantTicketPassDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 10.dp,
-            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)),
+            tonalElevation = 8.dp,
+            border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)),
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("instant_ticket_qr_dialog")
@@ -87,16 +87,16 @@ fun InstantTicketPassDialog(
                                 colors = listOf(Color(0xFF064E3B), Color(0xFF1E1B4B))
                             )
                         )
-                        .padding(horizontal = 20.dp, vertical = 18.dp)
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(48.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(MintPrimaryDark.copy(alpha = 0.22f)),
                             contentAlignment = Alignment.Center
@@ -105,7 +105,7 @@ fun InstantTicketPassDialog(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = null,
                                 tint = MintPrimaryDark,
-                                modifier = Modifier.size(30.dp)
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                         Text(
@@ -114,14 +114,14 @@ fun InstantTicketPassDialog(
                             } else {
                                 "تم إصدار تكت الحجز بنجاح"
                             },
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
                         )
                         Text(
                             text = booking.venueName,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.labelMedium,
                             color = Color.White.copy(alpha = 0.88f),
                             textAlign = TextAlign.Center
                         )
@@ -139,7 +139,7 @@ fun InstantTicketPassDialog(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (approval == BookingApprovalStatus.ACCEPTED) MintPrimaryDark else AmberGold,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
                     }
@@ -149,14 +149,14 @@ fun InstantTicketPassDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp),
+                        .padding(14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Organized 3-Column Metrics Strip: Order (#1+), People Ahead, Estimated Wait
+                    // Organized 3-Column Metrics Strip
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Surface(
                             shape = RoundedCornerShape(14.dp),
@@ -228,17 +228,17 @@ fun InstantTicketPassDialog(
                         }
                     }
 
-                    // Large Crisp Scannable QR Pass (if enabled by Control Panel)
+                    // Crisp Scannable QR Pass (if enabled)
                     if (controlConfig.enableQrCode) {
                         Surface(
-                            shape = RoundedCornerShape(22.dp),
+                            shape = RoundedCornerShape(16.dp),
                             color = Color.White,
-                            border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)),
-                            shadowElevation = 4.dp
+                            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)),
+                            shadowElevation = 3.dp
                         ) {
                             QrCodeCanvas(
                                 payload = com.example.util.QrCodeGenerator.buildTicketPayload(booking),
-                                modifier = Modifier.size(196.dp)
+                                modifier = Modifier.size(148.dp)
                             )
                         }
                     }
@@ -349,11 +349,13 @@ fun InstantTicketPassDialog(
                         if (controlConfig.enableWhatsAppShare) {
                             OutlinedButton(
                                 onClick = { IntentHelpers.shareTicketViaWhatsApp(context, booking) },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(38.dp)
                             ) {
-                                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("واتساب")
+                                Text("واتساب", style = MaterialTheme.typography.labelMedium)
                             }
                         }
                         Button(
@@ -361,9 +363,10 @@ fun InstantTicketPassDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             modifier = Modifier
                                 .weight(1.2f)
+                                .height(38.dp)
                                 .testTag("instant_ticket_view_button")
                         ) {
-                            Text("إدارة التذكرة")
+                            Text("إدارة التذكرة", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }

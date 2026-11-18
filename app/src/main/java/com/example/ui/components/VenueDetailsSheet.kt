@@ -147,10 +147,10 @@ fun VenueDetailsSheet(
                 .fillMaxWidth()
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 14.dp)
                 .navigationBarsPadding()
-                .padding(bottom = 22.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(bottom = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Concise Venue Header + Contact Actions
             Row(
@@ -165,7 +165,7 @@ fun VenueDetailsSheet(
                         border = BorderStroke(1.dp, StatusOpen.copy(alpha = 0.35f))
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
@@ -173,7 +173,7 @@ fun VenueDetailsSheet(
                                 imageVector = Icons.Default.Today,
                                 contentDescription = null,
                                 tint = StatusOpen,
-                                modifier = Modifier.size(13.dp)
+                                modifier = Modifier.size(12.dp)
                             )
                             Text(
                                 text = "حجز بنفس اليوم • دور مباشر",
@@ -183,50 +183,50 @@ fun VenueDetailsSheet(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = venue.name,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "${venue.city} • ${venue.area} • ${IntentHelpers.formatDinar(calculatedPrice)}",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(6.dp))
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     FilledTonalIconButton(
                         onClick = { IntentHelpers.dialPhone(context, venue.phone) },
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(38.dp)
                             .testTag("venue_detail_call_button")
                     ) {
-                        Icon(Icons.Default.Phone, contentDescription = "اتصال", modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Phone, contentDescription = "اتصال", modifier = Modifier.size(16.dp))
                     }
                     FilledTonalIconButton(
                         onClick = {
                             IntentHelpers.openMapLocation(context, venue.latitude, venue.longitude, venue.name)
                         },
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(38.dp)
                             .testTag("venue_detail_map_button")
                     ) {
-                        Icon(Icons.Default.LocationOn, contentDescription = "الموقع", modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.LocationOn, contentDescription = "الموقع", modifier = Modifier.size(16.dp))
                     }
                     FilledTonalIconButton(
                         onClick = {
                             IntentHelpers.openMessaging(context, venue.whatsapp, "مرحباً، أود الحجز في ${venue.name}")
                         },
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(38.dp)
                             .testTag("venue_detail_message_button")
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "رسالة", modifier = Modifier.size(18.dp))
+                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "رسالة", modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -276,14 +276,14 @@ fun VenueDetailsSheet(
             // Sports Fields Hours Stepper (1.5h min, 0.5h step, 3.0h max)
             if (isField) {
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(13.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding(9.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -301,10 +301,10 @@ fun VenueDetailsSheet(
                                     containerColor = MaterialTheme.colorScheme.primary
                                 ),
                                 modifier = Modifier
-                                    .size(44.dp)
+                                    .size(36.dp)
                                     .testTag("field_hours_decrease")
                             ) {
-                                Icon(Icons.Default.Remove, contentDescription = "إنقاص نصف ساعة")
+                                Icon(Icons.Default.Remove, contentDescription = "إنقاص نصف ساعة", modifier = Modifier.size(18.dp))
                             }
 
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -342,14 +342,14 @@ fun VenueDetailsSheet(
                                     containerColor = MaterialTheme.colorScheme.primary
                                 ),
                                 modifier = Modifier
-                                    .size(44.dp)
+                                    .size(36.dp)
                                     .testTag("field_hours_increase")
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "زيادة نصف ساعة")
+                                Icon(Icons.Default.Add, contentDescription = "زيادة نصف ساعة", modifier = Modifier.size(18.dp))
                             }
                         }
 
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                             FieldBookingDuration.validSteps.forEach { step ->
                                 FilterChip(
                                     selected = selectedHours == step,
@@ -367,17 +367,17 @@ fun VenueDetailsSheet(
                 }
             }
 
-            // Clinics Same-Day Visit Type & Urgency (Time-of-day periods removed)
+            // Clinics Same-Day Visit Type & Urgency
             if (isClinic) {
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(13.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding(9.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             DoctorVisitType.entries.forEach { visit ->
@@ -422,18 +422,18 @@ fun VenueDetailsSheet(
 
             // MANDATORY CUSTOMER INFO: Always entered fresh from the beginning on every booking
             Surface(
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                 border = BorderStroke(
-                    1.2.dp,
+                    1.dp,
                     if (hasAttemptedSubmit && (!isNameValid || !isPhoneValid)) StatusUrgent
                     else MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -586,10 +586,10 @@ fun VenueDetailsSheet(
                 },
                 enabled = controlConfig.allowNewBookings && venue.isOpen && venue.isAcceptingBookings,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(13.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .height(44.dp)
                     .testTag("confirm_venue_booking_button")
             ) {
                 Text(
@@ -671,17 +671,17 @@ private fun QueueMetricBox(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
         border = BorderStroke(1.dp, tint.copy(alpha = 0.25f)),
         modifier = modifier
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(1.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(14.dp))
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleSmall,

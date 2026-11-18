@@ -166,20 +166,20 @@ fun TicketsScreen(
                         ?: state.activeBookings.first()
 
                     LazyColumn(
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 104.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 80.dp),
+                        verticalArrangement = Arrangement.spacedBy(9.dp)
                     ) {
                         if (!hasNotificationPermission) {
                             item {
                                 Surface(
-                                    shape = RoundedCornerShape(18.dp),
+                                    shape = RoundedCornerShape(13.dp),
                                     color = MaterialTheme.colorScheme.secondaryContainer,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
@@ -254,18 +254,18 @@ fun TicketsScreen(
 
                         item {
                             Surface(
-                                shape = RoundedCornerShape(18.dp),
+                                shape = RoundedCornerShape(14.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
                                         text = "التحديث والمساعدة",
-                                        style = MaterialTheme.typography.labelMedium,
+                                        style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -275,26 +275,30 @@ fun TicketsScreen(
                                     ) {
                                         OutlinedButton(
                                             onClick = onSyncBridge,
-                                            shape = RoundedCornerShape(14.dp),
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                             modifier = Modifier
                                                 .weight(1f)
+                                                .height(36.dp)
                                                 .testTag("tickets_sync_approval_button")
                                         ) {
-                                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("تحديث الحالة", style = MaterialTheme.typography.labelMedium)
+                                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("تحديث الحالة", style = MaterialTheme.typography.labelSmall)
                                         }
                                         Button(
                                             onClick = onOpenSupport,
                                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                                            shape = RoundedCornerShape(14.dp),
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                             modifier = Modifier
                                                 .weight(1f)
+                                                .height(36.dp)
                                                 .testTag("tickets_support_button")
                                         ) {
-                                            Icon(Icons.Default.SupportAgent, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("الدعم الفني", style = MaterialTheme.typography.labelMedium)
+                                            Icon(Icons.Default.SupportAgent, contentDescription = null, modifier = Modifier.size(15.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("الدعم الفني", style = MaterialTheme.typography.labelSmall)
                                         }
                                     }
                                 }
@@ -335,8 +339,8 @@ fun TicketsScreen(
                     }
                 } else {
                     LazyColumn(
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 104.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 80.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(state.historyBookings, key = { it.id }) { booking ->
                             HistoryBookingCard(
@@ -356,38 +360,40 @@ fun TicketsScreen(
     zoomedBooking?.let { b ->
         Dialog(onDismissRequest = { zoomedBooking = null }) {
             Surface(
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 8.dp
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         text = b.venueName,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "رمز التذكرة: ${b.ticketCode}",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = EmeraldPrimary,
                         fontWeight = FontWeight.Bold
                     )
                     QrCodeCanvas(
                         payload = com.example.util.QrCodeGenerator.buildTicketPayload(b),
-                        modifier = Modifier.size(260.dp)
+                        modifier = Modifier.size(200.dp)
                     )
                     Text(
                         text = "اعرض هذا الرمز لموظف الاستقبال لمسح الدور",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Button(
                         onClick = { zoomedBooking = null },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp)
                     ) {
                         Text("إغلاق")
                     }
@@ -469,7 +475,7 @@ private fun HistoryBookingCard(
     val badgeText = if (isCompleted) "مكتمل" else "ملغى"
 
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(15.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -478,8 +484,8 @@ private fun HistoryBookingCard(
             .testTag("history_booking_card_${booking.id}")
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(11.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -489,7 +495,7 @@ private fun HistoryBookingCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = booking.venueName,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
@@ -553,23 +559,28 @@ private fun HistoryBookingCard(
                 Button(
                     onClick = onQuickRebook,
                     colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                     modifier = Modifier
                         .weight(1f)
+                        .height(36.dp)
                         .testTag("quick_rebook_button_${booking.id}")
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("حجز جديد لنفس المكان")
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("حجز جديد", style = MaterialTheme.typography.labelMedium)
                 }
 
                 if (reviewsEnabled && isCompleted && booking.userRating == null) {
                     OutlinedButton(
                         onClick = onRateClick,
-                        modifier = Modifier.weight(0.8f)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .weight(0.8f)
+                            .height(36.dp)
                     ) {
-                        Icon(Icons.Default.Star, contentDescription = null, tint = AmberGold, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Star, contentDescription = null, tint = AmberGold, modifier = Modifier.size(15.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("قيّم الخدمة")
+                        Text("قيّم الخدمة", style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }

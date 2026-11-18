@@ -117,14 +117,14 @@ fun ExploreScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 680.dp),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 104.dp),
-            verticalArrangement = Arrangement.spacedBy(11.dp)
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 80.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            // Optional Admin Broadcast / Maintenance Banner
+            // Optional Broadcast / Maintenance Banner
             if (ctrl.broadcastMessage.isNotBlank() || !ctrl.allowNewBookings) {
                 item {
                     Surface(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(12.dp),
                         color = if (!ctrl.allowNewBookings) StatusUrgent.copy(alpha = 0.14f)
                         else AmberGold.copy(alpha = 0.16f),
                         border = BorderStroke(
@@ -137,9 +137,9 @@ fun ExploreScreen(
                             .testTag("explore_control_banner")
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Campaign,
@@ -164,8 +164,8 @@ fun ExploreScreen(
             // Sleek Compact Hero & Instant Metrics Strip (replaces bulky banner + 3 separate boxes)
             item {
                 Card(
-                    shape = RoundedCornerShape(22.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Box(
@@ -188,21 +188,21 @@ fun ExploreScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                                .padding(horizontal = 12.dp, vertical = 9.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column(
                                 modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                                 ) {
                                     Text(
                                         text = state.preferences.selectedDistrict.displayName,
-                                        style = MaterialTheme.typography.titleMedium,
+                                        style = MaterialTheme.typography.titleSmall,
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,
@@ -218,13 +218,13 @@ fun ExploreScreen(
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MintPrimaryDark,
                                             fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
                                         )
                                     }
                                 }
                                 Text(
                                     text = "${state.openCountInDistrict} مفتوح • أسرع انتظار ${state.fastestWaitMinutes} د • ${state.averageRatingInDistrict} ★",
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = Color.White.copy(alpha = 0.85f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -232,7 +232,7 @@ fun ExploreScreen(
                             }
 
                             if (ctrl.enableFastestTurn) {
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
 
                                 Button(
                                     onClick = onBookFastestTurn,
@@ -241,19 +241,21 @@ fun ExploreScreen(
                                         containerColor = MintPrimaryDark,
                                         contentColor = Color(0xFF04221B)
                                     ),
-                                    shape = RoundedCornerShape(14.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                                    modifier = Modifier.testTag("fastest_turn_button")
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .height(34.dp)
+                                        .testTag("fastest_turn_button")
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Bolt,
                                         contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(14.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
                                     Text(
                                         text = "أسرع دور",
-                                        style = MaterialTheme.typography.labelLarge,
+                                        style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -557,36 +559,37 @@ fun ExploreScreen(
 
                 item {
                     Surface(
-                        shape = RoundedCornerShape(18.dp),
+                        shape = RoundedCornerShape(14.dp),
                         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(18.dp))
+                            .clip(RoundedCornerShape(14.dp))
                             .clickable { onOpenSupport() }
                             .testTag("explore_support_footer_card")
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                                .padding(horizontal = 12.dp, vertical = 9.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(
                                 modifier = Modifier.weight(1f),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.SupportAgent,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.secondary
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(19.dp)
                                 )
                                 Column {
                                     Text(
                                         text = "تحتاج مساعدة أو لديك استفسار؟",
-                                        style = MaterialTheme.typography.labelLarge,
+                                        style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
@@ -597,8 +600,8 @@ fun ExploreScreen(
                                 }
                             }
                             Text(
-                                text = "الدعم الفني ←",
-                                style = MaterialTheme.typography.labelMedium,
+                                text = "الدعم ←",
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.secondary,
                                 fontWeight = FontWeight.Bold
                             )
@@ -626,7 +629,7 @@ private fun FuturisticVenueCard(
     }
 
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(15.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.32f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -638,8 +641,8 @@ private fun FuturisticVenueCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -649,43 +652,41 @@ private fun FuturisticVenueCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(7.dp)
                                 .clip(CircleShape)
                                 .background(statusColor)
                         )
                         Text(
                             text = venue.name,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
                     }
-                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "${venue.city} • ${venue.area}" +
                             if (venue.category == ServiceCategory.CLINICS.displayName && venue.specialty.isNotBlank()) " • ${venue.specialty}" else "",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (!providerLabel.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(3.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.VerifiedUser,
                                 contentDescription = null,
                                 tint = StatusOpen,
-                                modifier = Modifier.size(13.dp)
+                                modifier = Modifier.size(12.dp)
                             )
                             Text(
                                 text = providerLabel,
@@ -712,13 +713,14 @@ private fun FuturisticVenueCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = AmberGold,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
 
                     IconButton(
                         onClick = onToggleFavorite,
                         modifier = Modifier
+                            .size(36.dp)
                             .minimumInteractiveComponentSize()
                             .clip(CircleShape)
                             .testTag("favorite_toggle_${venue.id}")
@@ -726,7 +728,8 @@ private fun FuturisticVenueCard(
                         Icon(
                             imageVector = if (venue.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = "المفضلة",
-                            tint = if (venue.isFavorite) StatusUrgent else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (venue.isFavorite) StatusUrgent else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -736,17 +739,17 @@ private fun FuturisticVenueCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(11.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "دور #${venue.nextTicketNumber}  •  قبلك ${venue.queueAheadCount}  •  " +
+                        text = "دور #${venue.nextTicketNumber} • قبلك ${venue.queueAheadCount} • " +
                             if (venue.estimatedWaitMinutes <= 0) "فوري" else "${venue.estimatedWaitMinutes} د",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -756,7 +759,7 @@ private fun FuturisticVenueCard(
                         } else {
                             IntentHelpers.formatDinar(venue.priceDinar)
                         },
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
                     )
@@ -765,16 +768,16 @@ private fun FuturisticVenueCard(
                 Button(
                     onClick = onDirectBook,
                     enabled = isAvailable,
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier
-                        .height(40.dp)
+                        .height(34.dp)
                         .testTag("direct_book_venue_${venue.id}")
                 ) {
                     Text(
                         text = if (isAvailable) "احجز الآن" else "متوقف",
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold
                     )
                 }

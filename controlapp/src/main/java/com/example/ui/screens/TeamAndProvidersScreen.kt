@@ -203,17 +203,17 @@ fun TeamAndProvidersScreen(
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
                     .testTag("team_search_input")
             )
 
             if (selectedSubTab == 0) {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 80.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item {
                         ActiveAdminSessionCard(
@@ -239,8 +239,8 @@ fun TeamAndProvidersScreen(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 80.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item {
                         ProvidersHeaderCard(
@@ -349,13 +349,13 @@ private fun ActiveAdminSessionCard(
     var menuExpanded by remember { mutableStateOf(false) }
 
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(15.dp),
         border = BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.45f)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -365,11 +365,11 @@ private fun ActiveAdminSessionCard(
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(34.dp)
                             .clip(CircleShape)
                             .background(EmeraldPrimary.copy(alpha = 0.16f)),
                         contentAlignment = Alignment.Center
@@ -378,7 +378,7 @@ private fun ActiveAdminSessionCard(
                             imageVector = Icons.Default.Shield,
                             contentDescription = null,
                             tint = EmeraldPrimary,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                     Column {
@@ -398,11 +398,14 @@ private fun ActiveAdminSessionCard(
                 Box {
                     OutlinedButton(
                         onClick = { menuExpanded = true },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.testTag("switch_active_admin_button")
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .height(34.dp)
+                            .testTag("switch_active_admin_button")
                     ) {
-                        Text("تبديل", style = MaterialTheme.typography.labelMedium)
-                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text("تبديل", style = MaterialTheme.typography.labelSmall)
+                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(15.dp))
                     }
                     DropdownMenu(
                         expanded = menuExpanded,
@@ -430,16 +433,19 @@ private fun ActiveAdminSessionCard(
                 onClick = onOpenAddAdmin,
                 enabled = canManageAdmins,
                 colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(11.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(38.dp)
                     .testTag("ctrl_add_admin_button")
             ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
                     text = if (canManageAdmins) "إضافة أدمن جديد وتحديد صلاحياته"
                     else "إضافة أدمن (يتطلب صلاحية إدارة الأدمن)",
+                    style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -461,9 +467,9 @@ private fun AdminAccountCard(
     val permCount = AdminPermissionType.entries.count { admin.hasPermission(it) }
 
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(15.dp),
         border = BorderStroke(
-            1.2.dp,
+            1.dp,
             if (isCurrent) EmeraldPrimary else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
         ),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -472,8 +478,8 @@ private fun AdminAccountCard(
             .testTag("admin_card_${admin.id}")
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -532,9 +538,9 @@ private fun AdminAccountCard(
                     if (!isCurrent) {
                         OutlinedButton(
                             onClick = onActivate,
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.height(34.dp)
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            modifier = Modifier.height(30.dp)
                         ) {
                             Text("تفعيل", style = MaterialTheme.typography.labelSmall)
                         }
@@ -542,14 +548,21 @@ private fun AdminAccountCard(
                     if (canEditPermissions) {
                         IconButton(
                             onClick = onEditDialog,
-                            modifier = Modifier.testTag("edit_admin_${admin.id}")
+                            modifier = Modifier
+                                .size(34.dp)
+                                .testTag("edit_admin_${admin.id}")
                         ) {
-                            Icon(Icons.Default.Edit, contentDescription = "تعديل الأدمن وصلاحياته", tint = EmeraldPrimary)
+                            Icon(Icons.Default.Edit, contentDescription = "تعديل الأدمن وصلاحياته", tint = EmeraldPrimary, modifier = Modifier.size(17.dp))
                         }
                     }
                     if (!admin.isSuperAdmin && canEditPermissions) {
-                        IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_admin_${admin.id}")) {
-                            Icon(Icons.Default.Delete, contentDescription = "حذف الأدمن", tint = StatusUrgent)
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .testTag("delete_admin_${admin.id}")
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "حذف الأدمن", tint = StatusUrgent, modifier = Modifier.size(17.dp))
                         }
                     }
                 }
@@ -560,7 +573,7 @@ private fun AdminAccountCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("حالة الحساب (مفعّل)", style = MaterialTheme.typography.bodySmall)
+                Text("حالة الحساب (مفعّل)", style = MaterialTheme.typography.labelMedium)
                 Switch(
                     checked = admin.isActive,
                     enabled = canEditPermissions,
@@ -578,18 +591,18 @@ private fun AdminAccountCard(
                 Text(
                     text = if (canEditPermissions) "الصلاحيات (اضغط للتعديل المباشر):"
                     else "صلاحيات الحساب (للتعديل بدّل لحساب يملك إدارة الأدمن):",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (canEditPermissions) {
-                    TextButton(onClick = onEditDialog) {
+                    TextButton(onClick = onEditDialog, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)) {
                         Text("تعديل الكل", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
 
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 TeamPermissionChip(
@@ -648,13 +661,13 @@ private fun ProvidersHeaderCard(
     onOpenAddProvider: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(15.dp),
         border = BorderStroke(1.dp, IndigoAccentLight.copy(alpha = 0.4f)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -673,13 +686,13 @@ private fun ProvidersHeaderCard(
                         } else {
                             "أضف أو عدّل صلاحيات أي طبيب أو صاحب ملعب أو تاجر لقبول التذاكر"
                         },
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 if (activeProvider != null) {
                     TextButton(onClick = onClearProviderMode) {
-                        Text("إنهاء الوضع")
+                        Text("إنهاء الوضع", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -688,14 +701,16 @@ private fun ProvidersHeaderCard(
                 onClick = onOpenAddProvider,
                 enabled = canManageProviders,
                 colors = ButtonDefaults.buttonColors(containerColor = IndigoAccentLight),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(11.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(38.dp)
                     .testTag("ctrl_add_provider_button")
             ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("إضافة طبيب / صاحب ملعب / تاجر", fontWeight = FontWeight.Bold, color = Color.White)
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(5.dp))
+                Text("إضافة طبيب / صاحب ملعب / تاجر", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     }
@@ -718,9 +733,9 @@ private fun ServiceProviderCard(
     val capCount = listOf(provider.canAcceptTickets, provider.canCallNext, provider.canPauseVenue).count { it }
 
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(15.dp),
         border = BorderStroke(
-            1.2.dp,
+            1.dp,
             if (isCurrentMode) IndigoAccentLight else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
         ),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -729,8 +744,8 @@ private fun ServiceProviderCard(
             .testTag("provider_card_${provider.id}")
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -740,21 +755,21 @@ private fun ServiceProviderCard(
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
+                            .size(34.dp)
                             .clip(CircleShape)
                             .background(IndigoAccentLight.copy(alpha = 0.14f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(roleIcon, contentDescription = null, tint = IndigoAccentLight, modifier = Modifier.size(22.dp))
+                        Icon(roleIcon, contentDescription = null, tint = IndigoAccentLight, modifier = Modifier.size(18.dp))
                     }
                     Column {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Text(
                                 text = provider.name,
@@ -773,13 +788,13 @@ private fun ServiceProviderCard(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = IndigoAccentLight,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
                                 )
                             }
                         }
                         Text(
                             text = "${provider.venueName} • $capCount/3 صلاحيات • مقبولة: ${provider.acceptedCount}",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -796,19 +811,26 @@ private fun ServiceProviderCard(
                     if (canManage) {
                         IconButton(
                             onClick = onEditDialog,
-                            modifier = Modifier.testTag("edit_provider_${provider.id}")
+                            modifier = Modifier
+                                .size(34.dp)
+                                .testTag("edit_provider_${provider.id}")
                         ) {
-                            Icon(Icons.Default.Edit, contentDescription = "تعديل مقدم الخدمة", tint = IndigoAccentLight)
+                            Icon(Icons.Default.Edit, contentDescription = "تعديل مقدم الخدمة", tint = IndigoAccentLight, modifier = Modifier.size(17.dp))
                         }
-                        IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_provider_${provider.id}")) {
-                            Icon(Icons.Default.Delete, contentDescription = "حذف", tint = StatusUrgent)
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .testTag("delete_provider_${provider.id}")
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "حذف", tint = StatusUrgent, modifier = Modifier.size(17.dp))
                         }
                     }
                 }
             }
 
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 TeamPermissionChip(
@@ -837,16 +859,19 @@ private fun ServiceProviderCard(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isCurrentMode) StatusOpen else EmeraldPrimary
                 ),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(35.dp)
                     .testTag("open_provider_workspace_${provider.id}")
             ) {
-                Icon(Icons.Default.VerifiedUser, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
+                Icon(Icons.Default.VerifiedUser, contentDescription = null, modifier = Modifier.size(15.dp))
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
                     text = if (isCurrentMode) "مفعّل حالياً — عرض التذاكر"
                     else "دخول بوضع ${provider.customTitle} لقبول التذاكر",
+                    style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
                 )
             }

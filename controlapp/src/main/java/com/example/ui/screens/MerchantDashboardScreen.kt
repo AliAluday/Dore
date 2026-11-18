@@ -147,13 +147,13 @@ fun MerchantDashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 680.dp),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 104.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 80.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Active Operator / Provider Switcher Card
             item {
                 Card(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(14.dp),
                     border = BorderStroke(
                         1.dp,
                         if (activeProvider != null) IndigoAccentLight.copy(alpha = 0.55f)
@@ -169,8 +169,8 @@ fun MerchantDashboardScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding(9.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -179,7 +179,7 @@ fun MerchantDashboardScreen(
                         ) {
                             Box(modifier = Modifier.weight(1f)) {
                                 Surface(
-                                    shape = RoundedCornerShape(14.dp),
+                                    shape = RoundedCornerShape(11.dp),
                                     color = MaterialTheme.colorScheme.surface,
                                     border = BorderStroke(
                                         1.dp,
@@ -187,14 +187,14 @@ fun MerchantDashboardScreen(
                                     ),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(14.dp))
+                                        .clip(RoundedCornerShape(11.dp))
                                         .clickable { providerMenuExpanded = true }
                                         .testTag("merchant_provider_switcher")
                                 ) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            .padding(horizontal = 9.dp, vertical = 7.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
@@ -204,7 +204,7 @@ fun MerchantDashboardScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(34.dp)
+                                                    .size(28.dp)
                                                     .clip(CircleShape)
                                                     .background(
                                                         if (activeProvider != null) IndigoAccentLight.copy(alpha = 0.18f)
@@ -216,15 +216,15 @@ fun MerchantDashboardScreen(
                                                     imageVector = if (activeProvider != null) Icons.Default.Badge else Icons.Default.AdminPanelSettings,
                                                     contentDescription = null,
                                                     tint = if (activeProvider != null) IndigoAccentLight else EmeraldPrimary,
-                                                    modifier = Modifier.size(19.dp)
+                                                    modifier = Modifier.size(16.dp)
                                                 )
                                             }
-                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
                                             Column {
                                                 Text(
                                                     text = activeProvider?.let { "${it.name} • ${it.customTitle}" }
                                                         ?: "وضع الأدمن الكامل (${state.activeAdmin?.name ?: "الإدارة"})",
-                                                    style = MaterialTheme.typography.titleSmall,
+                                                    style = MaterialTheme.typography.labelLarge,
                                                     fontWeight = FontWeight.Bold,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
@@ -300,17 +300,19 @@ fun MerchantDashboardScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
 
                             OutlinedButton(
                                 onClick = onSyncBridge,
-                                shape = RoundedCornerShape(14.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
-                                modifier = Modifier.testTag("merchant_sync_bridge_button")
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
+                                modifier = Modifier
+                                    .height(36.dp)
+                                    .testTag("merchant_sync_bridge_button")
                             ) {
-                                Icon(Icons.Default.Refresh, contentDescription = "مزامنة التذاكر", modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("مزامنة", style = MaterialTheme.typography.labelMedium)
+                                Icon(Icons.Default.Refresh, contentDescription = "مزامنة التذاكر", modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("مزامنة", style = MaterialTheme.typography.labelSmall)
                             }
                         }
 
@@ -332,20 +334,20 @@ fun MerchantDashboardScreen(
             item {
                 Box(modifier = Modifier.fillMaxWidth()) {
                     Surface(
-                        shape = RoundedCornerShape(18.dp),
+                        shape = RoundedCornerShape(14.dp),
                         color = MaterialTheme.colorScheme.surface,
                         border = BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.45f)),
                         tonalElevation = 2.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(18.dp))
+                            .clip(RoundedCornerShape(14.dp))
                             .clickable(enabled = activeProvider == null) { venueMenuExpanded = true }
                             .testTag("merchant_venue_dropdown")
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                                .padding(horizontal = 11.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -357,13 +359,13 @@ fun MerchantDashboardScreen(
                                     imageVector = Icons.Default.Store,
                                     contentDescription = null,
                                     tint = EmeraldPrimary,
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(19.dp)
                                 )
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
                                         text = selectedVenue.name,
-                                        style = MaterialTheme.typography.titleMedium,
+                                        style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -522,7 +524,7 @@ fun MerchantDashboardScreen(
             // Live Simulation Toggle Row
             item {
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(13.dp),
                     color = if (state.isLiveSimulationRunning) AmberGold.copy(alpha = 0.16f)
                     else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     border = BorderStroke(
@@ -535,7 +537,7 @@ fun MerchantDashboardScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                            .padding(horizontal = 11.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -547,12 +549,12 @@ fun MerchantDashboardScreen(
                                 imageVector = Icons.Default.NotificationsActive,
                                 contentDescription = null,
                                 tint = if (state.isLiveSimulationRunning) AmberAccent else EmeraldPrimary,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(19.dp)
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "محاكاة التنبيهات الحية",
-                                style = MaterialTheme.typography.titleSmall,
+                                style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -568,15 +570,15 @@ fun MerchantDashboardScreen(
             // Current Serving & Call Controls
             item {
                 Card(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(15.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.padding(11.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -586,59 +588,66 @@ fun MerchantDashboardScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "العميل قيد الخدمة الآن",
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     text = servingItem?.let { "${it.customerName} (${it.ticketCode})" } ?: "لا يوجد عميل حالياً",
-                                    style = MaterialTheme.typography.titleLarge,
+                                    style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = EmeraldPrimary
                                 )
                                 if (servingItem != null) {
                                     Text(
                                         text = servingItem.selectedOption,
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
                             OutlinedButton(
                                 onClick = { showWalkInDialog = true },
-                                modifier = Modifier.testTag("add_walkin_button")
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier
+                                    .height(34.dp)
+                                    .testTag("add_walkin_button")
                             ) {
-                                Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("حضوري")
+                                Text("حضوري", style = MaterialTheme.typography.labelSmall)
                             }
                         }
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Button(
                                 onClick = { onCallNext(selectedVenue.id) },
                                 colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                 modifier = Modifier
                                     .weight(1.2f)
+                                    .height(38.dp)
                                     .testTag("call_next_button")
                             ) {
-                                Icon(Icons.Default.Campaign, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("اتصل بالتالي")
+                                Icon(Icons.Default.Campaign, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("اتصل بالتالي", style = MaterialTheme.typography.labelMedium)
                             }
 
                             OutlinedButton(
                                 onClick = { onSkipCurrent(selectedVenue.id) },
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberAccent),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                 modifier = Modifier
                                     .weight(0.8f)
+                                    .height(38.dp)
                                     .testTag("skip_customer_button")
                             ) {
-                                Icon(Icons.Default.SkipNext, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("تخطي")
+                                Icon(Icons.Default.SkipNext, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("تخطي", style = MaterialTheme.typography.labelMedium)
                             }
                         }
 
@@ -866,7 +875,7 @@ private fun IncomingTicketApprovalCard(
     }
 
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(14.dp),
         border = BorderStroke(
             1.dp,
             if (approval == BookingApprovalStatus.PENDING) AmberGold.copy(alpha = 0.55f)
@@ -879,8 +888,8 @@ private fun IncomingTicketApprovalCard(
             .testTag("incoming_ticket_card_${booking.id}")
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -895,7 +904,7 @@ private fun IncomingTicketApprovalCard(
                     )
                     Text(
                         text = "${booking.ticketCode} • ${booking.selectedOption} • ${IntentHelpers.formatDinar(booking.priceDinar)}",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (booking.customerPhone.isNotBlank()) {
@@ -924,7 +933,7 @@ private fun IncomingTicketApprovalCard(
                         style = MaterialTheme.typography.labelSmall,
                         color = badgeColor,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                     )
                 }
             }
@@ -932,7 +941,7 @@ private fun IncomingTicketApprovalCard(
             if (approval == BookingApprovalStatus.PENDING) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Button(
                         onClick = onAccept,
@@ -940,31 +949,35 @@ private fun IncomingTicketApprovalCard(
                             containerColor = if (canAct) EmeraldPrimary else MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = if (canAct) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                         ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                         modifier = Modifier
                             .weight(1.3f)
+                            .height(35.dp)
                             .testTag("accept_ticket_${booking.id}")
                     ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(17.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("قبول التذكرة", fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("قبول التذكرة", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     }
                     OutlinedButton(
                         onClick = onReject,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                         modifier = Modifier
                             .weight(0.9f)
+                            .height(35.dp)
                             .testTag("reject_ticket_${booking.id}")
                     ) {
-                        Icon(Icons.Default.Cancel, contentDescription = null, modifier = Modifier.size(17.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("رفض")
+                        Icon(Icons.Default.Cancel, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("رفض", style = MaterialTheme.typography.labelMedium)
                     }
                 }
             } else {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = StatusOpen.copy(alpha = 0.12f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -974,10 +987,10 @@ private fun IncomingTicketApprovalCard(
                             if (booking.handledByProvider.isNotBlank()) append(" بواسطة ${booking.handledByProvider}")
                             if (booking.approvalNote.isNotBlank()) append(" — ${booking.approvalNote}")
                         },
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         color = StatusOpen,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                     )
                 }
             }
@@ -995,19 +1008,19 @@ private fun MerchantStatCard(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(13.dp),
         tonalElevation = 2.dp,
         border = BorderStroke(1.dp, tint.copy(alpha = 0.28f)),
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            modifier = Modifier.padding(9.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(19.dp))
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             Text(
@@ -1028,15 +1041,15 @@ private fun QueueWaitingRow(
     onMarkNoShow: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(13.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1046,12 +1059,12 @@ private fun QueueWaitingRow(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.customerName,
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "${item.ticketCode} • ${item.selectedOption}",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -1061,40 +1074,44 @@ private fun QueueWaitingRow(
                 ) {
                     Text(
                         text = "#${item.ticketNumber}",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                     )
                 }
             }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Button(
                     onClick = onCallByName,
                     colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     modifier = Modifier
                         .weight(1f)
+                        .height(34.dp)
                         .testTag("call_by_name_${item.id}")
                 ) {
-                    Icon(Icons.Default.Campaign, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("نداء بالاسم", style = MaterialTheme.typography.labelMedium)
+                    Icon(Icons.Default.Campaign, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text("نداء بالاسم", style = MaterialTheme.typography.labelSmall)
                 }
 
                 OutlinedButton(
                     onClick = onMarkNoShow,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     modifier = Modifier
                         .weight(1f)
+                        .height(34.dp)
                         .testTag("no_show_${item.id}")
                 ) {
-                    Icon(Icons.Default.PersonOff, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("توقف عن الحضور", style = MaterialTheme.typography.labelMedium)
+                    Icon(Icons.Default.PersonOff, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text("توقف عن الحضور", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }

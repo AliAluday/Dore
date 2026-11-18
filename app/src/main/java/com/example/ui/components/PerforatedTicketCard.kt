@@ -192,7 +192,7 @@ fun PerforatedTicketCard(
                             )
                         )
                     )
-                    .padding(18.dp)
+                    .padding(12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -201,7 +201,7 @@ fun PerforatedTicketCard(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Surface(
@@ -211,10 +211,10 @@ fun PerforatedTicketCard(
                             ) {
                                 Text(
                                     text = "${booking.venueCategory} • ${booking.venueCity}",
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = stageColor,
                                     fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
                             Surface(
@@ -226,20 +226,20 @@ fun PerforatedTicketCard(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = StatusOpen,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(5.dp))
                         Text(
                             text = booking.venueName,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "الخدمة: ${booking.selectedOption}",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         val approval = BookingApprovalStatus.fromName(booking.approvalStatus)
@@ -248,7 +248,7 @@ fun PerforatedTicketCard(
                             BookingApprovalStatus.REJECTED -> StatusUrgent
                             BookingApprovalStatus.PENDING -> AmberGold
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Surface(
                             shape = RoundedCornerShape(50),
                             color = approvalColor.copy(alpha = 0.14f),
@@ -265,17 +265,17 @@ fun PerforatedTicketCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = approvalColor,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                             )
                         }
                     }
 
                     Surface(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(12.dp),
                         color = stageColor
                     ) {
                         Column(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
@@ -285,7 +285,7 @@ fun PerforatedTicketCard(
                             )
                             Text(
                                 text = "#${booking.queueNumber}",
-                                style = MaterialTheme.typography.headlineSmall,
+                                style = MaterialTheme.typography.titleLarge,
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold
                             )
@@ -298,46 +298,46 @@ fun PerforatedTicketCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 ThreeStageProgressIndicator(currentStage = stage, activeColor = stageColor)
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Interactive QR + ETA Pod
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     if (controlConfig.enableQrCode) {
                         Surface(
-                            shape = RoundedCornerShape(18.dp),
-                            border = BorderStroke(2.dp, stageColor.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(14.dp),
+                            border = BorderStroke(1.5.dp, stageColor.copy(alpha = 0.5f)),
                             modifier = Modifier
-                                .clip(RoundedCornerShape(18.dp))
+                                .clip(RoundedCornerShape(14.dp))
                                 .clickable { onZoomQr() }
                                 .testTag("ticket_qr_button")
                         ) {
                             Box {
                                 QrCodeCanvas(
                                     payload = QrCodeGenerator.buildTicketPayload(booking),
-                                    modifier = Modifier.size(116.dp)
+                                    modifier = Modifier.size(90.dp)
                                 )
                                 Surface(
                                     shape = CircleShape,
                                     color = stageColor,
                                     modifier = Modifier
                                         .align(Alignment.BottomEnd)
-                                        .padding(5.dp)
+                                        .padding(4.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.ZoomIn,
                                         contentDescription = "تكبير رمز QR",
                                         tint = Color.White,
                                         modifier = Modifier
-                                            .padding(4.dp)
-                                            .size(14.dp)
+                                            .padding(3.dp)
+                                            .size(12.dp)
                                     )
                                 }
                             }
@@ -441,8 +441,8 @@ fun PerforatedTicketCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -508,7 +508,7 @@ fun PerforatedTicketCard(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
@@ -516,20 +516,22 @@ fun PerforatedTicketCard(
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier
                             .weight(1f)
+                            .height(38.dp)
                             .testTag("complete_ticket_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = null,
-                            modifier = Modifier.size(17.dp)
+                            modifier = Modifier.size(15.dp)
                         )
-                        Spacer(modifier = Modifier.width(5.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = if (controlConfig.enableLoyalty && controlConfig.pointsPerBooking > 0) {
                                 "إتمام (+${controlConfig.pointsPerBooking})"
                             } else {
                                 "إتمام الخدمة"
                             },
+                            style = MaterialTheme.typography.labelMedium,
                             maxLines = 1
                         )
                     }
@@ -537,28 +539,30 @@ fun PerforatedTicketCard(
                     OutlinedButton(
                         onClick = onCancelClick,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
-                        modifier = Modifier.testTag("cancel_ticket_button")
+                        modifier = Modifier
+                            .height(38.dp)
+                            .testTag("cancel_ticket_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Cancel,
                             contentDescription = null,
-                            modifier = Modifier.size(17.dp)
+                            modifier = Modifier.size(15.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("إلغاء", maxLines = 1)
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("إلغاء", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                     }
 
                     if (controlConfig.enableWhatsAppShare) {
                         FilledTonalIconButton(
                             onClick = onShareWhatsApp,
                             modifier = Modifier
-                                .size(46.dp)
+                                .size(38.dp)
                                 .testTag("share_whatsapp_button")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Share,
                                 contentDescription = "مشاركة عبر واتساب",
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -591,7 +595,7 @@ private fun ThreeStageProgressIndicator(currentStage: TicketStage, activeColor: 
             ) {
                 Box(
                     modifier = Modifier
-                        .size(30.dp)
+                        .size(24.dp)
                         .clip(CircleShape)
                         .background(if (reached) dotColor else MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
@@ -601,7 +605,7 @@ private fun ThreeStageProgressIndicator(currentStage: TicketStage, activeColor: 
                             imageVector = Icons.Default.Check,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(13.dp)
                         )
                     } else {
                         Text(
@@ -611,7 +615,7 @@ private fun ThreeStageProgressIndicator(currentStage: TicketStage, activeColor: 
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = stage.label,
                     style = MaterialTheme.typography.labelSmall,
@@ -624,8 +628,8 @@ private fun ThreeStageProgressIndicator(currentStage: TicketStage, activeColor: 
             if (index < stages.lastIndex) {
                 Box(
                     modifier = Modifier
-                        .width(24.dp)
-                        .height(3.dp)
+                        .width(18.dp)
+                        .height(2.5.dp)
                         .background(
                             if (index < currentStage.stepIndex) activeColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
                             RoundedCornerShape(2.dp)

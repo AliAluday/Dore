@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
@@ -141,6 +143,8 @@ fun ControlPanelScreen(
     var showAddVenueDialog by remember { mutableStateOf(false) }
     var showFactoryResetConfirm by remember { mutableStateOf(false) }
     var featuresSubTab by remember { mutableIntStateOf(0) }
+    var venueSearchQuery by remember { mutableStateOf("") }
+    var venueFilterCategory by remember { mutableStateOf(ServiceCategory.ALL) }
 
     val activeAdmin = state.activeAdmin
     val canManageFeatures = activeAdmin?.hasPermission(AdminPermissionType.MANAGE_FEATURES) ?: true
@@ -148,6 +152,18 @@ fun ControlPanelScreen(
     val canRunCommands = activeAdmin?.hasPermission(AdminPermissionType.RUN_COMMANDS) ?: true
     val providersByVenue = remember(state.providers) {
         state.providers.filter { it.isActive }.groupBy { it.venueId }
+    }
+    val filteredControlVenues = remember(state.districtVenues, venueSearchQuery, venueFilterCategory) {
+        val q = venueSearchQuery.trim()
+        state.districtVenues.filter { venue ->
+            val catMatch = venueFilterCategory == ServiceCategory.ALL ||
+                venue.category == venueFilterCategory.displayName
+            val queryMatch = q.isEmpty() ||
+                venue.name.contains(q, ignoreCase = true) ||
+                venue.area.contains(q, ignoreCase = true) ||
+                venue.city.contains(q, ignoreCase = true)
+            catMatch && queryMatch
+        }
     }
 
     Box(
@@ -713,7 +729,43 @@ fun ControlPanelScreen(
                             }
                         }
 
-                        items(state.districtVenues, key = { it.id }) { venue ->
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = venueSearchQuery,
+                                    onValueChange = { venueSearchQuery = it },
+                                    placeholder = { Text("ابحث باسم المركز أو المنطقة...", style = MaterialTheme.typography.bodySmall) },
+                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                                    trailingIcon = {
+                                        if (venueSearchQuery.isNotEmpty()) {
+                                            IconButton(onClick = { venueSearchQuery = "" }) {
+                                                Icon(Icons.Default.Clear, contentDescription = "مسح", modifier = Modifier.size(18.dp))
+                                            }
+                                        }
+                                    },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(14.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    items(ServiceCategory.entries) { cat ->
+                                        FilterChip(
+                                            selected = venueFilterCategory == cat,
+                                            onClick = { venueFilterCategory = cat },
+                                            label = { Text(cat.displayName, style = MaterialTheme.typography.labelSmall) }
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = "المراكز المعروضة (${filteredControlVenues.size} من ${state.districtVenues.size})",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        items(filteredControlVenues, key = { it.id }) { venue ->
                             ControlVenueCard(
                                 venue = venue,
                                 linkedProviders = providersByVenue[venue.id].orEmpty(),

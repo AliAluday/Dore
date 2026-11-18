@@ -112,6 +112,9 @@ fun ProfileScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            item {
+                ProfileSectionLabel("الوضع التجريبي والحساب")
+            }
             // Local Trial Mode Card
             item {
                 Card(
@@ -172,6 +175,9 @@ fun ProfileScreen(
                 }
             }
 
+            item {
+                ProfileSectionLabel("المساعدة والتواصل المباشر")
+            }
             // Technical Support Center Card (Send messages directly to Control App)
             item {
                 Card(
@@ -374,6 +380,9 @@ fun ProfileScreen(
 
             // Clean Compact Preferences & Android Notifications Card
             item {
+                ProfileSectionLabel("المنطقة والتفضيلات")
+            }
+            item {
                 Card(
                     shape = RoundedCornerShape(22.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
@@ -572,6 +581,17 @@ fun ProfileScreen(
             }
         )
     }
+}
+
+@Composable
+private fun ProfileSectionLabel(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(horizontal = 4.dp)
+    )
 }
 
 @Composable

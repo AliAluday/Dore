@@ -502,6 +502,48 @@ fun ExploreScreen(
                     }
                 }
             } else {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "المراكز المتاحة (${state.filteredVenues.size})",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (state.selectedArea != null ||
+                            state.searchQuery.isNotBlank() ||
+                            state.showFavoritesOnly ||
+                            state.selectedCategory != ServiceCategory.ALL
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .clickable {
+                                        onSelectArea(null)
+                                        onClearSearch()
+                                        onCategorySelect(ServiceCategory.ALL)
+                                        if (state.showFavoritesOnly) onToggleFavoritesOnly()
+                                    }
+                            ) {
+                                Text(
+                                    text = "إظهار الكل",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 items(state.filteredVenues, key = { it.id }) { venue ->
                     val linkedProvider = state.providers.firstOrNull { it.venueId == venue.id && it.isActive }
                     FuturisticVenueCard(

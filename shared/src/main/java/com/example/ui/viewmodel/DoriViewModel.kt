@@ -674,11 +674,25 @@ class DoriViewModel(
     fun updateAdminAccount(updated: AdminAccountEntity) {
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.MANAGE_ADMINS)) return@launch
-            if (updated.isSuperAdmin) {
-                _toastMessage.emit("صلاحيات المدير العام الأساسي ثابتة ولا يمكن تعطيلها")
+            val cleanName = updated.name.trim()
+            if (cleanName.length < 3) {
+                _toastMessage.emit("اسم الأدمن يجب أن لا يقل عن 3 أحرف")
                 return@launch
             }
-            repository.updateAdminAccount(updated)
+            val otherCanManageAdmins = uiState.value.admins.any {
+                it.id != updated.id && it.isActive && it.canManageAdmins
+            }
+            if ((!updated.isActive || !updated.canManageAdmins) && !otherCanManageAdmins) {
+                _toastMessage.emit("يجب أن يمتلك أدمن نشط واحد على الأقل صلاحية (إدارة الأدمن)")
+                return@launch
+            }
+            val normalized = updated.copy(
+                name = cleanName,
+                roleTitle = updated.roleTitle.trim().ifBlank { "مشرف تشغيل" },
+                phone = updated.phone.trim()
+            )
+            repository.updateAdminAccount(normalized)
+            _toastMessage.emit("تم تحديث بيانات وصلاحيات ${normalized.name} ✓")
         }
     }
 
@@ -738,7 +752,22 @@ class DoriViewModel(
     fun updateServiceProvider(provider: ServiceProviderEntity) {
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.MANAGE_PROVIDERS)) return@launch
-            repository.updateServiceProvider(provider)
+            val cleanName = provider.name.trim()
+            if (cleanName.length < 3) {
+                _toastMessage.emit("اسم مقدم الخدمة يجب أن لا يقل عن 3 أحرف")
+                return@launch
+            }
+            val venue = uiState.value.allVenues.find { it.id == provider.venueId }
+            val normalized = provider.copy(
+                name = cleanName,
+                customTitle = provider.customTitle.trim().ifBlank {
+                    ProviderRole.fromName(provider.providerRole).displayName
+                },
+                phone = provider.phone.trim(),
+                venueName = venue?.name ?: provider.venueName
+            )
+            repository.updateServiceProvider(normalized)
+            _toastMessage.emit("تم تحديث بيانات وصلاحيات ${normalized.name} ✓")
         }
     }
 

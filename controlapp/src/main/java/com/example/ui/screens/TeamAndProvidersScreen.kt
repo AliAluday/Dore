@@ -14,42 +14,37 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.VerifiedUser
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -75,14 +70,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.local.AdminAccountEntity
 import com.example.data.local.ServiceProviderEntity
-import com.example.data.local.VenueEntity
 import com.example.data.model.AdminPermissionType
 import com.example.data.model.ProviderRole
+import com.example.ui.components.AdminFormDialog
+import com.example.ui.components.ProviderFormDialog
+import com.example.ui.components.TeamPermissionChip
 import com.example.ui.theme.AmberGold
 import com.example.ui.theme.EmeraldPrimary
 import com.example.ui.theme.IndigoAccentLight
@@ -125,12 +121,35 @@ fun TeamAndProvidersScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedSubTab by remember { mutableIntStateOf(0) }
+    var searchQuery by remember { mutableStateOf("") }
     var showAddAdminDialog by remember { mutableStateOf(false) }
+    var editingAdmin by remember { mutableStateOf<AdminAccountEntity?>(null) }
     var showAddProviderDialog by remember { mutableStateOf(false) }
+    var editingProvider by remember { mutableStateOf<ServiceProviderEntity?>(null) }
 
     val activeAdmin = state.activeAdmin
     val canManageAdmins = activeAdmin?.hasPermission(AdminPermissionType.MANAGE_ADMINS) ?: true
     val canManageProviders = activeAdmin?.hasPermission(AdminPermissionType.MANAGE_PROVIDERS) ?: true
+
+    val filteredAdmins = remember(state.admins, searchQuery) {
+        val q = searchQuery.trim()
+        if (q.isEmpty()) state.admins
+        else state.admins.filter {
+            it.name.contains(q, ignoreCase = true) ||
+                it.roleTitle.contains(q, ignoreCase = true) ||
+                it.phone.contains(q, ignoreCase = true)
+        }
+    }
+
+    val filteredProviders = remember(state.providers, searchQuery) {
+        val q = searchQuery.trim()
+        if (q.isEmpty()) state.providers
+        else state.providers.filter {
+            it.name.contains(q, ignoreCase = true) ||
+                it.customTitle.contains(q, ignoreCase = true) ||
+                it.venueName.contains(q, ignoreCase = true)
+        }
+    }
 
     Box(
         modifier = modifier.fillMaxSize(),
@@ -144,23 +163,56 @@ fun TeamAndProvidersScreen(
             TabRow(selectedTabIndex = selectedSubTab) {
                 Tab(
                     selected = selectedSubTab == 0,
-                    onClick = { selectedSubTab = 0 },
+                    onClick = {
+                        selectedSubTab = 0
+                        searchQuery = ""
+                    },
                     text = { Text("الأدمن والصلاحيات (${state.admins.size})") },
                     icon = { Icon(Icons.Default.AdminPanelSettings, contentDescription = null) },
                     modifier = Modifier.testTag("team_admins_tab")
                 )
                 Tab(
                     selected = selectedSubTab == 1,
-                    onClick = { selectedSubTab = 1 },
+                    onClick = {
+                        selectedSubTab = 1
+                        searchQuery = ""
+                    },
                     text = { Text("الأطباء والتجار (${state.providers.size})") },
                     icon = { Icon(Icons.Default.Badge, contentDescription = null) },
                     modifier = Modifier.testTag("team_providers_tab")
                 )
             }
 
+            // Organized Quick Search Bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = {
+                    Text(
+                        if (selectedSubTab == 0) "ابحث عن أدمن بالاسم أو المسمى..."
+                        else "ابحث عن طبيب أو صاحب ملعب أو مركز...",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "مسح", modifier = Modifier.size(18.dp))
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                    .testTag("team_search_input")
+            )
+
             if (selectedSubTab == 0) {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item {
@@ -173,12 +225,13 @@ fun TeamAndProvidersScreen(
                         )
                     }
 
-                    items(state.admins, key = { it.id }) { admin ->
+                    items(filteredAdmins, key = { it.id }) { admin ->
                         AdminAccountCard(
                             admin = admin,
                             isCurrent = activeAdmin?.id == admin.id,
                             canEditPermissions = canManageAdmins,
                             onActivate = { onSelectActiveAdmin(admin.id) },
+                            onEditDialog = { editingAdmin = admin },
                             onUpdate = onUpdateAdmin,
                             onDelete = { onDeleteAdmin(admin.id) }
                         )
@@ -186,7 +239,7 @@ fun TeamAndProvidersScreen(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item {
@@ -199,7 +252,7 @@ fun TeamAndProvidersScreen(
                         )
                     }
 
-                    items(state.providers, key = { it.id }) { provider ->
+                    items(filteredProviders, key = { it.id }) { provider ->
                         ServiceProviderCard(
                             provider = provider,
                             isCurrentMode = state.activeProvider?.id == provider.id,
@@ -208,6 +261,7 @@ fun TeamAndProvidersScreen(
                                 onUpdateProvider(provider.copy(isActive = !provider.isActive))
                             },
                             onToggleCapability = { updated -> onUpdateProvider(updated) },
+                            onEditDialog = { editingProvider = provider },
                             onEnterProviderMode = { onOpenProviderWorkspace(provider.id) },
                             onDelete = { onDeleteProvider(provider.id) }
                         )
@@ -218,22 +272,67 @@ fun TeamAndProvidersScreen(
     }
 
     if (showAddAdminDialog) {
-        AddAdminDialog(
+        AdminFormDialog(
+            initialAdmin = null,
             onDismiss = { showAddAdminDialog = false },
-            onConfirm = { name, role, phone, f, v, q, s, p, a, c ->
-                onAddAdmin(name, role, phone, f, v, q, s, p, a, c)
+            onSave = { created ->
+                onAddAdmin(
+                    created.name,
+                    created.roleTitle,
+                    created.phone,
+                    created.canManageFeatures,
+                    created.canManageVenues,
+                    created.canManageQueues,
+                    created.canReplySupport,
+                    created.canManageProviders,
+                    created.canManageAdmins,
+                    created.canRunCommands
+                )
                 showAddAdminDialog = false
             }
         )
     }
 
+    editingAdmin?.let { target ->
+        AdminFormDialog(
+            initialAdmin = target,
+            onDismiss = { editingAdmin = null },
+            onSave = { updated ->
+                onUpdateAdmin(updated)
+                editingAdmin = null
+            }
+        )
+    }
+
     if (showAddProviderDialog) {
-        AddProviderDialog(
+        ProviderFormDialog(
+            initialProvider = null,
             venues = state.allVenues,
             onDismiss = { showAddProviderDialog = false },
-            onConfirm = { name, role, customTitle, phone, venueId, accept, call, pause ->
-                onAddProvider(name, role, customTitle, phone, venueId, accept, call, pause)
+            onSave = { created ->
+                onAddProvider(
+                    created.name,
+                    ProviderRole.fromName(created.providerRole),
+                    created.customTitle,
+                    created.phone,
+                    created.venueId,
+                    created.canAcceptTickets,
+                    created.canCallNext,
+                    created.canPauseVenue
+                )
                 showAddProviderDialog = false
+            }
+        )
+    }
+
+    editingProvider?.let { target ->
+        ProviderFormDialog(
+            initialProvider = target,
+            venues = state.allVenues,
+            onDismiss = { editingProvider = null },
+            onSave = { updated ->
+                onUpdateProvider(updated)
+                editingProvider = null
             }
         )
     }
@@ -355,9 +454,12 @@ private fun AdminAccountCard(
     isCurrent: Boolean,
     canEditPermissions: Boolean,
     onActivate: () -> Unit,
+    onEditDialog: () -> Unit,
     onUpdate: (AdminAccountEntity) -> Unit,
     onDelete: () -> Unit
 ) {
+    val permCount = AdminPermissionType.entries.count { admin.hasPermission(it) }
+
     Card(
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(
@@ -376,12 +478,12 @@ private fun AdminAccountCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
                             text = admin.name,
@@ -394,7 +496,7 @@ private fun AdminAccountCard(
                                 color = AmberGold.copy(alpha = 0.18f)
                             ) {
                                 Text(
-                                    text = "مدير عام",
+                                    text = "مدير أساسي",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = AmberGold,
                                     fontWeight = FontWeight.Bold,
@@ -417,8 +519,10 @@ private fun AdminAccountCard(
                             }
                         }
                     }
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "${admin.roleTitle}${if (admin.phone.isNotBlank()) " • ${admin.phone}" else ""}",
+                        text = "${admin.roleTitle} • $permCount/7 صلاحية" +
+                            if (admin.phone.isNotBlank()) " • ${admin.phone}" else "",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -435,6 +539,14 @@ private fun AdminAccountCard(
                             Text("تفعيل", style = MaterialTheme.typography.labelSmall)
                         }
                     }
+                    if (canEditPermissions) {
+                        IconButton(
+                            onClick = onEditDialog,
+                            modifier = Modifier.testTag("edit_admin_${admin.id}")
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = "تعديل الأدمن وصلاحياته", tint = EmeraldPrimary)
+                        }
+                    }
                     if (!admin.isSuperAdmin && canEditPermissions) {
                         IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_admin_${admin.id}")) {
                             Icon(Icons.Default.Delete, contentDescription = "حذف الأدمن", tint = StatusUrgent)
@@ -443,104 +555,88 @@ private fun AdminAccountCard(
                 }
             }
 
-            if (!admin.isSuperAdmin) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("حالة الحساب (مفعّل)", style = MaterialTheme.typography.bodySmall)
-                    Switch(
-                        checked = admin.isActive,
-                        enabled = canEditPermissions,
-                        onCheckedChange = { onUpdate(admin.copy(isActive = it)) }
-                    )
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("حالة الحساب (مفعّل)", style = MaterialTheme.typography.bodySmall)
+                Switch(
+                    checked = admin.isActive,
+                    enabled = canEditPermissions,
+                    onCheckedChange = { onUpdate(admin.copy(isActive = it)) }
+                )
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-            Text(
-                text = if (admin.isSuperAdmin) "يملك كافة الصلاحيات بشكل دائم"
-                else "صلاحيات الأدمن (اضغط للتعديل):",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (canEditPermissions) "الصلاحيات (اضغط للتعديل المباشر):"
+                    else "صلاحيات الحساب (للتعديل بدّل لحساب يملك إدارة الأدمن):",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (canEditPermissions) {
+                    TextButton(onClick = onEditDialog) {
+                        Text("تعديل الكل", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
 
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                PermissionChip(
+                TeamPermissionChip(
                     label = "المميزات",
                     checked = admin.canManageFeatures,
-                    enabled = !admin.isSuperAdmin && canEditPermissions,
+                    enabled = canEditPermissions,
                     onToggle = { onUpdate(admin.copy(canManageFeatures = !admin.canManageFeatures)) }
                 )
-                PermissionChip(
+                TeamPermissionChip(
                     label = "المراكز",
                     checked = admin.canManageVenues,
-                    enabled = !admin.isSuperAdmin && canEditPermissions,
+                    enabled = canEditPermissions,
                     onToggle = { onUpdate(admin.copy(canManageVenues = !admin.canManageVenues)) }
                 )
-                PermissionChip(
+                TeamPermissionChip(
                     label = "الطوابير والتذاكر",
                     checked = admin.canManageQueues,
-                    enabled = !admin.isSuperAdmin && canEditPermissions,
+                    enabled = canEditPermissions,
                     onToggle = { onUpdate(admin.copy(canManageQueues = !admin.canManageQueues)) }
                 )
-                PermissionChip(
+                TeamPermissionChip(
                     label = "الدعم الفني",
                     checked = admin.canReplySupport,
-                    enabled = !admin.isSuperAdmin && canEditPermissions,
+                    enabled = canEditPermissions,
                     onToggle = { onUpdate(admin.copy(canReplySupport = !admin.canReplySupport)) }
                 )
-                PermissionChip(
+                TeamPermissionChip(
                     label = "الأطباء والتجار",
                     checked = admin.canManageProviders,
-                    enabled = !admin.isSuperAdmin && canEditPermissions,
+                    enabled = canEditPermissions,
                     onToggle = { onUpdate(admin.copy(canManageProviders = !admin.canManageProviders)) }
                 )
-                PermissionChip(
+                TeamPermissionChip(
                     label = "إدارة الأدمن",
                     checked = admin.canManageAdmins,
-                    enabled = !admin.isSuperAdmin && canEditPermissions,
+                    enabled = canEditPermissions,
                     onToggle = { onUpdate(admin.copy(canManageAdmins = !admin.canManageAdmins)) }
                 )
-                PermissionChip(
+                TeamPermissionChip(
                     label = "الأوامر الحساسة",
                     checked = admin.canRunCommands,
-                    enabled = !admin.isSuperAdmin && canEditPermissions,
+                    enabled = canEditPermissions,
                     onToggle = { onUpdate(admin.copy(canRunCommands = !admin.canRunCommands)) }
                 )
             }
         }
     }
-}
-
-@Composable
-private fun PermissionChip(
-    label: String,
-    checked: Boolean,
-    enabled: Boolean,
-    onToggle: () -> Unit
-) {
-    FilterChip(
-        selected = checked,
-        onClick = { if (enabled) onToggle() },
-        enabled = enabled || checked,
-        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-        leadingIcon = {
-            if (checked) {
-                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp))
-            }
-        },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = StatusOpen.copy(alpha = 0.16f),
-            selectedLabelColor = StatusOpen,
-            selectedLeadingIconColor = StatusOpen
-        )
-    )
 }
 
 @Composable
@@ -575,7 +671,7 @@ private fun ProvidersHeaderCard(
                         text = if (activeProvider != null) {
                             "الوضع النشط: ${activeProvider.name} (${activeProvider.customTitle})"
                         } else {
-                            "أضف طبيباً أو صاحب ملعب أو تاجراً ليقبل التذاكر ويدير مركزه"
+                            "أضف أو عدّل صلاحيات أي طبيب أو صاحب ملعب أو تاجر لقبول التذاكر"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -613,11 +709,13 @@ private fun ServiceProviderCard(
     canManage: Boolean,
     onToggleActive: () -> Unit,
     onToggleCapability: (ServiceProviderEntity) -> Unit,
+    onEditDialog: () -> Unit,
     onEnterProviderMode: () -> Unit,
     onDelete: () -> Unit
 ) {
     val roleEnum = ProviderRole.fromName(provider.providerRole)
     val roleIcon = providerIcon(roleEnum)
+    val capCount = listOf(provider.canAcceptTickets, provider.canCallNext, provider.canPauseVenue).count { it }
 
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -661,7 +759,10 @@ private fun ServiceProviderCard(
                             Text(
                                 text = provider.name,
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
                             Surface(
                                 shape = CircleShape,
@@ -677,7 +778,7 @@ private fun ServiceProviderCard(
                             }
                         }
                         Text(
-                            text = "${provider.venueName} • مقبولة: ${provider.acceptedCount}",
+                            text = "${provider.venueName} • $capCount/3 صلاحيات • مقبولة: ${provider.acceptedCount}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -693,6 +794,12 @@ private fun ServiceProviderCard(
                         onCheckedChange = { onToggleActive() }
                     )
                     if (canManage) {
+                        IconButton(
+                            onClick = onEditDialog,
+                            modifier = Modifier.testTag("edit_provider_${provider.id}")
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = "تعديل مقدم الخدمة", tint = IndigoAccentLight)
+                        }
                         IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_provider_${provider.id}")) {
                             Icon(Icons.Default.Delete, contentDescription = "حذف", tint = StatusUrgent)
                         }
@@ -704,19 +811,19 @@ private fun ServiceProviderCard(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                PermissionChip(
+                TeamPermissionChip(
                     label = "قبول ورفض التذاكر",
                     checked = provider.canAcceptTickets,
                     enabled = canManage,
                     onToggle = { onToggleCapability(provider.copy(canAcceptTickets = !provider.canAcceptTickets)) }
                 )
-                PermissionChip(
+                TeamPermissionChip(
                     label = "استدعاء الدور",
                     checked = provider.canCallNext,
                     enabled = canManage,
                     onToggle = { onToggleCapability(provider.copy(canCallNext = !provider.canCallNext)) }
                 )
-                PermissionChip(
+                TeamPermissionChip(
                     label = "إيقاف/فتح الحجز",
                     checked = provider.canPauseVenue,
                     enabled = canManage,
@@ -745,247 +852,6 @@ private fun ServiceProviderCard(
             }
         }
     }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun AddAdminDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (
-        name: String,
-        roleTitle: String,
-        phone: String,
-        canFeatures: Boolean,
-        canVenues: Boolean,
-        canQueues: Boolean,
-        canSupport: Boolean,
-        canProviders: Boolean,
-        canAdmins: Boolean,
-        canCommands: Boolean
-    ) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var roleTitle by remember { mutableStateOf("مشرف تشغيل") }
-    var phone by remember { mutableStateOf("") }
-    var canFeatures by remember { mutableStateOf(false) }
-    var canVenues by remember { mutableStateOf(true) }
-    var canQueues by remember { mutableStateOf(true) }
-    var canSupport by remember { mutableStateOf(true) }
-    var canProviders by remember { mutableStateOf(true) }
-    var canAdmins by remember { mutableStateOf(false) }
-    var canCommands by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("إضافة أدمن جديد") },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("اسم الأدمن *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("add_admin_name_input")
-                )
-                OutlinedTextField(
-                    value = roleTitle,
-                    onValueChange = { roleTitle = it },
-                    label = { Text("المسمى الوظيفي") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("add_admin_role_input")
-                )
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("رقم الهاتف") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text("اختر الصلاحيات:", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    PermissionChip("المميزات", canFeatures, true) { canFeatures = !canFeatures }
-                    PermissionChip("المراكز", canVenues, true) { canVenues = !canVenues }
-                    PermissionChip("الطوابير", canQueues, true) { canQueues = !canQueues }
-                    PermissionChip("الدعم", canSupport, true) { canSupport = !canSupport }
-                    PermissionChip("التجار", canProviders, true) { canProviders = !canProviders }
-                    PermissionChip("الأدمن", canAdmins, true) { canAdmins = !canAdmins }
-                    PermissionChip("الأوامر", canCommands, true) { canCommands = !canCommands }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onConfirm(
-                        name, roleTitle, phone,
-                        canFeatures, canVenues, canQueues, canSupport, canProviders, canAdmins, canCommands
-                    )
-                },
-                enabled = name.trim().length >= 3,
-                colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
-                modifier = Modifier.testTag("confirm_add_admin_button")
-            ) {
-                Text("إضافة الأدمن")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("إلغاء") }
-        }
-    )
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun AddProviderDialog(
-    venues: List<VenueEntity>,
-    onDismiss: () -> Unit,
-    onConfirm: (
-        name: String,
-        role: ProviderRole,
-        customTitle: String,
-        phone: String,
-        venueId: Int,
-        canAccept: Boolean,
-        canCallNext: Boolean,
-        canPause: Boolean
-    ) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var selectedRole by remember { mutableStateOf(ProviderRole.DOCTOR) }
-    var customTitle by remember { mutableStateOf(ProviderRole.DOCTOR.displayName) }
-    var phone by remember { mutableStateOf("") }
-    var selectedVenue by remember(venues) { mutableStateOf(venues.firstOrNull()) }
-    var venueMenuExpanded by remember { mutableStateOf(false) }
-    var canAccept by remember { mutableStateOf(true) }
-    var canCallNext by remember { mutableStateOf(true) }
-    var canPause by remember { mutableStateOf(true) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("إضافة طبيب / صاحب ملعب / تاجر") },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("الاسم الكامل *") },
-                    placeholder = { Text("مثال: د. علي الحمداني أو كابتن أحمد") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("add_provider_name_input")
-                )
-
-                Text("نوع النشاط / الصفة:", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    ProviderRole.entries.forEach { role ->
-                        FilterChip(
-                            selected = selectedRole == role,
-                            onClick = {
-                                selectedRole = role
-                                customTitle = role.displayName
-                            },
-                            label = { Text(role.displayName, style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-                }
-
-                OutlinedTextField(
-                    value = customTitle,
-                    onValueChange = { customTitle = it },
-                    label = { Text("التسمية المخصصة") },
-                    placeholder = { Text("طبيب، صاحب ملعب، تاجر...") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("add_provider_title_input")
-                )
-
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("رقم الهاتف") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                // Venue Selector
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { venueMenuExpanded = true }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = selectedVenue?.name ?: "اختر المركز المرتبط",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
-                        }
-                    }
-                    DropdownMenu(
-                        expanded = venueMenuExpanded,
-                        onDismissRequest = { venueMenuExpanded = false },
-                        modifier = Modifier.heightIn(max = 300.dp)
-                    ) {
-                        venues.forEach { venue ->
-                            DropdownMenuItem(
-                                text = { Text("${venue.name} (${venue.city})") },
-                                onClick = {
-                                    selectedVenue = venue
-                                    venueMenuExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-
-                Text("الصلاحيات:", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    PermissionChip("قبول التذاكر", canAccept, true) { canAccept = !canAccept }
-                    PermissionChip("استدعاء التالي", canCallNext, true) { canCallNext = !canCallNext }
-                    PermissionChip("إيقاف الطابور", canPause, true) { canPause = !canPause }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val vId = selectedVenue?.id ?: 1
-                    onConfirm(name, selectedRole, customTitle, phone, vId, canAccept, canCallNext, canPause)
-                },
-                enabled = name.trim().length >= 3 && selectedVenue != null,
-                colors = ButtonDefaults.buttonColors(containerColor = IndigoAccentLight),
-                modifier = Modifier.testTag("confirm_add_provider_button")
-            ) {
-                Text("حفظ وإضافة", color = Color.White)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("إلغاء") }
-        }
-    )
 }
 
 private fun providerIcon(role: ProviderRole): ImageVector = when (role) {

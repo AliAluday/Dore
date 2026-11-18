@@ -405,6 +405,18 @@ class ExampleRobolectricTest {
                 )!!
                 assertEquals(com.example.data.model.BookingApprovalStatus.REJECTED.name, rejected.approvalStatus)
                 assertEquals(com.example.data.model.BookingStatus.CANCELLED.name, rejected.status)
+                // 4. Editing permissions of ANY Admin (including Super Admin) and ANY Doctor/Provider
+                repo.updateAdminAccount(superAdmin.copy(canRunCommands = false, roleTitle = "مدير مخصص"))
+                val editedSuper = db.doriDao().getAdminById(superAdmin.id)!!
+                assertFalse(editedSuper.hasPermission(com.example.data.model.AdminPermissionType.RUN_COMMANDS))
+                assertTrue(editedSuper.hasPermission(com.example.data.model.AdminPermissionType.MANAGE_ADMINS))
+                assertEquals("مدير مخصص", editedSuper.roleTitle)
+
+                repo.updateServiceProvider(doctor.copy(canAcceptTickets = false, canPauseVenue = true, customTitle = "استشاري باطنية"))
+                val editedDoctor = db.doriDao().getProviderById(doctor.id)!!
+                assertFalse(editedDoctor.canAcceptTickets)
+                assertTrue(editedDoctor.canPauseVenue)
+                assertEquals("استشاري باطنية", editedDoctor.customTitle)
             } finally {
                 db.close()
             }

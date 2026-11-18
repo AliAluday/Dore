@@ -138,7 +138,6 @@ data class AdminAccountEntity(
 ) {
     fun hasPermission(permission: AdminPermissionType): Boolean {
         if (!isActive) return false
-        if (isSuperAdmin) return true
         return when (permission) {
             AdminPermissionType.MANAGE_FEATURES -> canManageFeatures
             AdminPermissionType.MANAGE_VENUES -> canManageVenues

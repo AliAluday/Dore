@@ -151,6 +151,14 @@ fun TicketsScreen(
                             ) {
                                 Text("استكشف الأماكن المفتوحة")
                             }
+                            OutlinedButton(
+                                onClick = onOpenSupport,
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Icon(Icons.Default.SupportAgent, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("التواصل مع الدعم الفني")
+                            }
                         }
                     }
                 } else {
@@ -245,31 +253,50 @@ fun TicketsScreen(
                         }
 
                         item {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            Surface(
+                                shape = RoundedCornerShape(18.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                OutlinedButton(
-                                    onClick = onSyncBridge,
-                                    shape = RoundedCornerShape(14.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("tickets_sync_approval_button")
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("تحديث حالة القبول", style = MaterialTheme.typography.labelMedium)
-                                }
-                                OutlinedButton(
-                                    onClick = onOpenSupport,
-                                    shape = RoundedCornerShape(14.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("tickets_support_button")
-                                ) {
-                                    Icon(Icons.Default.SupportAgent, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("الدعم الفني", style = MaterialTheme.typography.labelMedium)
+                                    Text(
+                                        text = "المزامنة والمساعدة",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = onSyncBridge,
+                                            shape = RoundedCornerShape(14.dp),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .testTag("tickets_sync_approval_button")
+                                        ) {
+                                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("تحديث القبول", style = MaterialTheme.typography.labelMedium)
+                                        }
+                                        Button(
+                                            onClick = onOpenSupport,
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                            shape = RoundedCornerShape(14.dp),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .testTag("tickets_support_button")
+                                        ) {
+                                            Icon(Icons.Default.SupportAgent, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("الدعم الفني", style = MaterialTheme.typography.labelMedium)
+                                        }
+                                    }
                                 }
                             }
                         }

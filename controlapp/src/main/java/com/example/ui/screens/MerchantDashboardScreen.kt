@@ -28,8 +28,11 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.HourglassTop
@@ -39,6 +42,7 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.AlertDialog
@@ -50,6 +54,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -58,6 +63,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,10 +74,15 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import com.example.data.local.BookingEntity
 import com.example.data.local.MerchantQueueItemEntity
 import com.example.data.model.BookingApprovalStatus
@@ -118,6 +129,9 @@ fun MerchantDashboardScreen(
     var venueMenuExpanded by remember { mutableStateOf(false) }
     var providerMenuExpanded by remember { mutableStateOf(false) }
     var rejectingBooking by remember { mutableStateOf<BookingEntity?>(null) }
+    var confirmNoShowItem by remember { mutableStateOf<MerchantQueueItemEntity?>(null) }
+    var queueSearchQuery by remember(selectedVenue?.id) { mutableStateOf("") }
+    val haptic = LocalHapticFeedback.current
 
     val activeProvider = state.activeProvider
     val activeProviders = remember(state.providers) { state.providers.filter { it.isActive } }
@@ -144,6 +158,15 @@ fun MerchantDashboardScreen(
 
         val venueBookings = remember(state.activeBookings, selectedVenue.id) {
             state.activeBookings.filter { it.venueId == selectedVenue.id }
+        }
+        val visibleWaitingItems = remember(waitingItems, queueSearchQuery) {
+            val q = queueSearchQuery.trim()
+            if (q.isEmpty()) waitingItems
+            else waitingItems.filter {
+                it.customerName.contains(q, ignoreCase = true) ||
+                    it.ticketCode.contains(q, ignoreCase = true) ||
+                    it.selectedOption.contains(q, ignoreCase = true)
+            }
         }
         val pendingCount = venueBookings.count { it.approvalStatus == BookingApprovalStatus.PENDING.name }
 
@@ -545,8 +568,14 @@ fun MerchantDashboardScreen(
                     IncomingTicketApprovalCard(
                         booking = booking,
                         canAct = activeProvider?.canAcceptTickets ?: true,
-                        onAccept = { onAcceptTicket(booking.id, "تم القبول وتأكيد الموعد") },
-                        onReject = { rejectingBooking = booking }
+                        onAccept = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onAcceptTicket(booking.id, "تم القبول وتأكيد الموعد")
+                        },
+                        onReject = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            rejectingBooking = booking
+                        }
                     )
                 }
             }
@@ -654,7 +683,10 @@ fun MerchantDashboardScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Button(
-                                onClick = { onCallNext(selectedVenue.id) },
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onCallNext(selectedVenue.id)
+                                },
                                 colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                 modifier = Modifier
@@ -669,7 +701,10 @@ fun MerchantDashboardScreen(
                             }
 
                             OutlinedButton(
-                                onClick = { onSkipCurrent(selectedVenue.id) },
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onSkipCurrent(selectedVenue.id)
+                                },
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberAccent),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                 modifier = Modifier
@@ -694,7 +729,10 @@ fun MerchantDashboardScreen(
                             Text("إيقاف الطابور مؤقتاً", style = MaterialTheme.typography.bodyMedium)
                             Switch(
                                 checked = selectedVenue.isPaused,
-                                onCheckedChange = { onTogglePauseQueue(selectedVenue.id) },
+                                onCheckedChange = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onTogglePauseQueue(selectedVenue.id)
+                                },
                                 modifier = Modifier.testTag("pause_queue_switch")
                             )
                         }
@@ -709,7 +747,10 @@ fun MerchantDashboardScreen(
                             Text("استقبال طلبات الحجز الجديدة", style = MaterialTheme.typography.bodyMedium)
                             Switch(
                                 checked = selectedVenue.isAcceptingBookings,
-                                onCheckedChange = { onToggleAcceptingBookings(selectedVenue.id) },
+                                onCheckedChange = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onToggleAcceptingBookings(selectedVenue.id)
+                                },
                                 modifier = Modifier.testTag("accept_bookings_switch")
                             )
                         }
@@ -738,7 +779,30 @@ fun MerchantDashboardScreen(
                 }
             }
 
-            if (waitingItems.isEmpty()) {
+            if (waitingItems.size > 3) {
+                item {
+                    OutlinedTextField(
+                        value = queueSearchQuery,
+                        onValueChange = { queueSearchQuery = it },
+                        placeholder = { Text("ابحث بالاسم أو رقم التذكرة في الطابور...", style = MaterialTheme.typography.bodySmall) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        trailingIcon = {
+                            if (queueSearchQuery.isNotEmpty()) {
+                                IconButton(onClick = { queueSearchQuery = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "مسح البحث", modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("merchant_queue_search")
+                    )
+                }
+            }
+
+            if (visibleWaitingItems.isEmpty()) {
                 item {
                     Surface(
                         shape = RoundedCornerShape(16.dp),
@@ -746,7 +810,11 @@ fun MerchantDashboardScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "الطابور فارغ حالياً — أضف عميل حضوري أو اسحب الحجوزات بالمزامنة.",
+                            text = if (waitingItems.isEmpty()) {
+                                "الطابور فارغ حالياً — أضف عميل حضوري أو اسحب الحجوزات بالمزامنة."
+                            } else {
+                                "لا توجد نتائج مطابقة للبحث في الطابور."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(16.dp)
@@ -754,12 +822,22 @@ fun MerchantDashboardScreen(
                     }
                 }
             } else {
-                items(waitingItems, key = { it.id }) { item ->
+                items(visibleWaitingItems, key = { it.id }) { item ->
                     QueueWaitingRow(
                         item = item,
                         canAct = canCallNext,
-                        onCallByName = { onCallCustomerByName(selectedVenue.id, item.id, item.customerName) },
-                        onMarkNoShow = { onMarkNoShow(selectedVenue.id, item.id, item.customerName) }
+                        onCallByName = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onCallCustomerByName(selectedVenue.id, item.id, item.customerName)
+                        },
+                        onMarkNoShow = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            if (canCallNext) {
+                                confirmNoShowItem = item
+                            } else {
+                                onMarkNoShow(selectedVenue.id, item.id, item.customerName)
+                            }
+                        }
                     )
                 }
             }
@@ -891,6 +969,33 @@ fun MerchantDashboardScreen(
             }
         )
     }
+
+    confirmNoShowItem?.let { item ->
+        AlertDialog(
+            onDismissRequest = { confirmNoShowItem = null },
+            title = { Text("تأكيد عدم الحضور") },
+            text = {
+                Text("هل أنت متأكد من تسجيل «${item.customerName}» (${item.ticketCode}) كمتوقف عن الحضور وإزالته من طابور الانتظار؟")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onMarkNoShow(selectedVenue?.id ?: item.venueId, item.id, item.customerName)
+                        confirmNoShowItem = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatusUrgent)
+                ) {
+                    Text("تأكيد عدم الحضور")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmNoShowItem = null }) {
+                    Text("تراجع")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -924,6 +1029,17 @@ private fun IncomingTicketApprovalCard(
         BookingApprovalStatus.REJECTED -> StatusUrgent
     }
 
+    val clipboardManager = LocalClipboardManager.current
+    val haptic = LocalHapticFeedback.current
+    var copiedCode by remember { mutableStateOf(false) }
+
+    LaunchedEffect(copiedCode) {
+        if (copiedCode) {
+            delay(1800L)
+            copiedCode = false
+        }
+    }
+
     Card(
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(
@@ -952,11 +1068,48 @@ private fun IncomingTicketApprovalCard(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        text = "${booking.ticketCode} • ${booking.selectedOption} • ${IntentHelpers.formatDinar(booking.priceDinar)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = EmeraldPrimary.copy(alpha = 0.1f),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable {
+                                    clipboardManager.setText(AnnotatedString(booking.ticketCode))
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    copiedCode = true
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (copiedCode) Icons.Default.Check else Icons.Default.ContentCopy,
+                                    contentDescription = "نسخ رمز التذكرة",
+                                    tint = EmeraldPrimary,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = if (copiedCode) "✓ تم النسخ" else booking.ticketCode,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = EmeraldPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Text(
+                            text = "${booking.selectedOption} • ${IntentHelpers.formatDinar(booking.priceDinar)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                     if (booking.customerPhone.isNotBlank()) {
                         Text(
                             text = "هاتف: ${booking.customerPhone}",

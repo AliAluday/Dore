@@ -863,4 +863,109 @@ class ExampleRobolectricTest {
                 db.close()
             }
         }
+
+    @Test
+    fun `support reply never duplicates across synthetic bridge merges or rapid taps and profile normalizes digits`() =
+        kotlinx.coroutines.runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val db = androidx.room.Room.inMemoryDatabaseBuilder(
+                context,
+                com.example.data.local.DoriDatabase::class.java
+            ).allowMainThreadQueries().build()
+            try {
+                val prefs = com.example.data.local.UserPreferencesDataStore(context)
+                val repo = com.example.data.repository.DoriRepository(db.doriDao(), prefs)
+                repo.ensureSeeded()
+
+                // 1. User starts a support chat + rapid accidental double-tap follow-up
+                val ticket = repo.createSupportTicket(
+                    senderName = "مصطفى",
+                    senderPhone = "07701112233",
+                    category = com.example.data.model.SupportCategory.GENERAL,
+                    subject = "استفسار",
+                    message = "مرحبا أحتاج مساعدة",
+                    requestType = com.example.data.model.SupportRequestType.CHAT
+                ).getOrThrow()
+
+                repo.sendUserSupportFollowUp(ticket.externalId, "مصطفى", "هل يوجد حجز الآن؟").getOrThrow()
+                repo.sendUserSupportFollowUp(ticket.externalId, "مصطفى", "هل يوجد حجز الآن؟").getOrThrow()
+                val userFollowUps = db.doriDao().getMessagesForTicketOnce(ticket.externalId)
+                    .filter { !it.isFromAdmin && it.body == "هل يوجد حجز الآن؟" }
+                assertEquals(1, userFollowUps.size)
+
+                // 2. Synthetic SYNC-A- / PUSH-A- reply arrives BEFORE authoritative MSG- reply
+                val replyBody = "أهلاً بك مصطفى، تم تفعيل دورك بنجاح"
+                val now = System.currentTimeMillis()
+                repo.mergePulledSupportTickets(
+                    listOf(
+                        ticket.copy(
+                            status = com.example.data.model.SupportTicketStatus.REPLIED.name,
+                            adminReply = replyBody,
+                            repliedByAdmin = "أحمد الموصلي",
+                            updatedAt = now
+                        )
+                    ),
+                    isControlApp = false
+                )
+                val realAdminMsg = com.example.data.local.SupportMessageEntity(
+                    externalMessageId = "MSG-AUTH-REPLY-1",
+                    ticketExternalId = ticket.externalId,
+                    isFromAdmin = true,
+                    senderName = "أحمد الموصلي",
+                    body = replyBody,
+                    createdAt = now + 50L
+                )
+                repo.mergePulledSupportMessages(listOf(realAdminMsg), isControlApp = false)
+
+                // Must collapse synthetic SYNC-A- row and keep strictly 1 authoritative reply
+                val afterMergeMsgs = db.doriDao().getMessagesForTicketOnce(ticket.externalId)
+                    .filter { it.isFromAdmin && it.body == replyBody }
+                assertEquals(1, afterMergeMsgs.size)
+                assertEquals("MSG-AUTH-REPLY-1", afterMergeMsgs.first().externalMessageId)
+                assertEquals("فريق الدعم الفني", afterMergeMsgs.first().senderName)
+
+                // 3. Reversed order: authoritative MSG- exists first, then legacy ticket/synthetic message arrives
+                val secondReply = "شكراً لتواصلك معنا"
+                val controlTicket = repo.createSupportTicket(
+                    senderName = "زهراء",
+                    senderPhone = "07705556677",
+                    category = com.example.data.model.SupportCategory.BOOKING_ISSUE,
+                    subject = "مشكلة حجز",
+                    message = "تفاصيل المشكلة هنا",
+                    requestType = com.example.data.model.SupportRequestType.COMPLAINT
+                ).getOrThrow()
+                repo.replyToSupportTicket(controlTicket.id, secondReply, "فريق الإدارة").getOrThrow()
+                // Rapid duplicate reply tap within 1500ms must also be ignored
+                repo.replyToSupportTicket(controlTicket.id, secondReply, "فريق الإدارة").getOrThrow()
+                // Inject stale synthetic PUSH-A- matching same reply
+                repo.mergePulledSupportMessages(
+                    listOf(
+                        com.example.data.local.SupportMessageEntity(
+                            externalMessageId = "PUSH-A-${controlTicket.externalId}-${secondReply.hashCode()}",
+                            ticketExternalId = controlTicket.externalId,
+                            isFromAdmin = true,
+                            senderName = "فريق الدعم الفني",
+                            body = secondReply,
+                            createdAt = System.currentTimeMillis() + 100L
+                        )
+                    ),
+                    isControlApp = true
+                )
+                val finalAdminReplies = db.doriDao().getMessagesForTicketOnce(controlTicket.externalId)
+                    .filter { it.isFromAdmin && it.body == secondReply }
+                assertEquals(1, finalAdminReplies.size)
+
+                // 4. Profile update normalizes Arabic-Indic digits & zero-loyalty completion stays 0 earned
+                repo.updateProfile("نور الهدى", "٠٧٧٠٩٩٩١١٢٢", NinevehDistrict.MOSUL_LEFT)
+                assertEquals("07709991122", prefs.userPreferences.first().userPhone)
+
+                repo.updateControlConfig { it.copy(enableLoyalty = false, pointsPerBooking = 15) }
+                val ptsBefore = prefs.userPreferences.first().loyaltyPoints
+                val b = repo.bookQueueTicket(1, "نور الهدى", "07709991122", "كشف عام").getOrThrow()
+                repo.completeBookingWithOptionalReview(b.id, null, null)
+                assertEquals(ptsBefore, prefs.userPreferences.first().loyaltyPoints)
+            } finally {
+                db.close()
+            }
+        }
 }

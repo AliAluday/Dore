@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocalHospital
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -68,6 +70,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -124,8 +128,11 @@ fun TeamAndProvidersScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showAddAdminDialog by remember { mutableStateOf(false) }
     var editingAdmin by remember { mutableStateOf<AdminAccountEntity?>(null) }
+    var deletingAdmin by remember { mutableStateOf<AdminAccountEntity?>(null) }
     var showAddProviderDialog by remember { mutableStateOf(false) }
     var editingProvider by remember { mutableStateOf<ServiceProviderEntity?>(null) }
+    var deletingProvider by remember { mutableStateOf<ServiceProviderEntity?>(null) }
+    val haptic = LocalHapticFeedback.current
 
     val activeAdmin = state.activeAdmin
     val canManageAdmins = activeAdmin?.hasPermission(AdminPermissionType.MANAGE_ADMINS) ?: true
@@ -215,12 +222,23 @@ fun TeamAndProvidersScreen(
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 80.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (!canManageAdmins) {
+                        item {
+                            TeamPermissionLockedBanner(
+                                permissionName = AdminPermissionType.MANAGE_ADMINS.label,
+                                adminName = activeAdmin?.name ?: ""
+                            )
+                        }
+                    }
                     item {
                         ActiveAdminSessionCard(
                             activeAdmin = activeAdmin,
                             allAdmins = state.admins,
                             canManageAdmins = canManageAdmins,
-                            onSelectActiveAdmin = onSelectActiveAdmin,
+                            onSelectActiveAdmin = { id ->
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelectActiveAdmin(id)
+                            },
                             onOpenAddAdmin = { showAddAdminDialog = true }
                         )
                     }
@@ -230,10 +248,23 @@ fun TeamAndProvidersScreen(
                             admin = admin,
                             isCurrent = activeAdmin?.id == admin.id,
                             canEditPermissions = canManageAdmins,
-                            onActivate = { onSelectActiveAdmin(admin.id) },
+                            onActivate = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onSelectActiveAdmin(admin.id)
+                            },
                             onEditDialog = { editingAdmin = admin },
-                            onUpdate = onUpdateAdmin,
-                            onDelete = { onDeleteAdmin(admin.id) }
+                            onUpdate = { updated ->
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onUpdateAdmin(updated)
+                            },
+                            onDelete = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                if (canManageAdmins) {
+                                    deletingAdmin = admin
+                                } else {
+                                    onDeleteAdmin(admin.id)
+                                }
+                            }
                         )
                     }
                 }
@@ -242,12 +273,23 @@ fun TeamAndProvidersScreen(
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 80.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (!canManageProviders) {
+                        item {
+                            TeamPermissionLockedBanner(
+                                permissionName = AdminPermissionType.MANAGE_PROVIDERS.label,
+                                adminName = activeAdmin?.name ?: ""
+                            )
+                        }
+                    }
                     item {
                         ProvidersHeaderCard(
                             activeProvider = state.activeProvider,
                             providerCount = state.providers.size,
                             canManageProviders = canManageProviders,
-                            onClearProviderMode = { onSelectActiveProvider(0L) },
+                            onClearProviderMode = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelectActiveProvider(0L)
+                            },
                             onOpenAddProvider = { showAddProviderDialog = true }
                         )
                     }
@@ -258,12 +300,26 @@ fun TeamAndProvidersScreen(
                             isCurrentMode = state.activeProvider?.id == provider.id,
                             canManage = canManageProviders,
                             onToggleActive = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onUpdateProvider(provider.copy(isActive = !provider.isActive))
                             },
-                            onToggleCapability = { updated -> onUpdateProvider(updated) },
+                            onToggleCapability = { updated ->
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onUpdateProvider(updated)
+                            },
                             onEditDialog = { editingProvider = provider },
-                            onEnterProviderMode = { onOpenProviderWorkspace(provider.id) },
-                            onDelete = { onDeleteProvider(provider.id) }
+                            onEnterProviderMode = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onOpenProviderWorkspace(provider.id)
+                            },
+                            onDelete = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                if (canManageProviders) {
+                                    deletingProvider = provider
+                                } else {
+                                    onDeleteProvider(provider.id)
+                                }
+                            }
                         )
                     }
                 }
@@ -335,6 +391,87 @@ fun TeamAndProvidersScreen(
                 editingProvider = null
             }
         )
+    }
+
+    deletingAdmin?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deletingAdmin = null },
+            title = { Text("تأكيد حذف حساب الأدمن") },
+            text = {
+                Text("هل أنت متأكد من حذف حساب الأدمن «${target.name}» (${target.roleTitle})؟")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onDeleteAdmin(target.id)
+                        deletingAdmin = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatusUrgent)
+                ) {
+                    Text("حذف الحساب")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingAdmin = null }) {
+                    Text("تراجع")
+                }
+            }
+        )
+    }
+
+    deletingProvider?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deletingProvider = null },
+            title = { Text("تأكيد حذف مقدم الخدمة") },
+            text = {
+                Text("هل أنت متأكد من حذف «${target.name}» (${target.customTitle}) المرتبط بـ ${target.venueName}؟")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onDeleteProvider(target.id)
+                        deletingProvider = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatusUrgent)
+                ) {
+                    Text("حذف المزود")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingProvider = null }) {
+                    Text("تراجع")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun TeamPermissionLockedBanner(
+    permissionName: String,
+    adminName: String
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = StatusUrgent.copy(alpha = 0.1f),
+        border = BorderStroke(1.dp, StatusUrgent.copy(alpha = 0.35f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(Icons.Default.Lock, contentDescription = null, tint = StatusUrgent, modifier = Modifier.size(18.dp))
+            Text(
+                text = "الحساب الحالي ($adminName) لا يملك صلاحية ($permissionName) — التعديلات محمية.",
+                style = MaterialTheme.typography.labelMedium,
+                color = StatusUrgent,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }
 

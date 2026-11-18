@@ -65,7 +65,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -74,6 +76,7 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.model.LoyaltyTier
 import com.example.data.model.NinevehDistrict
+import com.example.data.model.UserProfileSettings
 import com.example.ui.theme.AmberGold
 import com.example.ui.theme.DiamondBlue
 import com.example.ui.theme.EmeraldPrimary
@@ -93,8 +96,10 @@ fun ProfileScreen(
     onSetMuteVibration: (Boolean) -> Unit,
     onUpdateProfile: (name: String, phone: String, district: NinevehDistrict) -> Unit = { _, _, _ -> },
     onOpenSupport: () -> Unit = {},
+    onTestAlert: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val haptics = LocalHapticFeedback.current
     val prefs = state.preferences
     val points = prefs.loyaltyPoints
     val tier = LoyaltyTier.fromPoints(points)
@@ -612,7 +617,10 @@ fun ProfileScreen(
                             title = "الوضع الليلي",
                             subtitle = "تبديل مظهر التطبيق",
                             checked = prefs.isDarkMode,
-                            onCheckedChange = { onToggleDarkMode() },
+                            onCheckedChange = {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onToggleDarkMode()
+                            },
                             tag = "profile_dark_mode_switch"
                         )
 
@@ -621,7 +629,10 @@ fun ProfileScreen(
                             title = "كتم الصوت",
                             subtitle = "إيقاف نغمة تنبيه الدور",
                             checked = prefs.muteSound,
-                            onCheckedChange = onSetMuteSound,
+                            onCheckedChange = {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSetMuteSound(it)
+                            },
                             tag = "profile_mute_sound_switch"
                         )
 
@@ -630,9 +641,36 @@ fun ProfileScreen(
                             title = "كتم الاهتزاز",
                             subtitle = "إيقاف الاهتزاز عند التحديث",
                             checked = prefs.muteVibration,
-                            onCheckedChange = onSetMuteVibration,
+                            onCheckedChange = {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSetMuteVibration(it)
+                            },
                             tag = "profile_mute_vibration_switch"
                         )
+
+                        OutlinedButton(
+                            onClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onTestAlert()
+                            },
+                            shape = RoundedCornerShape(11.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(38.dp)
+                                .testTag("profile_test_alert_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.NotificationsActive,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "تجربة نغمة واهتزاز تنبيه الدور",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
@@ -668,6 +706,8 @@ fun ProfileScreen(
     if (showEditAccountDialog) {
         var nameDraft by remember(prefs.userName) { mutableStateOf(prefs.userName) }
         var phoneDraft by remember(prefs.userPhone) { mutableStateOf(prefs.userPhone) }
+        val normalizedPhone = UserProfileSettings.normalizeDigits(phoneDraft.trim())
+        val isPhoneValidOrEmpty = normalizedPhone.isEmpty() || UserProfileSettings.isValidPhone(normalizedPhone)
         AlertDialog(
             onDismissRequest = { showEditAccountDialog = false },
             title = { Text("بيانات الحساب") },
@@ -692,6 +732,10 @@ fun ProfileScreen(
                         onValueChange = { phoneDraft = it },
                         label = { Text("رقم الهاتف (اختياري)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        isError = !isPhoneValidOrEmpty,
+                        supportingText = if (!isPhoneValidOrEmpty) {
+                            { Text("أدخل رقم هاتف صحيح (10-14 رقماً) أو اتركه فارغاً") }
+                        } else null,
                         singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -702,10 +746,11 @@ fun ProfileScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        onUpdateProfile(nameDraft.trim(), phoneDraft.trim(), prefs.selectedDistrict)
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onUpdateProfile(nameDraft.trim(), normalizedPhone, prefs.selectedDistrict)
                         showEditAccountDialog = false
                     },
-                    enabled = nameDraft.trim().length >= 2,
+                    enabled = nameDraft.trim().length >= 2 && isPhoneValidOrEmpty,
                     modifier = Modifier.testTag("profile_save_account_button")
                 ) {
                     Text("حفظ")

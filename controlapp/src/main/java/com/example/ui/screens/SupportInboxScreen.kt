@@ -35,7 +35,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.MarkChatUnread
 import androidx.compose.material.icons.filled.Person
@@ -43,6 +45,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SupportAgent
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -70,13 +74,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import com.example.data.local.SupportMessageEntity
 import com.example.data.local.SupportTicketEntity
 import com.example.data.model.AdminPermissionType
@@ -108,6 +117,7 @@ fun SupportInboxScreen(
     var inboxSection by remember { mutableIntStateOf(0) }
     var filterIndex by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
+    val haptic = LocalHapticFeedback.current
     val canReply = state.activeAdmin?.hasPermission(AdminPermissionType.REPLY_SUPPORT) ?: true
 
     val allChatTickets = remember(state.supportTickets) {
@@ -233,7 +243,10 @@ fun SupportInboxScreen(
                             }
 
                             Button(
-                                onClick = onSyncBridge,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onSyncBridge()
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MintPrimaryDark,
                                     contentColor = Color(0xFF04221B)
@@ -267,7 +280,10 @@ fun SupportInboxScreen(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable { inboxSection = 0 }
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                inboxSection = 0
+                            }
                             .testTag("ctrl_support_section_chats")
                     ) {
                         Row(
@@ -298,7 +314,10 @@ fun SupportInboxScreen(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable { inboxSection = 1 }
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                inboxSection = 1
+                            }
                             .testTag("ctrl_support_section_cards")
                     ) {
                         Row(
@@ -467,6 +486,7 @@ private fun ControlProblemTicketCard(
     val userExtraNotes = remember(threadMessages, ticket.message) {
         threadMessages.filter { !it.isFromAdmin && it.body.trim() != ticket.message.trim() }
     }
+    val haptic = LocalHapticFeedback.current
     var resolutionDraft by remember(ticket.id) { mutableStateOf("") }
 
     Card(
@@ -603,7 +623,10 @@ private fun ControlProblemTicketCard(
             ) {
                 if (ticket.status != SupportTicketStatus.CLOSED.name) {
                     OutlinedButton(
-                        onClick = onMarkInReview,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onMarkInReview()
+                        },
                         enabled = canReply,
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                         modifier = Modifier.height(32.dp)
@@ -611,7 +634,10 @@ private fun ControlProblemTicketCard(
                         Text("قيد المراجعة", style = MaterialTheme.typography.labelSmall)
                     }
                     OutlinedButton(
-                        onClick = onCloseTicket,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onCloseTicket()
+                        },
                         enabled = canReply,
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                         modifier = Modifier.height(32.dp)
@@ -620,7 +646,10 @@ private fun ControlProblemTicketCard(
                     }
                 } else {
                     OutlinedButton(
-                        onClick = onReopenTicket,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onReopenTicket()
+                        },
                         enabled = canReply,
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                         modifier = Modifier
@@ -664,6 +693,7 @@ private fun ControlProblemTicketCard(
                         onClick = {
                             val txt = resolutionDraft.trim()
                             if (txt.isNotEmpty()) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onSendReply(txt)
                                 resolutionDraft = ""
                             }
@@ -696,9 +726,33 @@ fun buildControlThreadMessages(
     ticket: SupportTicketEntity,
     stored: List<SupportMessageEntity>
 ): List<SupportMessageEntity> {
-    val list = stored.toMutableList()
-    if (list.isEmpty() && ticket.message.isNotBlank()) {
-        list.add(
+    fun isSynthetic(id: String): Boolean =
+        id.startsWith("PUSH-") || id.startsWith("SYNC-") || id.startsWith("LEGACY-")
+
+    val deduped = mutableListOf<SupportMessageEntity>()
+    for (msg in stored.sortedBy { it.createdAt }) {
+        val bodyKey = msg.body.trim()
+        val existingIdx = deduped.indexOfFirst {
+            it.isFromAdmin == msg.isFromAdmin && it.body.trim() == bodyKey
+        }
+        if (existingIdx >= 0) {
+            val existing = deduped[existingIdx]
+            if (isSynthetic(existing.externalMessageId) && !isSynthetic(msg.externalMessageId)) {
+                deduped[existingIdx] = msg
+            } else if (!isSynthetic(existing.externalMessageId) && !isSynthetic(msg.externalMessageId) &&
+                existing.externalMessageId != msg.externalMessageId
+            ) {
+                if (kotlin.math.abs(msg.createdAt - existing.createdAt) >= 2_500L) {
+                    deduped.add(msg)
+                }
+            }
+        } else {
+            deduped.add(msg)
+        }
+    }
+
+    if (deduped.isEmpty() && ticket.message.isNotBlank()) {
+        deduped.add(
             SupportMessageEntity(
                 externalMessageId = "LEGACY-U-${ticket.externalId}",
                 ticketExternalId = ticket.externalId,
@@ -710,20 +764,20 @@ fun buildControlThreadMessages(
         )
     }
     if (ticket.adminReply.isNotBlank() &&
-        list.none { it.isFromAdmin && it.body.trim() == ticket.adminReply.trim() }
+        deduped.none { it.isFromAdmin && it.body.trim() == ticket.adminReply.trim() }
     ) {
-        list.add(
+        deduped.add(
             SupportMessageEntity(
                 externalMessageId = "LEGACY-A-${ticket.externalId}-${ticket.adminReply.hashCode()}",
                 ticketExternalId = ticket.externalId,
                 isFromAdmin = true,
                 senderName = ticket.repliedByAdmin.ifBlank { "فريق الدعم الفني" },
                 body = ticket.adminReply,
-                createdAt = maxOf(ticket.updatedAt, (list.lastOrNull()?.createdAt ?: 0L) + 1L)
+                createdAt = maxOf(ticket.updatedAt, (deduped.lastOrNull()?.createdAt ?: 0L) + 1L)
             )
         )
     }
-    return list.sortedBy { it.createdAt }
+    return deduped.sortedBy { it.createdAt }
 }
 
 @Composable
@@ -978,6 +1032,8 @@ fun ControlSupportChatOverlay(
     val isKeyboardOpen = WindowInsets.ime.getBottom(density) > 0
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val haptic = LocalHapticFeedback.current
+    val clipboardManager = LocalClipboardManager.current
 
     val handleExitAttempt: () -> Unit = {
         if (isKeyboardOpen) {
@@ -993,10 +1049,18 @@ fun ControlSupportChatOverlay(
     }
 
     var replyDraft by remember(ticket.id) { mutableStateOf("") }
+    var copiedBadge by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val isComplaint = SupportRequestType.fromName(ticket.requestType) == SupportRequestType.COMPLAINT
     val catEnum = SupportCategory.fromName(ticket.category)
     val displayUserName = ticket.senderName.trim().ifBlank { "مستخدم دوري" }
+
+    LaunchedEffect(copiedBadge) {
+        if (copiedBadge) {
+            delay(1800L)
+            copiedBadge = false
+        }
+    }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -1080,22 +1144,47 @@ fun ControlSupportChatOverlay(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                Text(
-                                    text = buildString {
-                                        if (ticket.senderPhone.isNotBlank()) {
-                                            append(ticket.senderPhone)
-                                            append(" • ")
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable {
+                                            val copyValue = ticket.senderPhone.ifBlank { ticket.externalId }
+                                            clipboardManager.setText(AnnotatedString(copyValue))
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            copiedBadge = true
                                         }
-                                        append(if (isComplaint) "شكوى (${catEnum.displayName})" else "محادثة مباشرة")
-                                        if (ticket.relatedVenueName.isNotBlank()) {
-                                            append(" • ${ticket.relatedVenueName}")
-                                        }
-                                    },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White.copy(alpha = 0.85f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                        .padding(vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = if (copiedBadge) {
+                                            "✓ تم نسخ ${ticket.senderPhone.ifBlank { ticket.externalId }}"
+                                        } else {
+                                            buildString {
+                                                if (ticket.senderPhone.isNotBlank()) {
+                                                    append(ticket.senderPhone)
+                                                    append(" • ")
+                                                }
+                                                append(if (isComplaint) "شكوى (${catEnum.displayName})" else "محادثة مباشرة")
+                                                if (ticket.relatedVenueName.isNotBlank()) {
+                                                    append(" • ${ticket.relatedVenueName}")
+                                                }
+                                            }
+                                        },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (copiedBadge) MintPrimaryDark else Color.White.copy(alpha = 0.85f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    Icon(
+                                        imageVector = if (copiedBadge) Icons.Default.Check else Icons.Default.ContentCopy,
+                                        contentDescription = "نسخ البيانات",
+                                        tint = if (copiedBadge) MintPrimaryDark else Color.White.copy(alpha = 0.72f),
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                }
                             }
                         }
 
@@ -1105,7 +1194,10 @@ fun ControlSupportChatOverlay(
                         ) {
                             if (ticket.status != SupportTicketStatus.CLOSED.name) {
                                 OutlinedButton(
-                                    onClick = onMarkInReview,
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onMarkInReview()
+                                    },
                                     enabled = canReply,
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                     modifier = Modifier.height(30.dp)
@@ -1113,7 +1205,10 @@ fun ControlSupportChatOverlay(
                                     Text("مراجعة", style = MaterialTheme.typography.labelSmall, color = Color.White)
                                 }
                                 OutlinedButton(
-                                    onClick = onCloseTicket,
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onCloseTicket()
+                                    },
                                     enabled = canReply,
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                     modifier = Modifier.height(30.dp)
@@ -1122,7 +1217,10 @@ fun ControlSupportChatOverlay(
                                 }
                             } else {
                                 OutlinedButton(
-                                    onClick = onReopenTicket,
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onReopenTicket()
+                                    },
                                     enabled = canReply,
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                     modifier = Modifier
@@ -1297,56 +1395,102 @@ fun ControlSupportChatOverlay(
                         shadowElevation = 6.dp,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                .padding(top = 6.dp, bottom = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            OutlinedTextField(
-                                value = replyDraft,
-                                onValueChange = { replyDraft = it },
-                                placeholder = {
-                                    Text(
-                                        "اكتب رسالتك إلى $displayUserName...",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                },
-                                enabled = canReply,
-                                minLines = 1,
-                                maxLines = 3,
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(min = 48.dp)
-                                    .testTag("ctrl_support_reply_input_${ticket.id}")
-                            )
-                            IconButton(
-                                onClick = {
-                                    val txt = replyDraft.trim()
-                                    if (txt.isNotEmpty()) {
-                                        onSendReply(txt)
-                                        replyDraft = ""
-                                    }
-                                },
-                                enabled = canReply && replyDraft.trim().isNotEmpty(),
-                                modifier = Modifier
-                                    .size(46.dp)
-                                    .minimumInteractiveComponentSize()
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (canReply && replyDraft.trim().isNotEmpty()) EmeraldPrimary
-                                        else MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                    .testTag("ctrl_support_send_reply_${ticket.id}")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = "إرسال الرد",
-                                    tint = if (canReply && replyDraft.trim().isNotEmpty()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(19.dp)
+                            val quickReplies = remember {
+                                listOf(
+                                    "أهلاً بك، جاري متابعة طلبك الآن",
+                                    "تم حل المشكلة بنجاح، نتمنى لك يوماً سعيداً",
+                                    "يرجى تزويدنا برقم التذكرة للمتابعة"
                                 )
+                            }
+                            if (canReply) {
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    items(quickReplies.size) { index ->
+                                        val snippet = quickReplies[index]
+                                        AssistChip(
+                                            onClick = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                replyDraft = snippet
+                                            },
+                                            label = {
+                                                Text(
+                                                    text = snippet,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    maxLines = 1
+                                                )
+                                            },
+                                            colors = AssistChipDefaults.assistChipColors(
+                                                containerColor = EmeraldPrimary.copy(alpha = 0.08f),
+                                                labelColor = EmeraldPrimary
+                                            ),
+                                            border = BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.25f)),
+                                            modifier = Modifier
+                                                .height(30.dp)
+                                                .testTag("ctrl_support_quick_reply_$index")
+                                        )
+                                    }
+                                }
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = replyDraft,
+                                    onValueChange = { replyDraft = it },
+                                    placeholder = {
+                                        Text(
+                                            "اكتب رسالتك إلى $displayUserName...",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    },
+                                    enabled = canReply,
+                                    minLines = 1,
+                                    maxLines = 3,
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 48.dp)
+                                        .testTag("ctrl_support_reply_input_${ticket.id}")
+                                )
+                                IconButton(
+                                    onClick = {
+                                        val txt = replyDraft.trim()
+                                        if (txt.isNotEmpty()) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onSendReply(txt)
+                                            replyDraft = ""
+                                        }
+                                    },
+                                    enabled = canReply && replyDraft.trim().isNotEmpty(),
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .minimumInteractiveComponentSize()
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (canReply && replyDraft.trim().isNotEmpty()) EmeraldPrimary
+                                            else MaterialTheme.colorScheme.surfaceVariant
+                                        )
+                                        .testTag("ctrl_support_send_reply_${ticket.id}")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Send,
+                                        contentDescription = "إرسال الرد",
+                                        tint = if (canReply && replyDraft.trim().isNotEmpty()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
                             }
                         }
                     }

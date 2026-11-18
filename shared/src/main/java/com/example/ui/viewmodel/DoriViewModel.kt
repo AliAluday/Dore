@@ -408,16 +408,12 @@ class DoriViewModel(
         val isCtrl = appMode == DoriAppMode.CONTROL_APP
         val changedCount = withContext(Dispatchers.IO) {
             var count = 0
-            val remoteTickets = DoriLocalBridgeClient.pullSupportTicketsFromPeer(ctx, isCtrl)
-            count += repository.mergePulledSupportTickets(remoteTickets, isCtrl)
             val remoteMessages = DoriLocalBridgeClient.pullSupportMessagesFromPeer(ctx, isCtrl)
             count += repository.mergePulledSupportMessages(remoteMessages, isControlApp = isCtrl)
+            val remoteTickets = DoriLocalBridgeClient.pullSupportTicketsFromPeer(ctx, isCtrl)
+            count += repository.mergePulledSupportTickets(remoteTickets, isCtrl)
 
             if (isCtrl) {
-                val unsynced = repository.getAllSupportTicketsSnapshot()
-                unsynced.filter { it.adminReply.isNotBlank() }.forEach { replied ->
-                    DoriLocalBridgeClient.pushSupportReplyToUser(ctx, replied)
-                }
                 repository.getAllSupportMessagesSnapshot()
                     .filter { it.isFromAdmin && !it.syncedToPeer }
                     .forEach { msg ->
@@ -426,6 +422,10 @@ class DoriViewModel(
                             count++
                         }
                     }
+                val unsynced = repository.getAllSupportTicketsSnapshot()
+                unsynced.filter { it.adminReply.isNotBlank() }.forEach { replied ->
+                    DoriLocalBridgeClient.pushSupportReplyToUser(ctx, replied)
+                }
                 val remoteBookings = DoriLocalBridgeClient.pullBookingsFromUser(ctx)
                 count += repository.mergePulledBookingsForControl(remoteBookings)
 
@@ -450,13 +450,6 @@ class DoriViewModel(
                     DoriLocalBridgeClient.pushControlStateToUser(ctx, payload)
                 }
             } else {
-                val localTickets = repository.getAllSupportTicketsSnapshot()
-                localTickets.filter { !it.syncedToControl }.forEach { pending ->
-                    if (DoriLocalBridgeClient.pushSupportTicketToControl(ctx, pending)) {
-                        repository.markSupportTicketDelivered(pending.id)
-                        count++
-                    }
-                }
                 repository.getAllSupportMessagesSnapshot()
                     .filter { !it.isFromAdmin && !it.syncedToPeer }
                     .forEach { msg ->
@@ -465,6 +458,13 @@ class DoriViewModel(
                             count++
                         }
                     }
+                val localTickets = repository.getAllSupportTicketsSnapshot()
+                localTickets.filter { !it.syncedToControl }.forEach { pending ->
+                    if (DoriLocalBridgeClient.pushSupportTicketToControl(ctx, pending)) {
+                        repository.markSupportTicketDelivered(pending.id)
+                        count++
+                    }
+                }
                 repository.getAllBookingsSnapshot()
                     .filter { it.status == BookingStatus.ACTIVE.name }
                     .forEach { activeBooking ->
@@ -589,8 +589,13 @@ class DoriViewModel(
 
     fun quickBookVenue(venue: VenueEntity) {
         viewModelScope.launch {
-            if (!uiState.value.preferences.controlConfig.allowNewBookings) {
+            val ctrl = uiState.value.preferences.controlConfig
+            if (!ctrl.allowNewBookings) {
                 _toastMessage.emit("الحجوزات متوقفة مؤقتاً حالياً")
+                return@launch
+            }
+            if (venue.category in ctrl.disabledCategories) {
+                _toastMessage.emit("هذا القسم متوقف مؤقتاً حالياً")
                 return@launch
             }
             if (!venue.isOpen || !venue.isAcceptingBookings) {
@@ -681,7 +686,10 @@ class DoriViewModel(
                     DoriLocalBridgeClient.pushBookingToControl(getApplication(), updated)
                 }
             }
-            _toastMessage.emit("تم إتمام الخدمة بنجاح! حصلت على +$earned نقاط ولاء")
+            _toastMessage.emit(
+                if (earned > 0) "تم إتمام الخدمة بنجاح! حصلت على +$earned نقاط ولاء"
+                else "تم إتمام الخدمة بنجاح ✓"
+            )
         }
     }
 
@@ -744,7 +752,6 @@ class DoriViewModel(
             )
             result.onSuccess { ticket ->
                 val pushed = withContext(Dispatchers.IO) {
-                    val ticketOk = DoriLocalBridgeClient.pushSupportTicketToControl(getApplication(), ticket)
                     val msgs = repository.getAllSupportMessagesSnapshot()
                         .filter { it.ticketExternalId == ticket.externalId && !it.isFromAdmin && !it.syncedToPeer }
                     msgs.forEach { m ->
@@ -752,7 +759,7 @@ class DoriViewModel(
                             repository.markSupportMessageSynced(m.id)
                         }
                     }
-                    ticketOk
+                    DoriLocalBridgeClient.pushSupportTicketToControl(getApplication(), ticket)
                 }
                 if (pushed) {
                     repository.markSupportTicketDelivered(ticket.id)
@@ -784,9 +791,9 @@ class DoriViewModel(
                 messageBody = messageBody
             ).onSuccess { (updatedTicket, msgEntity) ->
                 val pushed = withContext(Dispatchers.IO) {
-                    val tOk = DoriLocalBridgeClient.pushSupportTicketToControl(getApplication(), updatedTicket)
                     val mOk = DoriLocalBridgeClient.pushSupportMessageToControl(getApplication(), msgEntity)
                     if (mOk) repository.markSupportMessageSynced(msgEntity.id)
+                    val tOk = DoriLocalBridgeClient.pushSupportTicketToControl(getApplication(), updatedTicket)
                     tOk && mOk
                 }
                 if (pushed) {
@@ -806,7 +813,6 @@ class DoriViewModel(
             repository.replyToSupportTicket(ticketId, replyText, adminLabel)
                 .onSuccess { updated ->
                     val pushed = withContext(Dispatchers.IO) {
-                        val ticketOk = DoriLocalBridgeClient.pushSupportReplyToUser(getApplication(), updated)
                         val msgs = repository.getAllSupportMessagesSnapshot()
                             .filter { it.ticketExternalId == updated.externalId && it.isFromAdmin && !it.syncedToPeer }
                         msgs.forEach { m ->
@@ -814,7 +820,7 @@ class DoriViewModel(
                                 repository.markSupportMessageSynced(m.id)
                             }
                         }
-                        ticketOk
+                        DoriLocalBridgeClient.pushSupportReplyToUser(getApplication(), updated)
                     }
                     _toastMessage.emit(
                         if (pushed) "تم إرسال الرد وإشعار المستخدم ✓"
@@ -1406,8 +1412,32 @@ class DoriViewModel(
         optionalNote: String = ""
     ) {
         viewModelScope.launch {
-            repository.updateProfile(name.trim(), phone.trim(), district, age.trim(), optionalNote.trim())
-            _toastMessage.emit("تم حفظ معلوماتك محلياً")
+            val cleanPhone = UserProfileSettings.normalizeDigits(phone.trim())
+            if (cleanPhone.isNotEmpty() && !UserProfileSettings.isValidPhone(cleanPhone)) {
+                _toastMessage.emit("يرجى إدخال رقم هاتف صحيح (10 إلى 14 رقماً) أو تركه فارغاً")
+                return@launch
+            }
+            repository.updateProfile(name.trim(), cleanPhone, district, age.trim(), optionalNote.trim())
+            _toastMessage.emit("تم حفظ معلوماتك محلياً ✓")
+        }
+    }
+
+    fun testTurnAlert() {
+        viewModelScope.launch {
+            val prefsNow = uiState.value.preferences
+            AlertNotifier.triggerTurnAlert(
+                context = getApplication(),
+                muteSound = prefsNow.muteSound,
+                muteVibration = prefsNow.muteVibration,
+                isUrgent = true
+            )
+            val statusText = when {
+                prefsNow.muteSound && prefsNow.muteVibration -> "الصوت والاهتزاز مكتومان حالياً"
+                prefsNow.muteSound -> "تم اختبار الاهتزاز (الصوت مكتوم)"
+                prefsNow.muteVibration -> "تم اختبار نغمة التنبيه (الاهتزاز مكتوم)"
+                else -> "تم اختبار نغمة واهتزاز تنبيه الدور بنجاح 🔔"
+            }
+            _toastMessage.emit(statusText)
         }
     }
 

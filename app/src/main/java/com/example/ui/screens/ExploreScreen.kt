@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -62,10 +65,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -100,6 +106,7 @@ fun ExploreScreen(
     modifier: Modifier = Modifier
 ) {
     val ctrl = state.preferences.controlConfig
+    val haptics = LocalHapticFeedback.current
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var areaMenuExpanded by remember { mutableStateOf(false) }
 
@@ -235,7 +242,10 @@ fun ExploreScreen(
                                 Spacer(modifier = Modifier.width(6.dp))
 
                                 Button(
-                                    onClick = onBookFastestTurn,
+                                    onClick = {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onBookFastestTurn()
+                                    },
                                     enabled = ctrl.allowNewBookings,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MintPrimaryDark,
@@ -274,7 +284,10 @@ fun ExploreScreen(
                         val selected = state.selectedCategory == category
                         FilterChip(
                             selected = selected,
-                            onClick = { onCategorySelect(category) },
+                            onClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onCategorySelect(category)
+                            },
                             label = { Text(category.displayName) },
                             leadingIcon = {
                                 categoryIcon(category)?.let { icon ->
@@ -621,6 +634,12 @@ private fun FuturisticVenueCard(
     onDirectBook: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
+    val haptics = LocalHapticFeedback.current
+    val favScale by animateFloatAsState(
+        targetValue = if (venue.isFavorite) 1.18f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "favScale"
+    )
     val isAvailable = bookingsAllowed && venue.isOpen && venue.isAcceptingBookings
     val statusColor = when {
         !bookingsAllowed || !venue.isOpen || !venue.isAcceptingBookings -> StatusUrgent
@@ -718,7 +737,10 @@ private fun FuturisticVenueCard(
                     }
 
                     IconButton(
-                        onClick = onToggleFavorite,
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleFavorite()
+                        },
                         modifier = Modifier
                             .size(36.dp)
                             .minimumInteractiveComponentSize()
@@ -729,7 +751,9 @@ private fun FuturisticVenueCard(
                             imageVector = if (venue.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = "المفضلة",
                             tint = if (venue.isFavorite) StatusUrgent else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier
+                                .size(18.dp)
+                                .scale(favScale)
                         )
                     }
                 }
@@ -766,11 +790,18 @@ private fun FuturisticVenueCard(
                 }
 
                 Button(
-                    onClick = onDirectBook,
-                    enabled = isAvailable,
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onDirectBook()
+                    },
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isAvailable) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = if (isAvailable) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
                     modifier = Modifier
                         .height(34.dp)
                         .testTag("direct_book_venue_${venue.id}")

@@ -283,20 +283,32 @@ class UserBridgeProvider : ContentProvider() {
                 val body = v.getAsString(SupportMessageCols.BODY).orEmpty()
                 val createdAt = v.getAsLong(SupportMessageCols.CREATED_AT) ?: System.currentTimeMillis()
                 var insertedNew = false
+                val isSynthetic = extMsgId.startsWith("PUSH-A-") ||
+                    extMsgId.startsWith("SYNC-A-") ||
+                    extMsgId.startsWith("LEGACY-")
                 runBlocking {
-                    if (dao.getSupportMessageByExternalId(extMsgId) == null) {
-                        dao.insertSupportMessage(
-                            SupportMessageEntity(
-                                externalMessageId = extMsgId,
-                                ticketExternalId = ticketExtId,
-                                isFromAdmin = isFromAdmin,
-                                senderName = senderName,
-                                body = body,
-                                syncedToPeer = true,
-                                createdAt = createdAt
+                    val existingMsgs = dao.getMessagesForTicketOnce(ticketExtId)
+                    val duplicateSynthetic = isSynthetic && existingMsgs.any {
+                        it.isFromAdmin == isFromAdmin && it.body.trim() == body.trim()
+                    }
+                    if (!duplicateSynthetic) {
+                        if (!isSynthetic && isFromAdmin) {
+                            dao.deleteSyntheticAdminMessagesMatchingBody(ticketExtId, body)
+                        }
+                        if (dao.getSupportMessageByExternalId(extMsgId) == null) {
+                            dao.insertSupportMessage(
+                                SupportMessageEntity(
+                                    externalMessageId = extMsgId,
+                                    ticketExternalId = ticketExtId,
+                                    isFromAdmin = isFromAdmin,
+                                    senderName = senderName,
+                                    body = body,
+                                    syncedToPeer = true,
+                                    createdAt = createdAt
+                                )
                             )
-                        )
-                        insertedNew = true
+                            insertedNew = true
+                        }
                     }
                     if (isFromAdmin && body.isNotBlank()) {
                         val parent = dao.getSupportTicketByExternalId(ticketExtId)

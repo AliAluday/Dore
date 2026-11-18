@@ -61,7 +61,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -98,6 +100,7 @@ fun VenueDetailsSheet(
     ) -> Unit
 ) {
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val isField = venue.category == ServiceCategory.FIELDS.displayName
@@ -267,7 +270,10 @@ fun VenueDetailsSheet(
                 venue.customOptions.forEach { option ->
                     FilterChip(
                         selected = selectedOption == option,
-                        onClick = { selectedOption = option },
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            selectedOption = option
+                        },
                         label = { Text(option, style = MaterialTheme.typography.labelMedium) }
                     )
                 }
@@ -292,6 +298,7 @@ fun VenueDetailsSheet(
                         ) {
                             FilledIconButton(
                                 onClick = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     selectedHours = FieldBookingDuration.clamp(
                                         selectedHours - FieldBookingDuration.STEP_HOURS
                                     )
@@ -333,6 +340,7 @@ fun VenueDetailsSheet(
 
                             FilledIconButton(
                                 onClick = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     selectedHours = FieldBookingDuration.clamp(
                                         selectedHours + FieldBookingDuration.STEP_HOURS
                                     )
@@ -553,7 +561,11 @@ fun VenueDetailsSheet(
             Button(
                 onClick = {
                     hasAttemptedSubmit = true
-                    if (!isNameValid || !isPhoneValid) return@Button
+                    if (!isNameValid || !isPhoneValid) {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        return@Button
+                    }
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
 
                     val finalOption = when {
                         isField -> "$selectedOption • ${FieldBookingDuration.shortLabel(selectedHours)}"

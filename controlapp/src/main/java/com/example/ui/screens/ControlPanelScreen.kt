@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -84,6 +85,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -144,10 +147,13 @@ fun ControlPanelScreen(
     var broadcastInput by remember(ctrl.broadcastMessage) { mutableStateOf(ctrl.broadcastMessage) }
     var showAddVenueDialog by remember { mutableStateOf(false) }
     var showFactoryResetConfirm by remember { mutableStateOf(false) }
+    var pendingBatchAction by remember { mutableStateOf<BatchCommandAction?>(null) }
+    var lastExecutedCommand by remember { mutableStateOf<String?>(null) }
     var deletingVenue by remember { mutableStateOf<VenueEntity?>(null) }
     var featuresSubTab by remember { mutableIntStateOf(0) }
     var venueSearchQuery by remember { mutableStateOf("") }
     var venueFilterCategory by remember { mutableStateOf(ServiceCategory.ALL) }
+    val haptic = LocalHapticFeedback.current
 
     val activeAdmin = state.activeAdmin
     val canManageFeatures = activeAdmin?.hasPermission(AdminPermissionType.MANAGE_FEATURES) ?: true
@@ -324,13 +330,19 @@ fun ControlPanelScreen(
                                 ) {
                                     Tab(
                                         selected = featuresSubTab == 0,
-                                        onClick = { featuresSubTab = 0 },
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            featuresSubTab = 0
+                                        },
                                         text = { Text("المميزات والإعلانات", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) },
                                         modifier = Modifier.testTag("ctrl_subtab_features")
                                     )
                                     Tab(
                                         selected = featuresSubTab == 1,
-                                        onClick = { featuresSubTab = 1 },
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            featuresSubTab = 1
+                                        },
                                         text = { Text("الأوامر السريعة", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) },
                                         modifier = Modifier.testTag("ctrl_subtab_commands")
                                     )
@@ -394,7 +406,10 @@ fun ControlPanelScreen(
                                                 .testTag("control_broadcast_input")
                                         )
                                         Button(
-                                            onClick = { onSetBroadcastMessage(broadcastInput) },
+                                            onClick = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                onSetBroadcastMessage(broadcastInput)
+                                            },
                                             shape = RoundedCornerShape(12.dp),
                                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                             modifier = Modifier
@@ -432,6 +447,7 @@ fun ControlPanelScreen(
                                         subtitle = "إيقاف أو تشغيل الحجز في كامل التطبيق",
                                         checked = ctrl.allowNewBookings,
                                         onCheckedChange = { checked ->
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             onUpdateControlConfig { it.copy(allowNewBookings = checked) }
                                         },
                                         tag = "ctrl_switch_allow_bookings"
@@ -442,6 +458,7 @@ fun ControlPanelScreen(
                                         subtitle = "إظهار زر الحجز الأسرع في الصفحة الرئيسية",
                                         checked = ctrl.enableFastestTurn,
                                         onCheckedChange = { checked ->
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             onUpdateControlConfig { it.copy(enableFastestTurn = checked) }
                                         },
                                         tag = "ctrl_switch_fastest_turn"
@@ -452,6 +469,7 @@ fun ControlPanelScreen(
                                         subtitle = "عرض وتوليد رمز QR الحقيقي في التذاكر",
                                         checked = ctrl.enableQrCode,
                                         onCheckedChange = { checked ->
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             onUpdateControlConfig { it.copy(enableQrCode = checked) }
                                         },
                                         tag = "ctrl_switch_qr"
@@ -462,6 +480,7 @@ fun ControlPanelScreen(
                                         subtitle = "تفعيل زر إرسال التذكرة على واتساب",
                                         checked = ctrl.enableWhatsAppShare,
                                         onCheckedChange = { checked ->
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             onUpdateControlConfig { it.copy(enableWhatsAppShare = checked) }
                                         },
                                         tag = "ctrl_switch_whatsapp"
@@ -472,6 +491,7 @@ fun ControlPanelScreen(
                                         subtitle = "إظهار المراجعات وطلب تقييم الخدمة",
                                         checked = ctrl.enableReviews,
                                         onCheckedChange = { checked ->
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             onUpdateControlConfig { it.copy(enableReviews = checked) }
                                         },
                                         tag = "ctrl_switch_reviews"
@@ -482,6 +502,7 @@ fun ControlPanelScreen(
                                         subtitle = "منح نقاط ولاء تلقائياً عند إتمام الدور",
                                         checked = ctrl.enableLoyalty,
                                         onCheckedChange = { checked ->
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             onUpdateControlConfig { it.copy(enableLoyalty = checked) }
                                         },
                                         tag = "ctrl_switch_loyalty"
@@ -492,6 +513,7 @@ fun ControlPanelScreen(
                                         subtitle = "إظهار حقلي العمر والملاحظة الإضافية",
                                         checked = ctrl.enableOptionalFields,
                                         onCheckedChange = { checked ->
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             onUpdateControlConfig { it.copy(enableOptionalFields = checked) }
                                         },
                                         tag = "ctrl_switch_optional_fields"
@@ -502,6 +524,7 @@ fun ControlPanelScreen(
                                         subtitle = "تفعيل التنبيهات المنبثقة والصوت والاهتزاز",
                                         checked = ctrl.enableLiveAlerts,
                                         onCheckedChange = { checked ->
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             onUpdateControlConfig { it.copy(enableLiveAlerts = checked) }
                                         },
                                         tag = "ctrl_switch_live_alerts"
@@ -519,6 +542,7 @@ fun ControlPanelScreen(
                                                 FilterChip(
                                                     selected = ctrl.pointsPerBooking == pts,
                                                     onClick = {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                         onUpdateControlConfig { it.copy(pointsPerBooking = pts) }
                                                     },
                                                     label = { Text("+$pts نقطة") },
@@ -559,7 +583,10 @@ fun ControlPanelScreen(
                                             val enabled = category.displayName !in ctrl.disabledCategories
                                             FilterChip(
                                                 selected = enabled,
-                                                onClick = { onToggleCategoryEnabled(category) },
+                                                onClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    onToggleCategoryEnabled(category)
+                                                },
                                                 label = { Text(category.displayName) },
                                                 leadingIcon = {
                                                     Icon(
@@ -590,6 +617,58 @@ fun ControlPanelScreen(
                                 }
                             }
                             item {
+                                AnimatedVisibility(visible = lastExecutedCommand != null) {
+                                    lastExecutedCommand?.let { bannerText ->
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = StatusOpen.copy(alpha = 0.14f),
+                                            border = BorderStroke(1.dp, StatusOpen.copy(alpha = 0.35f)),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .testTag("ctrl_last_command_banner")
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.CheckCircle,
+                                                        contentDescription = null,
+                                                        tint = StatusOpen,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Text(
+                                                        text = bannerText,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = StatusOpen,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                                IconButton(
+                                                    onClick = { lastExecutedCommand = null },
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Clear,
+                                                        contentDescription = "إخفاء",
+                                                        tint = StatusOpen,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            item {
                                 CommandActionCard(
                                     title = "تقديم جميع الأدوار خطوة",
                                     subtitle = "تحريك كل التذاكر النشطة في الطوابير وتنبيه المستخدمين",
@@ -597,7 +676,13 @@ fun ControlPanelScreen(
                                     icon = Icons.Default.FastForward,
                                     accent = EmeraldPrimary,
                                     testTag = "ctrl_cmd_advance_all",
-                                    onClick = onAdvanceAllQueues
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onAdvanceAllQueues()
+                                        if (canRunCommands) {
+                                            lastExecutedCommand = "آخر إجراء مُنفَّذ: تقديم جميع الأدوار خطوة ✓"
+                                        }
+                                    }
                                 )
                             }
                             item {
@@ -608,7 +693,14 @@ fun ControlPanelScreen(
                                     icon = Icons.Default.CheckCircle,
                                     accent = StatusOpen,
                                     testTag = "ctrl_cmd_complete_all",
-                                    onClick = onCompleteAllActive
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        if (canRunCommands) {
+                                            pendingBatchAction = BatchCommandAction.COMPLETE_ALL
+                                        } else {
+                                            onCompleteAllActive()
+                                        }
+                                    }
                                 )
                             }
                             item {
@@ -619,7 +711,14 @@ fun ControlPanelScreen(
                                     icon = Icons.Default.Cancel,
                                     accent = AmberAccent,
                                     testTag = "ctrl_cmd_cancel_all",
-                                    onClick = onCancelAllActive
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        if (canRunCommands) {
+                                            pendingBatchAction = BatchCommandAction.CANCEL_ALL
+                                        } else {
+                                            onCancelAllActive()
+                                        }
+                                    }
                                 )
                             }
                             item {
@@ -630,7 +729,14 @@ fun ControlPanelScreen(
                                     icon = Icons.Default.LockOpen,
                                     accent = MaterialTheme.colorScheme.secondary,
                                     testTag = "ctrl_cmd_reset_queues",
-                                    onClick = onResetAllQueues
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        if (canRunCommands) {
+                                            pendingBatchAction = BatchCommandAction.RESET_QUEUES
+                                        } else {
+                                            onResetAllQueues()
+                                        }
+                                    }
                                 )
                             }
                             item {
@@ -660,13 +766,28 @@ fun ControlPanelScreen(
                                         }
                                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                             Button(
-                                                onClick = { onAdjustLoyaltyPoints(50) },
+                                                onClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    onAdjustLoyaltyPoints(50)
+                                                    if (canRunCommands) {
+                                                        lastExecutedCommand = "آخر إجراء مُنفَّذ: إضافة +50 نقطة ولاء ✓"
+                                                    }
+                                                },
                                                 colors = ButtonDefaults.buttonColors(containerColor = AmberGold, contentColor = Color(0xFF1F1600)),
                                                 modifier = Modifier.testTag("ctrl_cmd_add_50_points")
                                             ) {
                                                 Text("+50", fontWeight = FontWeight.Bold)
                                             }
-                                            OutlinedButton(onClick = onResetLoyaltyPoints) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    if (canRunCommands) {
+                                                        pendingBatchAction = BatchCommandAction.RESET_POINTS
+                                                    } else {
+                                                        onResetLoyaltyPoints()
+                                                    }
+                                                }
+                                            ) {
                                                 Text("تصفير")
                                             }
                                         }
@@ -681,7 +802,14 @@ fun ControlPanelScreen(
                                     icon = Icons.Default.RestartAlt,
                                     accent = StatusUrgent,
                                     testTag = "ctrl_cmd_factory_reset",
-                                    onClick = { showFactoryResetConfirm = true }
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        if (canRunCommands) {
+                                            showFactoryResetConfirm = true
+                                        } else {
+                                            onFactoryReset()
+                                        }
+                                    }
                                 )
                             }
                         }
@@ -832,6 +960,7 @@ fun ControlPanelScreen(
                     onClick = {
                         onFactoryReset()
                         showFactoryResetConfirm = false
+                        lastExecutedCommand = "آخر إجراء مُنفَّذ: إعادة ضبط المصنع بالكامل ✓"
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = StatusUrgent)
                 ) {
@@ -840,6 +969,39 @@ fun ControlPanelScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showFactoryResetConfirm = false }) {
+                    Text("تراجع")
+                }
+            }
+        )
+    }
+
+    pendingBatchAction?.let { action ->
+        AlertDialog(
+            onDismissRequest = { pendingBatchAction = null },
+            title = { Text(action.dialogTitle) },
+            text = { Text(action.dialogBody) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        when (action) {
+                            BatchCommandAction.COMPLETE_ALL -> onCompleteAllActive()
+                            BatchCommandAction.CANCEL_ALL -> onCancelAllActive()
+                            BatchCommandAction.RESET_QUEUES -> onResetAllQueues()
+                            BatchCommandAction.RESET_POINTS -> onResetLoyaltyPoints()
+                        }
+                        lastExecutedCommand = "آخر إجراء مُنفَّذ: ${action.successBanner} ✓"
+                        pendingBatchAction = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (action == BatchCommandAction.COMPLETE_ALL) StatusOpen else StatusUrgent
+                    )
+                ) {
+                    Text(action.confirmLabel)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingBatchAction = null }) {
                     Text("تراجع")
                 }
             }
@@ -871,6 +1033,38 @@ fun ControlPanelScreen(
             }
         )
     }
+}
+
+private enum class BatchCommandAction(
+    val dialogTitle: String,
+    val dialogBody: String,
+    val confirmLabel: String,
+    val successBanner: String
+) {
+    COMPLETE_ALL(
+        dialogTitle = "تأكيد إتمام كل التذاكر النشطة",
+        dialogBody = "سيتم إنهاء جميع التذاكر النشطة حالياً ومنح نقاط الولاء (إن كانت مفعّلة).",
+        confirmLabel = "إتمام الكل",
+        successBanner = "إتمام جميع التذاكر النشطة"
+    ),
+    CANCEL_ALL(
+        dialogTitle = "تأكيد إلغاء كل التذاكر النشطة",
+        dialogBody = "سيتم نقل جميع التذاكر النشطة إلى السجل كملغاة وتفريغ الأدوار.",
+        confirmLabel = "إلغاء الكل",
+        successBanner = "إلغاء جميع التذاكر النشطة"
+    ),
+    RESET_QUEUES(
+        dialogTitle = "تأكيد تصفير جميع الطوابير",
+        dialogBody = "ستتم إعادة ترقيم جميع المراكز والبدء من التذكرة #1.",
+        confirmLabel = "تصفير الطوابير",
+        successBanner = "تصفير جميع الطوابير والبدء من #1"
+    ),
+    RESET_POINTS(
+        dialogTitle = "تأكيد تصفير نقاط الولاء",
+        dialogBody = "سيتم تصفير رصيد نقاط الولاء للمستخدم إلى 0.",
+        confirmLabel = "تصفير الرصيد",
+        successBanner = "تصفير رصيد نقاط الولاء"
+    )
 }
 
 @Composable

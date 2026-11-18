@@ -68,6 +68,7 @@ class DoriRepository(
         if (dao.getAllProvidersOnce().isEmpty()) {
             dao.insertProviders(SeedData.initialProviders())
         }
+        cleanupDuplicateSyntheticMessages()
     }
 
     suspend fun setSelectedDistrict(district: NinevehDistrict) {
@@ -93,7 +94,8 @@ class DoriRepository(
         age: String = "",
         optionalNote: String = ""
     ) {
-        prefs.updateProfile(name, phone, district, age, optionalNote)
+        val cleanPhone = UserProfileSettings.normalizeDigits(phone.trim())
+        prefs.updateProfile(name.trim(), cleanPhone, district, age.trim(), optionalNote.trim())
     }
 
     suspend fun toggleFavorite(venueId: Int, currentFavorite: Boolean) {
@@ -945,6 +947,13 @@ class DoriRepository(
             ?: return Result.failure(IllegalStateException("المحادثة غير موجودة"))
         val cleanName = senderName.trim().ifBlank { existing.senderName.ifBlank { "مستخدم دوري" } }
         val now = System.currentTimeMillis()
+        val existingMsgs = dao.getMessagesForTicketOnce(existing.externalId)
+        val recentDuplicate = existingMsgs.lastOrNull {
+            !it.isFromAdmin && it.body.trim() == cleanBody && (now - it.createdAt) in 0L..1500L
+        }
+        if (recentDuplicate != null) {
+            return Result.success(existing to recentDuplicate)
+        }
         val msgEntity = SupportMessageEntity(
             externalMessageId = "MSG-${UUID.randomUUID().toString().take(10).uppercase()}",
             ticketExternalId = existing.externalId,
@@ -993,6 +1002,14 @@ class DoriRepository(
             ?: return Result.failure(IllegalStateException("رسالة الدعم غير موجودة"))
         val adminLabel = adminName.ifBlank { "فريق الدعم الفني" }
         val now = System.currentTimeMillis()
+        val existingMsgs = dao.getMessagesForTicketOnce(existing.externalId)
+        val recentDuplicate = existingMsgs.lastOrNull {
+            it.isFromAdmin && it.body.trim() == cleanReply && (now - it.createdAt) in 0L..1500L
+        }
+        if (recentDuplicate != null) {
+            return Result.success(existing)
+        }
+        dao.deleteSyntheticAdminMessagesMatchingBody(existing.externalId, cleanReply)
         val updated = existing.copy(
             adminReply = cleanReply,
             repliedByAdmin = adminLabel,
@@ -1115,7 +1132,38 @@ class DoriRepository(
                 }
             }
         }
+        cleanupDuplicateSyntheticMessages()
         return changed
+    }
+
+    private fun isSyntheticMessageId(externalMessageId: String): Boolean {
+        return externalMessageId.startsWith("PUSH-A-") ||
+            externalMessageId.startsWith("SYNC-A-") ||
+            externalMessageId.startsWith("LEGACY-A-") ||
+            externalMessageId.startsWith("LEGACY-U-")
+    }
+
+    suspend fun cleanupDuplicateSyntheticMessages(): Int {
+        val all = dao.getAllSupportMessagesOnce()
+        if (all.size <= 1) return 0
+        var removed = 0
+        all.groupBy { it.ticketExternalId }.values.forEach { thread ->
+            val realKeys = thread
+                .filter { !isSyntheticMessageId(it.externalMessageId) }
+                .map { it.isFromAdmin to it.body.trim() }
+                .toSet()
+            val seenSyntheticKeys = mutableSetOf<Pair<Boolean, String>>()
+            thread.forEach { msg ->
+                if (isSyntheticMessageId(msg.externalMessageId)) {
+                    val key = msg.isFromAdmin to msg.body.trim()
+                    if (key in realKeys || !seenSyntheticKeys.add(key)) {
+                        dao.deleteSupportMessageById(msg.id)
+                        removed++
+                    }
+                }
+            }
+        }
+        return removed
     }
 
     suspend fun mergePulledSupportMessages(
@@ -1125,6 +1173,17 @@ class DoriRepository(
         var added = 0
         for (remote in incoming) {
             if (remote.externalMessageId.isBlank() || remote.ticketExternalId.isBlank()) continue
+            val isSynthetic = isSyntheticMessageId(remote.externalMessageId)
+            val ticketMsgs = dao.getMessagesForTicketOnce(remote.ticketExternalId)
+            if (isSynthetic && ticketMsgs.any {
+                    it.isFromAdmin == remote.isFromAdmin && it.body.trim() == remote.body.trim()
+                }
+            ) {
+                continue
+            }
+            if (!isSynthetic && remote.isFromAdmin) {
+                dao.deleteSyntheticAdminMessagesMatchingBody(remote.ticketExternalId, remote.body)
+            }
             if (dao.getSupportMessageByExternalId(remote.externalMessageId) == null) {
                 val sanitizedSender = if (!isControlApp && remote.isFromAdmin) {
                     "فريق الدعم الفني"
@@ -1169,6 +1228,7 @@ class DoriRepository(
                 }
             }
         }
+        cleanupDuplicateSyntheticMessages()
         return added
     }
 

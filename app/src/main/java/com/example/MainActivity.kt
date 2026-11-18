@@ -282,7 +282,8 @@ fun DoriAppRoot(
                             onOpenSupport = {
                                 viewModel.syncLocalBridge(silent = true)
                                 showSupportSheet = true
-                            }
+                            },
+                            onTestAlert = viewModel::testTurnAlert
                         )
                     }
 

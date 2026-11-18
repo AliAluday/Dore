@@ -38,7 +38,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,7 +50,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -173,6 +179,9 @@ fun PerforatedTicketCard(
         label = "stageColor"
     )
 
+    val haptics = LocalHapticFeedback.current
+    val clipboard = LocalClipboardManager.current
+    var copiedCode by remember(booking.id) { mutableStateOf(false) }
     val ticketShape = remember { perforatedTicketShape(0.62f) }
     val approval = BookingApprovalStatus.fromName(booking.approvalStatus)
     val approvalColor = when (approval) {
@@ -262,10 +271,17 @@ fun PerforatedTicketCard(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // Compact Queue Number + Ticket Code Pill
+                    // Compact Queue Number + Tap-to-Copy Ticket Code Pill
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = stageColor
+                        color = stageColor,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable {
+                                clipboard.setText(AnnotatedString(booking.ticketCode))
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                copiedCode = true
+                            }
                     ) {
                         Column(
                             modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
@@ -278,9 +294,9 @@ fun PerforatedTicketCard(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = booking.ticketCode,
+                                text = if (copiedCode) "✓ تم النسخ" else booking.ticketCode,
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                                color = Color.White.copy(alpha = 0.88f)
+                                color = Color.White.copy(alpha = 0.92f)
                             )
                         }
                     }
@@ -361,7 +377,10 @@ fun PerforatedTicketCard(
                             border = BorderStroke(1.2.dp, stageColor.copy(alpha = 0.55f)),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
-                                .clickable { onZoomQr() }
+                                .clickable {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onZoomQr()
+                                }
                                 .testTag("ticket_qr_button")
                         ) {
                             Box {
@@ -474,7 +493,10 @@ fun PerforatedTicketCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
-                        onClick = onCompleteClick,
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onCompleteClick()
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                         shape = RoundedCornerShape(10.dp),
@@ -502,7 +524,10 @@ fun PerforatedTicketCard(
                     }
 
                     OutlinedButton(
-                        onClick = onCancelClick,
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onCancelClick()
+                        },
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                         shape = RoundedCornerShape(10.dp),
@@ -521,7 +546,10 @@ fun PerforatedTicketCard(
 
                     if (controlConfig.enableWhatsAppShare) {
                         FilledTonalIconButton(
-                            onClick = onShareWhatsApp,
+                            onClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onShareWhatsApp()
+                            },
                             modifier = Modifier
                                 .size(34.dp)
                                 .testTag("share_whatsapp_button")

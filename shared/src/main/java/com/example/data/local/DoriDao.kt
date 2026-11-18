@@ -185,6 +185,17 @@ interface DoriDao {
     @Update
     suspend fun updateSupportMessage(message: SupportMessageEntity)
 
+    @Query(
+        "DELETE FROM support_messages WHERE ticketExternalId = :ticketExternalId " +
+            "AND isFromAdmin = 1 " +
+            "AND (externalMessageId LIKE 'PUSH-A-%' OR externalMessageId LIKE 'SYNC-A-%' OR externalMessageId LIKE 'LEGACY-A-%') " +
+            "AND TRIM(body) = TRIM(:body)"
+    )
+    suspend fun deleteSyntheticAdminMessagesMatchingBody(ticketExternalId: String, body: String)
+
+    @Query("DELETE FROM support_messages WHERE id = :id")
+    suspend fun deleteSupportMessageById(id: Long)
+
     @Query("DELETE FROM support_messages")
     suspend fun deleteAllSupportMessages()
 

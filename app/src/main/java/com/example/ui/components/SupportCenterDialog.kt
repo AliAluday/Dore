@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddComment
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.ListAlt
@@ -80,10 +82,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -139,6 +145,7 @@ fun SupportCenterSheet(
     val isKeyboardOpen = WindowInsets.ime.getBottom(density) > 0
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val haptics = LocalHapticFeedback.current
 
     val handleExitAttempt: () -> Unit = {
         if (isKeyboardOpen) {
@@ -340,7 +347,10 @@ fun SupportCenterSheet(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable { currentTab = tab }
+                                .clickable {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    currentTab = tab
+                                }
                                 .testTag("support_tab_${tab.name.lowercase()}")
                         ) {
                             Row(
@@ -513,7 +523,27 @@ private fun buildThreadMessages(
         )
     }
 
-    return stored.sortedBy { it.createdAt }
+    val deduped = mutableListOf<SupportMessageEntity>()
+    val sorted = stored.sortedBy { it.createdAt }
+    val realKeys = sorted.filter { msg ->
+        val ext = msg.externalMessageId
+        !ext.startsWith("PUSH-A-") && !ext.startsWith("SYNC-A-") &&
+            !ext.startsWith("LEGACY-A-") && !ext.startsWith("LEGACY-U-")
+    }.map { it.isFromAdmin to it.body.trim() }.toSet()
+
+    val seenSyntheticKeys = mutableSetOf<Pair<Boolean, String>>()
+    sorted.forEach { msg ->
+        val ext = msg.externalMessageId
+        val isSynthetic = ext.startsWith("PUSH-A-") || ext.startsWith("SYNC-A-") ||
+            ext.startsWith("LEGACY-A-") || ext.startsWith("LEGACY-U-")
+        val key = msg.isFromAdmin to msg.body.trim()
+        if (!isSynthetic) {
+            deduped.add(msg)
+        } else if (key !in realKeys && seenSyntheticKeys.add(key)) {
+            deduped.add(msg)
+        }
+    }
+    return deduped
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -527,7 +557,8 @@ private fun LiveSupportChatTab(
     onStartNewChat: () -> Unit,
     onSendMessage: (String) -> Unit
 ) {
-    var messageDraft by remember { mutableStateOf("") }
+    val haptics = LocalHapticFeedback.current
+    var messageDraft by remember(activeTicket?.externalId) { mutableStateOf("") }
     val listState = rememberLazyListState()
 
     val quickStarters = listOf(
@@ -740,6 +771,7 @@ private fun LiveSupportChatTab(
                         onClick = {
                             val text = messageDraft.trim()
                             if (text.isNotEmpty()) {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onSendMessage(text)
                                 messageDraft = ""
                             }
@@ -1207,6 +1239,9 @@ private fun ProblemTicketCardUser(
     }
     var showNoteBox by remember(ticket.id) { mutableStateOf(false) }
     var noteDraft by remember(ticket.id) { mutableStateOf("") }
+    var copiedId by remember(ticket.id) { mutableStateOf(false) }
+    val clipboardManager = LocalClipboardManager.current
+    val haptics = LocalHapticFeedback.current
 
     Card(
         shape = RoundedCornerShape(15.dp),
@@ -1244,12 +1279,36 @@ private fun ProblemTicketCardUser(
                             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                         )
                     }
-                    Text(
-                        text = ticket.externalId,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (copiedId) StatusOpen.copy(alpha = 0.14f) else Color.Transparent,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable {
+                                clipboardManager.setText(AnnotatedString(ticket.externalId))
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                copiedId = true
+                            }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                text = if (copiedId) "تم نسخ ${ticket.externalId}" else ticket.externalId,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (copiedId) StatusOpen else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                            Icon(
+                                imageVector = if (copiedId) Icons.Default.CheckCircle else Icons.Default.ContentCopy,
+                                contentDescription = "نسخ رقم البطاقة",
+                                tint = if (copiedId) StatusOpen else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(11.dp)
+                            )
+                        }
+                    }
                 }
 
                 Surface(
@@ -1367,11 +1426,15 @@ private fun ProblemTicketCardUser(
             if (ticket.status != SupportTicketStatus.CLOSED.name) {
                 if (!showNoteBox) {
                     AssistChip(
-                        onClick = { showNoteBox = true },
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showNoteBox = true
+                        },
                         leadingIcon = { Icon(Icons.Default.AddComment, contentDescription = null, modifier = Modifier.size(14.dp)) },
                         label = { Text("إضافة توضيح على البطاقة", style = MaterialTheme.typography.labelSmall) }
                     )
-                } else {
+                }
+                AnimatedVisibility(visible = showNoteBox) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -1390,6 +1453,7 @@ private fun ProblemTicketCardUser(
                             onClick = {
                                 val txt = noteDraft.trim()
                                 if (txt.isNotEmpty()) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     onSendNote(txt)
                                     noteDraft = ""
                                     showNoteBox = false

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.MarkChatRead
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Schedule
@@ -104,9 +106,9 @@ import java.util.Date
 import java.util.Locale
 
 private enum class SupportSheetTab(val label: String) {
-    LIVE_CHAT("محادثة مباشرة"),
-    COMPLAINT_FORM("تقديم شكوى"),
-    MY_REQUESTS("طلباتي")
+    LIVE_CHAT("المراسلة"),
+    COMPLAINT_FORM("طلب حل مشكلة"),
+    MY_REQUESTS("بطاقات المشاكل")
 }
 
 @Composable
@@ -152,31 +154,40 @@ fun SupportCenterSheet(
         handleExitAttempt()
     }
 
+    val chatTickets = remember(tickets) {
+        tickets.filter { SupportRequestType.fromName(it.requestType) == SupportRequestType.CHAT }
+    }
+    val problemCards = remember(tickets) {
+        tickets.filter { SupportRequestType.fromName(it.requestType) == SupportRequestType.COMPLAINT }
+    }
+
     var currentTab by remember { mutableStateOf(SupportSheetTab.LIVE_CHAT) }
     var startedNewChatExplicitly by remember { mutableStateOf(false) }
     var selectedTicketExtId by remember {
-        mutableStateOf(pickDefaultSupportTicketId(tickets))
+        mutableStateOf(pickDefaultSupportTicketId(chatTickets))
     }
     var awaitNewTicketSwitch by remember { mutableStateOf(false) }
-    var previousTicketsCount by remember { mutableStateOf(tickets.size) }
+    var previousChatTicketsCount by remember { mutableStateOf(chatTickets.size) }
 
     LaunchedEffect(Unit) {
         onSyncReplies()
     }
 
-    LaunchedEffect(tickets, awaitNewTicketSwitch, startedNewChatExplicitly) {
-        if (awaitNewTicketSwitch && tickets.size > previousTicketsCount) {
-            selectedTicketExtId = tickets.maxByOrNull { it.updatedAt }?.externalId
+    LaunchedEffect(chatTickets, awaitNewTicketSwitch, startedNewChatExplicitly) {
+        if (awaitNewTicketSwitch && chatTickets.size > previousChatTicketsCount) {
+            selectedTicketExtId = chatTickets.maxByOrNull { it.updatedAt }?.externalId
             awaitNewTicketSwitch = false
             startedNewChatExplicitly = false
         } else if (
             !startedNewChatExplicitly &&
-            tickets.isNotEmpty() &&
-            (selectedTicketExtId == null || tickets.none { it.externalId == selectedTicketExtId })
+            chatTickets.isNotEmpty() &&
+            (selectedTicketExtId == null || chatTickets.none { it.externalId == selectedTicketExtId })
         ) {
-            selectedTicketExtId = pickDefaultSupportTicketId(tickets)
+            selectedTicketExtId = pickDefaultSupportTicketId(chatTickets)
+        } else if (selectedTicketExtId != null && chatTickets.none { it.externalId == selectedTicketExtId }) {
+            selectedTicketExtId = pickDefaultSupportTicketId(chatTickets)
         }
-        previousTicketsCount = tickets.size
+        previousChatTicketsCount = chatTickets.size
     }
 
     var senderName by remember(defaultName) { mutableStateOf(defaultName) }
@@ -191,15 +202,16 @@ fun SupportCenterSheet(
                 interactionSource = remember { MutableInteractionSource() },
                 onClick = handleExitAttempt
             )
-            .statusBarsPadding(),
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding(),
         contentAlignment = Alignment.BottomCenter
     ) {
         Surface(
             modifier = Modifier
                 .widthIn(max = 620.dp)
                 .fillMaxWidth()
-                .fillMaxHeight(0.93f)
-                .imePadding()
+                .fillMaxHeight(0.94f)
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() },
@@ -211,9 +223,7 @@ fun SupportCenterSheet(
             shadowElevation = 16.dp
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .navigationBarsPadding()
+                modifier = Modifier.fillMaxSize()
             ) {
                 // Compact Top Handle + Gradient Header
                 Box(
@@ -252,14 +262,14 @@ fun SupportCenterSheet(
                             }
                             Column {
                                 Text(
-                                    text = "الدعم الفني والشكاوى",
+                                    text = "الدعم الفني والبطاقات",
                                     style = MaterialTheme.typography.titleSmall,
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
                                     text = if (isKeyboardOpen) "اضغط خروج لإخفاء الكيبورد أولاً"
-                                    else "محادثة فورية وتقديم طلبات الشكوى",
+                                    else "مراسلة عادية أو تقديم طلب حل مشكلة كبطاقة",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color.White.copy(alpha = 0.85f),
                                     maxLines = 1,
@@ -319,10 +329,10 @@ fun SupportCenterSheet(
                             SupportSheetTab.COMPLAINT_FORM -> Icons.Default.ReportProblem
                             SupportSheetTab.MY_REQUESTS -> Icons.Default.ListAlt
                         }
-                        val labelText = if (tab == SupportSheetTab.MY_REQUESTS && tickets.isNotEmpty()) {
-                            "${tab.label} (${tickets.size})"
-                        } else {
-                            tab.label
+                        val labelText = when {
+                            tab == SupportSheetTab.MY_REQUESTS && problemCards.isNotEmpty() -> "${tab.label} (${problemCards.size})"
+                            tab == SupportSheetTab.LIVE_CHAT && chatTickets.isNotEmpty() -> "${tab.label} (${chatTickets.size})"
+                            else -> tab.label
                         }
                         Surface(
                             shape = RoundedCornerShape(12.dp),
@@ -370,12 +380,12 @@ fun SupportCenterSheet(
                 ) { tab ->
                     when (tab) {
                         SupportSheetTab.LIVE_CHAT -> {
-                            val activeTicket = tickets.find { it.externalId == selectedTicketExtId }
+                            val activeTicket = chatTickets.find { it.externalId == selectedTicketExtId }
                             val threadMessages = remember(activeTicket, messagesByTicket) {
                                 buildThreadMessages(activeTicket, messagesByTicket)
                             }
                             LiveSupportChatTab(
-                                tickets = tickets,
+                                tickets = chatTickets,
                                 activeTicket = activeTicket,
                                 messages = threadMessages,
                                 senderName = senderName,
@@ -398,14 +408,14 @@ fun SupportCenterSheet(
                                             text
                                         )
                                     } else {
-                                        previousTicketsCount = tickets.size
+                                        previousChatTicketsCount = chatTickets.size
                                         awaitNewTicketSwitch = true
                                         startedNewChatExplicitly = false
                                         onSendTicket(
                                             accountDisplayName,
                                             senderPhone,
                                             SupportCategory.GENERAL,
-                                            "محادثة دعم مباشر",
+                                            "مراسلة دعم مباشر",
                                             text,
                                             SupportRequestType.CHAT,
                                             ""
@@ -420,12 +430,8 @@ fun SupportCenterSheet(
                                 venues = venues,
                                 senderName = senderName,
                                 senderPhone = senderPhone,
-                                onNameChange = { senderName = it },
                                 onPhoneChange = { senderPhone = it },
                                 onSubmitComplaint = { category, venueName, subject, details ->
-                                    previousTicketsCount = tickets.size
-                                    awaitNewTicketSwitch = true
-                                    startedNewChatExplicitly = false
                                     onSendTicket(
                                         senderName.ifBlank { "مستخدم دوري" },
                                         senderPhone,
@@ -435,19 +441,22 @@ fun SupportCenterSheet(
                                         SupportRequestType.COMPLAINT,
                                         venueName
                                     )
-                                    currentTab = SupportSheetTab.LIVE_CHAT
+                                    currentTab = SupportSheetTab.MY_REQUESTS
                                 }
                             )
                         }
 
                         SupportSheetTab.MY_REQUESTS -> {
                             SupportRequestsListTab(
-                                tickets = tickets,
+                                cards = problemCards,
                                 messagesByTicket = messagesByTicket,
-                                onOpenThread = { extId ->
-                                    startedNewChatExplicitly = false
-                                    selectedTicketExtId = extId
-                                    currentTab = SupportSheetTab.LIVE_CHAT
+                                senderName = senderName,
+                                onSendCardNote = { extId, noteText ->
+                                    onSendFollowUp(
+                                        extId,
+                                        senderName.ifBlank { "مستخدم دوري" },
+                                        noteText
+                                    )
                                 },
                                 onSyncReplies = onSyncReplies,
                                 onNewComplaint = { currentTab = SupportSheetTab.COMPLAINT_FORM }
@@ -462,8 +471,8 @@ fun SupportCenterSheet(
 
 private fun pickDefaultSupportTicketId(tickets: List<SupportTicketEntity>): String? {
     val sorted = tickets.sortedByDescending { it.updatedAt }
+    // Only auto-select an open chat so the typing bar is always ready by default
     return sorted.firstOrNull { it.status != SupportTicketStatus.CLOSED.name }?.externalId
-        ?: sorted.firstOrNull()?.externalId
 }
 
 private fun buildThreadMessages(
@@ -670,18 +679,18 @@ private fun LiveSupportChatTab(
             }
         }
 
-        // Pinned Chat Composer Bar
+        // Pinned Chat Composer Bar (always prominent above keyboard)
         val isClosed = activeTicket?.status == SupportTicketStatus.CLOSED.name
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
         if (isClosed) {
             Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -692,59 +701,66 @@ private fun LiveSupportChatTab(
                     )
                     Button(
                         onClick = onStartNewChat,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
-                        modifier = Modifier.height(32.dp)
+                        modifier = Modifier.height(34.dp)
                     ) {
                         Text("بدء محادثة جديدة", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
         } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 4.dp,
+                shadowElevation = 6.dp,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                OutlinedTextField(
-                    value = messageDraft,
-                    onValueChange = { messageDraft = it },
-                    placeholder = { Text("اكتب رسالتك للدعم الفني...", style = MaterialTheme.typography.bodySmall) },
-                    minLines = 1,
-                    maxLines = 3,
-                    shape = RoundedCornerShape(16.dp),
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .testTag("support_chat_input")
-                )
-                IconButton(
-                    onClick = {
-                        val text = messageDraft.trim()
-                        if (text.isNotEmpty()) {
-                            onSendMessage(text)
-                            messageDraft = ""
-                        }
-                    },
-                    enabled = messageDraft.trim().isNotEmpty(),
-                    modifier = Modifier
-                        .size(44.dp)
-                        .minimumInteractiveComponentSize()
-                        .clip(CircleShape)
-                        .background(
-                            if (messageDraft.trim().isNotEmpty()) EmeraldPrimary
-                            else MaterialTheme.colorScheme.surfaceVariant
-                        )
-                        .testTag("support_chat_send")
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "إرسال الرسالة",
-                        tint = if (messageDraft.trim().isNotEmpty()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(19.dp)
+                    OutlinedTextField(
+                        value = messageDraft,
+                        onValueChange = { messageDraft = it },
+                        placeholder = { Text("اكتب رسالتك للدعم الفني...", style = MaterialTheme.typography.bodySmall) },
+                        minLines = 1,
+                        maxLines = 3,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .testTag("support_chat_input")
                     )
+                    IconButton(
+                        onClick = {
+                            val text = messageDraft.trim()
+                            if (text.isNotEmpty()) {
+                                onSendMessage(text)
+                                messageDraft = ""
+                            }
+                        },
+                        enabled = messageDraft.trim().isNotEmpty(),
+                        modifier = Modifier
+                            .size(46.dp)
+                            .minimumInteractiveComponentSize()
+                            .clip(CircleShape)
+                            .background(
+                                if (messageDraft.trim().isNotEmpty()) EmeraldPrimary
+                                else MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            .testTag("support_chat_send")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "إرسال الرسالة",
+                            tint = if (messageDraft.trim().isNotEmpty()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
                 }
             }
         }
@@ -843,7 +859,6 @@ private fun ComplaintRequestFormTab(
     venues: List<VenueEntity>,
     senderName: String,
     senderPhone: String,
-    onNameChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
     onSubmitComplaint: (
         category: SupportCategory,
@@ -885,14 +900,36 @@ private fun ComplaintRequestFormTab(
             ) {
                 Icon(Icons.Default.ReportProblem, contentDescription = null, tint = StatusUrgent, modifier = Modifier.size(18.dp))
                 Text(
-                    text = "تقديم طلب شكوى رسمي — تتم متابعته والرد عليك في المحادثة المباشرة.",
+                    text = "تقديم طلب لحل مشكلة كبطاقة متابعة — تظهر حالة البطاقة والحل في تبويب «بطاقات المشاكل».",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
         }
 
-        Text("تصنيف الطلب:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+        // Account owner chip (uses account name automatically)
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = EmeraldPrimary.copy(alpha = 0.09f),
+            border = BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.25f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(Icons.Default.Person, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(16.dp))
+                Text(
+                    text = "صاحب البطاقة (اسم الحساب): ${senderName.ifBlank { "مستخدم دوري" }}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        Text("تصنيف المشكلة:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -930,7 +967,7 @@ private fun ComplaintRequestFormTab(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (selectedVenueName.isBlank()) "المركز المعني بالشكوى (اختياري): شكوى عامة"
+                        text = if (selectedVenueName.isBlank()) "المركز المعني بالبطاقة (اختياري): طلب عام"
                         else "المركز المعني: $selectedVenueName",
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
@@ -946,7 +983,7 @@ private fun ComplaintRequestFormTab(
                 onDismissRequest = { venueMenuExpanded = false }
             ) {
                 DropdownMenuItem(
-                    text = { Text("شكوى عامة (بدون مركز محدد)") },
+                    text = { Text("طلب عام (بدون مركز محدد)") },
                     onClick = {
                         selectedVenueName = ""
                         venueMenuExpanded = false
@@ -980,37 +1017,22 @@ private fun ComplaintRequestFormTab(
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedTextField(
-                value = senderName,
-                onValueChange = onNameChange,
-                label = { Text("الاسم") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("support_sender_name_input")
-            )
-            OutlinedTextField(
-                value = senderPhone,
-                onValueChange = onPhoneChange,
-                label = { Text("الهاتف (اختياري)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("support_sender_phone_input")
-            )
-        }
+        OutlinedTextField(
+            value = senderPhone,
+            onValueChange = onPhoneChange,
+            label = { Text("رقم الهاتف للتواصل (اختياري)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("support_sender_phone_input")
+        )
 
         OutlinedTextField(
             value = subject,
             onValueChange = { subject = it },
-            label = { Text("عنوان الشكوى أو الطلب") },
+            label = { Text("عنوان المشكلة أو الطلب") },
             placeholder = { Text("مثال: تأخر في استقبال التذكرة") },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
@@ -1025,8 +1047,8 @@ private fun ComplaintRequestFormTab(
                 details = it
                 validationError = null
             },
-            label = { Text("تفاصيل الشكوى *") },
-            placeholder = { Text("اشرح المشكلة أو الطلب بالتفصيل...") },
+            label = { Text("تفاصيل المشكلة *") },
+            placeholder = { Text("اشرح المشكلة أو الطلب بالتفصيل ليتم حلها عبر البطاقة...") },
             minLines = 2,
             maxLines = 4,
             isError = validationError != null,
@@ -1040,13 +1062,13 @@ private fun ComplaintRequestFormTab(
         Button(
             onClick = {
                 if (details.trim().length < 4) {
-                    validationError = "يرجى كتابة 4 أحرف على الأقل في تفاصيل الشكوى"
+                    validationError = "يرجى كتابة 4 أحرف على الأقل في تفاصيل المشكلة"
                     return@Button
                 }
                 onSubmitComplaint(
                     selectedCategory,
                     selectedVenueName,
-                    subject.ifBlank { "طلب شكوى: ${selectedCategory.displayName}" },
+                    subject.ifBlank { "بطاقة مشكلة: ${selectedCategory.displayName}" },
                     details
                 )
                 subject = ""
@@ -1058,28 +1080,29 @@ private fun ComplaintRequestFormTab(
             contentPadding = PaddingValues(vertical = 8.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(42.dp)
+                .height(44.dp)
                 .testTag("support_send_button")
         ) {
             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(6.dp))
-            Text("إرسال طلب الشكوى", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Text("تقديم الطلب كبطاقة", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         }
     }
 }
 
 @Composable
 private fun SupportRequestsListTab(
-    tickets: List<SupportTicketEntity>,
+    cards: List<SupportTicketEntity>,
     messagesByTicket: Map<String, List<SupportMessageEntity>>,
-    onOpenThread: (String) -> Unit,
+    senderName: String,
+    onSendCardNote: (ticketExternalId: String, noteBody: String) -> Unit,
     onSyncReplies: () -> Unit,
     onNewComplaint: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
             Row(
@@ -1088,7 +1111,7 @@ private fun SupportRequestsListTab(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "سجل المحادثات والشكاوى (${tickets.size})",
+                    text = "بطاقات حل المشاكل (${cards.size})",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -1101,43 +1124,46 @@ private fun SupportRequestsListTab(
                     AssistChip(
                         onClick = onNewComplaint,
                         leadingIcon = { Icon(Icons.Default.ReportProblem, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                        label = { Text("شكوى جديدة", style = MaterialTheme.typography.labelSmall) }
+                        label = { Text("بطاقة جديدة", style = MaterialTheme.typography.labelSmall) }
                     )
                 }
             }
         }
 
-        if (tickets.isEmpty()) {
+        if (cards.isEmpty()) {
             item {
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "لا توجد محادثات أو شكاوى مسجلة بعد — ابدأ بمراسلة الدعم أو قدم طلب شكوى.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(14.dp)
-                    )
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "لا توجد بطاقات مشاكل مقدمة بعد. يمكنك تقديم أي طلب لحل مشكلة كبطاقة من تبويب «طلب حل مشكلة».",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = onNewComplaint,
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                            modifier = Modifier.height(36.dp)
+                        ) {
+                            Text("إنشاء بطاقة مشكلة", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
                 }
             }
         } else {
-            items(tickets, key = { it.id }) { ticket ->
+            items(cards, key = { it.id }) { ticket ->
                 val thread = buildThreadMessages(ticket, messagesByTicket)
-                val msgCount = maxOf(1, thread.size)
-                val lastMsg = thread.lastOrNull()
-                val previewText = when {
-                    lastMsg != null && lastMsg.isFromAdmin -> "فريق الدعم الفني: ${lastMsg.body}"
-                    lastMsg != null -> "أنت: ${lastMsg.body}"
-                    ticket.adminReply.isNotBlank() -> "فريق الدعم الفني: ${ticket.adminReply}"
-                    else -> ticket.message
-                }
-                SupportHistoryCard(
+                ProblemTicketCardUser(
                     ticket = ticket,
-                    messageCount = msgCount,
-                    previewText = previewText,
-                    onClick = { onOpenThread(ticket.externalId) }
+                    thread = thread,
+                    accountName = senderName,
+                    onSendNote = { note -> onSendCardNote(ticket.externalId, note) }
                 )
             }
         }
@@ -1145,15 +1171,14 @@ private fun SupportRequestsListTab(
 }
 
 @Composable
-private fun SupportHistoryCard(
+private fun ProblemTicketCardUser(
     ticket: SupportTicketEntity,
-    messageCount: Int,
-    previewText: String,
-    onClick: () -> Unit
+    thread: List<SupportMessageEntity>,
+    accountName: String,
+    onSendNote: (String) -> Unit
 ) {
     val statusEnum = SupportTicketStatus.fromName(ticket.status)
     val catEnum = SupportCategory.fromName(ticket.category)
-    val isComplaint = SupportRequestType.fromName(ticket.requestType) == SupportRequestType.COMPLAINT
     val statusColor = when (statusEnum) {
         SupportTicketStatus.REPLIED -> StatusOpen
         SupportTicketStatus.DELIVERED -> IndigoAccentLight
@@ -1169,21 +1194,33 @@ private fun SupportHistoryCard(
     val dateLabel = remember(ticket.updatedAt) {
         SimpleDateFormat("HH:mm • dd/MM", Locale("ar")).format(Date(ticket.updatedAt))
     }
+    val adminReplies = remember(thread, ticket.adminReply) {
+        val list = thread.filter { it.isFromAdmin }.map { it.body }.toMutableList()
+        if (ticket.adminReply.isNotBlank() && list.none { it.trim() == ticket.adminReply.trim() }) {
+            list.add(ticket.adminReply)
+        }
+        list
+    }
+    val userExtraNotes = remember(thread, ticket.message) {
+        thread.filter { !it.isFromAdmin && it.body.trim() != ticket.message.trim() }
+    }
+    var showNoteBox by remember(ticket.id) { mutableStateOf(false) }
+    var noteDraft by remember(ticket.id) { mutableStateOf("") }
 
     Card(
-        shape = RoundedCornerShape(13.dp),
-        border = BorderStroke(1.dp, statusColor.copy(alpha = 0.35f)),
+        shape = RoundedCornerShape(15.dp),
+        border = BorderStroke(1.2.dp, statusColor.copy(alpha = 0.4f)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(13.dp))
-            .clickable(onClick = onClick)
             .testTag("user_support_card_${ticket.id}")
     ) {
         Column(
-            modifier = Modifier.padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Card Header: Ticket Badge + Code + Status
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1192,26 +1229,25 @@ private fun SupportHistoryCard(
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (isComplaint) StatusUrgent.copy(alpha = 0.14f) else EmeraldPrimary.copy(alpha = 0.14f)
+                        shape = RoundedCornerShape(7.dp),
+                        color = StatusUrgent.copy(alpha = 0.14f)
                     ) {
                         Text(
-                            text = if (isComplaint) "شكوى" else "محادثة",
+                            text = "بطاقة مشكلة",
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (isComplaint) StatusUrgent else EmeraldPrimary,
+                            color = StatusUrgent,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                         )
                     }
                     Text(
-                        text = ticket.subject,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        text = ticket.externalId,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
                 }
 
@@ -1220,7 +1256,7 @@ private fun SupportHistoryCard(
                     color = statusColor.copy(alpha = 0.16f)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
@@ -1235,38 +1271,148 @@ private fun SupportHistoryCard(
                 }
             }
 
-            if (ticket.relatedVenueName.isNotBlank()) {
-                Text(
-                    text = "المركز: ${ticket.relatedVenueName} • ${catEnum.displayName}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
+            // Title & Meta
             Text(
-                text = previewText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                text = ticket.subject,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Text(
+                text = buildString {
+                    append(catEnum.displayName)
+                    if (ticket.relatedVenueName.isNotBlank()) {
+                        append(" • ${ticket.relatedVenueName}")
+                    }
+                    append(" • $dateLabel")
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            // Original Problem Body
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                modifier = Modifier.fillMaxWidth()
             ) {
+                Column(
+                    modifier = Modifier.padding(9.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "وصف المشكلة (${ticket.senderName.ifBlank { accountName.ifBlank { "صاحب الحساب" } }}):",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = ticket.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    userExtraNotes.forEach { extra ->
+                        Text(
+                            text = "توضيح إضافي: ${extra.body}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // Admin Resolution / Reply Section
+            if (adminReplies.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(11.dp),
+                    color = StatusOpen.copy(alpha = 0.11f),
+                    border = BorderStroke(1.dp, StatusOpen.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(Icons.Default.SupportAgent, contentDescription = null, tint = StatusOpen, modifier = Modifier.size(15.dp))
+                            Text(
+                                text = "رد فريق الدعم الفني والحل:",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = StatusOpen
+                            )
+                        }
+                        adminReplies.forEach { reply ->
+                            Text(
+                                text = reply,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            } else {
                 Text(
-                    text = "${ticket.externalId} • $dateLabel • $messageCount رسائل",
+                    text = "بانتظار مراجعة فريق الدعم الفني وإضافة الحل على البطاقة.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Text(
-                    text = "فتح المحادثة ←",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = EmeraldPrimary,
-                    fontWeight = FontWeight.Bold
-                )
+            }
+
+            // Optional clarification note on open cards
+            if (ticket.status != SupportTicketStatus.CLOSED.name) {
+                if (!showNoteBox) {
+                    AssistChip(
+                        onClick = { showNoteBox = true },
+                        leadingIcon = { Icon(Icons.Default.AddComment, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                        label = { Text("إضافة توضيح على البطاقة", style = MaterialTheme.typography.labelSmall) }
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = noteDraft,
+                            onValueChange = { noteDraft = it },
+                            placeholder = { Text("اكتب توضيحاً إضافياً للبطاقة...", style = MaterialTheme.typography.bodySmall) },
+                            minLines = 1,
+                            maxLines = 2,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = {
+                                val txt = noteDraft.trim()
+                                if (txt.isNotEmpty()) {
+                                    onSendNote(txt)
+                                    noteDraft = ""
+                                    showNoteBox = false
+                                }
+                            },
+                            enabled = noteDraft.trim().isNotEmpty(),
+                            modifier = Modifier
+                                .size(42.dp)
+                                .minimumInteractiveComponentSize()
+                                .clip(CircleShape)
+                                .background(
+                                    if (noteDraft.trim().isNotEmpty()) EmeraldPrimary
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "إرسال التوضيح",
+                                tint = if (noteDraft.trim().isNotEmpty()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
     }

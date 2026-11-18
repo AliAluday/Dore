@@ -48,7 +48,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,12 +67,16 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.model.AdminPermissionType
+import com.example.data.model.SupportTicketStatus
 import com.example.ui.components.LiveOverlayAlertBanner
 import com.example.ui.components.TopStickyHeader
 import com.example.ui.screens.ControlPanelScreen
+import com.example.ui.screens.ControlSupportChatOverlay
 import com.example.ui.screens.MerchantDashboardScreen
 import com.example.ui.screens.SupportInboxScreen
 import com.example.ui.screens.TeamAndProvidersScreen
+import com.example.ui.screens.buildControlThreadMessages
 import com.example.ui.theme.DoriTheme
 import com.example.ui.viewmodel.AppTab
 import com.example.ui.viewmodel.DoriAppMode
@@ -110,6 +116,10 @@ private fun ControlAppRoot(
     val lifecycleOwner = LocalLifecycleOwner.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var openSupportTicketId by remember { mutableStateOf<Long?>(null) }
+    val openSupportTicket = openSupportTicketId?.let { id ->
+        state.supportTickets.find { it.id == id }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.toastMessage.collect { msg ->
@@ -133,7 +143,7 @@ private fun ControlAppRoot(
         }
     }
 
-    BackHandler(enabled = state.currentTab != AppTab.CONTROL_FEATURES) {
+    BackHandler(enabled = openSupportTicket == null && state.currentTab != AppTab.CONTROL_FEATURES) {
         viewModel.selectTab(AppTab.CONTROL_FEATURES)
     }
 
@@ -212,7 +222,8 @@ private fun ControlAppRoot(
                             state = state,
                             onSyncBridge = { viewModel.syncLocalBridge(silent = false) },
                             onReplyTicket = viewModel::replyToSupportTicket,
-                            onUpdateStatus = viewModel::updateSupportTicketStatus
+                            onUpdateStatus = viewModel::updateSupportTicketStatus,
+                            onOpenChatTicket = { ticketId -> openSupportTicketId = ticketId }
                         )
 
                         else -> ControlPanelScreen(
@@ -260,6 +271,22 @@ private fun ControlAppRoot(
                     },
                     onDismiss = viewModel::dismissTurnAlert,
                     modifier = Modifier.align(Alignment.TopCenter)
+                )
+            }
+
+            if (openSupportTicket != null) {
+                val canReply = state.activeAdmin?.hasPermission(AdminPermissionType.REPLY_SUPPORT) ?: true
+                ControlSupportChatOverlay(
+                    ticket = openSupportTicket,
+                    messages = buildControlThreadMessages(
+                        openSupportTicket,
+                        state.supportMessagesByTicket[openSupportTicket.externalId].orEmpty()
+                    ),
+                    canReply = canReply,
+                    onSendReply = { text -> viewModel.replyToSupportTicket(openSupportTicket.id, text) },
+                    onMarkInReview = { viewModel.updateSupportTicketStatus(openSupportTicket.id, SupportTicketStatus.IN_REVIEW) },
+                    onCloseTicket = { viewModel.updateSupportTicketStatus(openSupportTicket.id, SupportTicketStatus.CLOSED) },
+                    onDismiss = { openSupportTicketId = null }
                 )
             }
         }

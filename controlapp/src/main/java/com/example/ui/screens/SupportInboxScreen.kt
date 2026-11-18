@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -100,31 +101,55 @@ fun SupportInboxScreen(
     onSyncBridge: () -> Unit,
     onReplyTicket: (Long, String) -> Unit,
     onUpdateStatus: (Long, SupportTicketStatus) -> Unit,
+    onOpenChatTicket: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    // 0 = Normal messaging (المراسلات), 1 = Problem resolution cards (بطاقات حل المشاكل)
+    var inboxSection by remember { mutableIntStateOf(0) }
     var filterIndex by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
-    var openChatTicketId by remember { mutableStateOf<Long?>(null) }
     val canReply = state.activeAdmin?.hasPermission(AdminPermissionType.REPLY_SUPPORT) ?: true
 
-    val filteredConversations = remember(
-        state.supportTickets,
+    val allChatTickets = remember(state.supportTickets) {
+        state.supportTickets.filter { SupportRequestType.fromName(it.requestType) == SupportRequestType.CHAT }
+    }
+    val allProblemCards = remember(state.supportTickets) {
+        state.supportTickets.filter { SupportRequestType.fromName(it.requestType) == SupportRequestType.COMPLAINT }
+    }
+    val pendingChatCount = remember(allChatTickets) {
+        allChatTickets.count {
+            it.status == SupportTicketStatus.SENT.name ||
+                it.status == SupportTicketStatus.DELIVERED.name ||
+                it.status == SupportTicketStatus.IN_REVIEW.name
+        }
+    }
+    val pendingCardCount = remember(allProblemCards) {
+        allProblemCards.count {
+            it.status == SupportTicketStatus.SENT.name ||
+                it.status == SupportTicketStatus.DELIVERED.name ||
+                it.status == SupportTicketStatus.IN_REVIEW.name
+        }
+    }
+
+    val filteredItems = remember(
+        allChatTickets,
+        allProblemCards,
         state.supportMessagesByTicket,
+        inboxSection,
         filterIndex,
         searchQuery
     ) {
+        val baseList = if (inboxSection == 0) allChatTickets else allProblemCards
         val q = searchQuery.trim()
-        state.supportTickets
+        baseList
             .sortedByDescending { it.updatedAt }
             .filter { ticket ->
                 val matchesFilter = when (filterIndex) {
                     1 -> ticket.status == SupportTicketStatus.SENT.name ||
                         ticket.status == SupportTicketStatus.DELIVERED.name ||
                         ticket.status == SupportTicketStatus.IN_REVIEW.name
-                    2 -> SupportRequestType.fromName(ticket.requestType) == SupportRequestType.CHAT
-                    3 -> SupportRequestType.fromName(ticket.requestType) == SupportRequestType.COMPLAINT
-                    4 -> ticket.status == SupportTicketStatus.REPLIED.name
-                    5 -> ticket.status == SupportTicketStatus.CLOSED.name
+                    2 -> ticket.status == SupportTicketStatus.REPLIED.name
+                    3 -> ticket.status == SupportTicketStatus.CLOSED.name
                     else -> true
                 }
                 if (!matchesFilter) return@filter false
@@ -138,8 +163,6 @@ fun SupportInboxScreen(
                     latestBody.contains(q, ignoreCase = true)
             }
     }
-
-    val openChatTicket = openChatTicketId?.let { id -> state.supportTickets.find { it.id == id } }
 
     Box(
         modifier = modifier.fillMaxSize(),
@@ -187,16 +210,19 @@ fun SupportInboxScreen(
                                 )
                                 Column {
                                     Text(
-                                        text = "محادثات المستخدمين (${state.supportTickets.size})",
+                                        text = if (inboxSection == 0) "مراسلات الدعم (${allChatTickets.size})"
+                                        else "بطاقات حل المشاكل (${allProblemCards.size})",
                                         style = MaterialTheme.typography.titleSmall,
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = if (state.supportAlertCount > 0) {
-                                            "${state.supportAlertCount} محادثة بانتظار الرد — اضغط لفتح الدردشة"
+                                        text = if (inboxSection == 0) {
+                                            if (pendingChatCount > 0) "$pendingChatCount محادثة بانتظار الرد — اضغط للرد"
+                                            else "اضغط على أي محادثة لفتح الدردشة والرد المباشر"
                                         } else {
-                                            "اضغط على اسم أي مستخدم لفتح المحادثة المباشرة"
+                                            if (pendingCardCount > 0) "$pendingCardCount بطاقة مشكلة بانتظار الحل"
+                                            else "تظهر طلبات حل المشاكل كبطاقات للحل والمتابعة"
                                         },
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color.White.copy(alpha = 0.85f),
@@ -222,6 +248,78 @@ fun SupportInboxScreen(
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text("سحب", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                             }
+                        }
+                    }
+                }
+            }
+
+            // Segmented Mode Tabs: Normal Chat vs Problem Cards
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val chatSelected = inboxSection == 0
+                    val cardsSelected = inboxSection == 1
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (chatSelected) EmeraldPrimary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { inboxSection = 0 }
+                            .testTag("ctrl_support_section_chats")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Chat,
+                                contentDescription = null,
+                                tint = if (chatSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "المراسلات (${allChatTickets.size})",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (chatSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (cardsSelected) StatusUrgent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { inboxSection = 1 }
+                            .testTag("ctrl_support_section_cards")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ReportProblem,
+                                contentDescription = null,
+                                tint = if (cardsSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "بطاقات المشاكل (${allProblemCards.size})",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (cardsSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
                         }
                     }
                 }
@@ -254,7 +352,7 @@ fun SupportInboxScreen(
 
             // Filter Pills
             item {
-                val filterLabels = listOf("الكل", "بانتظار الرد", "محادثات", "شكاوى", "تم الرد", "مغلقة")
+                val filterLabels = listOf("الكل", "بانتظار الرد", "تم الرد", "مغلقة")
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(filterLabels.size) { idx ->
                         FilterChip(
@@ -271,7 +369,7 @@ fun SupportInboxScreen(
                 }
             }
 
-            if (filteredConversations.isEmpty()) {
+            if (filteredItems.isEmpty()) {
                 item {
                     Surface(
                         shape = RoundedCornerShape(18.dp),
@@ -290,20 +388,24 @@ fun SupportInboxScreen(
                                 modifier = Modifier.size(40.dp)
                             )
                             Text(
-                                text = "لا توجد محادثات مطابقة",
+                                text = if (inboxSection == 0) "لا توجد مراسلات مطابقة" else "لا توجد بطاقات مشاكل مطابقة",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "عندما يراسل المستخدم الدعم أو يرسل شكوى سيظهر اسمه هنا لبدء المحادثة المباشرة.",
+                                text = if (inboxSection == 0) {
+                                    "عندما يبدأ المستخدم مراسلة عادية ستظهر محادثته هنا للرد الفوري."
+                                } else {
+                                    "عندما يقدم المستخدم طلب لحل مشكلة سيظهر هنا كبطاقة لإضافة الحل."
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
-            } else {
-                items(filteredConversations, key = { it.id }) { ticket ->
+            } else if (inboxSection == 0) {
+                items(filteredItems, key = { it.id }) { ticket ->
                     val threadMsgs = buildControlThreadMessages(
                         ticket = ticket,
                         stored = state.supportMessagesByTicket[ticket.externalId].orEmpty()
@@ -311,30 +413,273 @@ fun SupportInboxScreen(
                     ConversationUserRow(
                         ticket = ticket,
                         threadMessages = threadMsgs,
-                        onClick = { openChatTicketId = ticket.id }
+                        onClick = { onOpenChatTicket(ticket.id) }
+                    )
+                }
+            } else {
+                items(filteredItems, key = { it.id }) { ticket ->
+                    val threadMsgs = buildControlThreadMessages(
+                        ticket = ticket,
+                        stored = state.supportMessagesByTicket[ticket.externalId].orEmpty()
+                    )
+                    ControlProblemTicketCard(
+                        ticket = ticket,
+                        threadMessages = threadMsgs,
+                        canReply = canReply,
+                        onSendReply = { text -> onReplyTicket(ticket.id, text) },
+                        onMarkInReview = { onUpdateStatus(ticket.id, SupportTicketStatus.IN_REVIEW) },
+                        onCloseTicket = { onUpdateStatus(ticket.id, SupportTicketStatus.CLOSED) },
+                        onOpenFullView = { onOpenChatTicket(ticket.id) }
                     )
                 }
             }
         }
+    }
+}
 
-        if (openChatTicket != null) {
-            ControlSupportChatOverlay(
-                ticket = openChatTicket,
-                messages = buildControlThreadMessages(
-                    openChatTicket,
-                    state.supportMessagesByTicket[openChatTicket.externalId].orEmpty()
-                ),
-                canReply = canReply,
-                onSendReply = { text -> onReplyTicket(openChatTicket.id, text) },
-                onMarkInReview = { onUpdateStatus(openChatTicket.id, SupportTicketStatus.IN_REVIEW) },
-                onCloseTicket = { onUpdateStatus(openChatTicket.id, SupportTicketStatus.CLOSED) },
-                onDismiss = { openChatTicketId = null }
+@Composable
+private fun ControlProblemTicketCard(
+    ticket: SupportTicketEntity,
+    threadMessages: List<SupportMessageEntity>,
+    canReply: Boolean,
+    onSendReply: (String) -> Unit,
+    onMarkInReview: () -> Unit,
+    onCloseTicket: () -> Unit,
+    onOpenFullView: () -> Unit
+) {
+    val statusEnum = SupportTicketStatus.fromName(ticket.status)
+    val catEnum = SupportCategory.fromName(ticket.category)
+    val statusColor = when (statusEnum) {
+        SupportTicketStatus.REPLIED -> StatusOpen
+        SupportTicketStatus.DELIVERED, SupportTicketStatus.SENT -> IndigoAccentLight
+        SupportTicketStatus.IN_REVIEW -> AmberGold
+        SupportTicketStatus.CLOSED -> StatusPaused
+    }
+    val timeLabel = remember(ticket.updatedAt) {
+        SimpleDateFormat("HH:mm • dd/MM", Locale("ar")).format(Date(ticket.updatedAt))
+    }
+    val displayUserName = ticket.senderName.trim().ifBlank { "مستخدم دوري" }
+    val adminReplies = remember(threadMessages) {
+        threadMessages.filter { it.isFromAdmin }
+    }
+    val userExtraNotes = remember(threadMessages, ticket.message) {
+        threadMessages.filter { !it.isFromAdmin && it.body.trim() != ticket.message.trim() }
+    }
+    var resolutionDraft by remember(ticket.id) { mutableStateOf("") }
+
+    Card(
+        shape = RoundedCornerShape(15.dp),
+        border = BorderStroke(1.2.dp, statusColor.copy(alpha = 0.4f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("ctrl_support_card_${ticket.id}")
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(7.dp),
+                        color = StatusUrgent.copy(alpha = 0.14f)
+                    ) {
+                        Text(
+                            text = "بطاقة مشكلة",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = StatusUrgent,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                        )
+                    }
+                    Text(
+                        text = displayUserName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Surface(
+                    shape = CircleShape,
+                    color = statusColor.copy(alpha = 0.16f)
+                ) {
+                    Text(
+                        text = statusEnum.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = statusColor,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = buildString {
+                    append(ticket.externalId)
+                    append(" • ${catEnum.displayName}")
+                    if (ticket.relatedVenueName.isNotBlank()) append(" • ${ticket.relatedVenueName}")
+                    if (ticket.senderPhone.isNotBlank()) append(" • ${ticket.senderPhone}")
+                    append(" • $timeLabel")
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            Text(
+                text = ticket.subject,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(9.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Text(
+                        text = ticket.message,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    userExtraNotes.forEach { extra ->
+                        Text(
+                            text = "توضيح المستخدم: ${extra.body}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            if (adminReplies.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = EmeraldPrimary.copy(alpha = 0.1f),
+                    border = BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(9.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = "الحل المرسل:",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = EmeraldPrimary
+                        )
+                        adminReplies.forEach { r ->
+                            Text(
+                                text = "${r.senderName.ifBlank { "الإدارة" }}: ${r.body}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Card status actions
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (ticket.status != SupportTicketStatus.CLOSED.name) {
+                    OutlinedButton(
+                        onClick = onMarkInReview,
+                        enabled = canReply,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("قيد المراجعة", style = MaterialTheme.typography.labelSmall)
+                    }
+                    OutlinedButton(
+                        onClick = onCloseTicket,
+                        enabled = canReply,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("تم الحل / إغلاق", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                OutlinedButton(
+                    onClick = onOpenFullView,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text("فتح البطاقة", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+
+            // Inline resolution reply composer on the problem card
+            if (ticket.status != SupportTicketStatus.CLOSED.name) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    OutlinedTextField(
+                        value = resolutionDraft,
+                        onValueChange = { resolutionDraft = it },
+                        placeholder = { Text("اكتب الحل والرد على البطاقة...", style = MaterialTheme.typography.bodySmall) },
+                        enabled = canReply,
+                        minLines = 1,
+                        maxLines = 2,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .testTag("ctrl_support_reply_input_${ticket.id}")
+                    )
+                    IconButton(
+                        onClick = {
+                            val txt = resolutionDraft.trim()
+                            if (txt.isNotEmpty()) {
+                                onSendReply(txt)
+                                resolutionDraft = ""
+                            }
+                        },
+                        enabled = canReply && resolutionDraft.trim().isNotEmpty(),
+                        modifier = Modifier
+                            .size(44.dp)
+                            .minimumInteractiveComponentSize()
+                            .clip(CircleShape)
+                            .background(
+                                if (canReply && resolutionDraft.trim().isNotEmpty()) EmeraldPrimary
+                                else MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            .testTag("ctrl_support_send_reply_${ticket.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "إرسال الحل",
+                            tint = if (canReply && resolutionDraft.trim().isNotEmpty()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
-private fun buildControlThreadMessages(
+fun buildControlThreadMessages(
     ticket: SupportTicketEntity,
     stored: List<SupportMessageEntity>
 ): List<SupportMessageEntity> {
@@ -606,7 +951,7 @@ private fun ConversationUserRow(
 }
 
 @Composable
-private fun ControlSupportChatOverlay(
+fun ControlSupportChatOverlay(
     ticket: SupportTicketEntity,
     messages: List<SupportMessageEntity>,
     canReply: Boolean,
@@ -654,15 +999,16 @@ private fun ControlSupportChatOverlay(
                 interactionSource = remember { MutableInteractionSource() },
                 onClick = handleExitAttempt
             )
-            .statusBarsPadding(),
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding(),
         contentAlignment = Alignment.BottomCenter
     ) {
         Surface(
             modifier = Modifier
                 .widthIn(max = 640.dp)
                 .fillMaxWidth()
-                .fillMaxHeight(0.92f)
-                .imePadding()
+                .fillMaxHeight(0.94f)
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() },
@@ -674,9 +1020,7 @@ private fun ControlSupportChatOverlay(
             shadowElevation = 16.dp
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .navigationBarsPadding()
+                modifier = Modifier.fillMaxSize()
             ) {
                 // Header showing User Name & Conversation Context
                 Box(
@@ -885,59 +1229,66 @@ private fun ControlSupportChatOverlay(
                     }
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
 
-                // Chat Composer Bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(horizontal = 10.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                // Chat Composer Bar (always prominent above keyboard)
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 4.dp,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    OutlinedTextField(
-                        value = replyDraft,
-                        onValueChange = { replyDraft = it },
-                        placeholder = {
-                            Text(
-                                "اكتب رسالتك إلى $displayUserName...",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        },
-                        enabled = canReply,
-                        minLines = 1,
-                        maxLines = 3,
-                        shape = RoundedCornerShape(16.dp),
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .testTag("ctrl_support_reply_input_${ticket.id}")
-                    )
-                    IconButton(
-                        onClick = {
-                            val txt = replyDraft.trim()
-                            if (txt.isNotEmpty()) {
-                                onSendReply(txt)
-                                replyDraft = ""
-                            }
-                        },
-                        enabled = canReply && replyDraft.trim().isNotEmpty(),
-                        modifier = Modifier
-                            .size(44.dp)
-                            .minimumInteractiveComponentSize()
-                            .clip(CircleShape)
-                            .background(
-                                if (canReply && replyDraft.trim().isNotEmpty()) EmeraldPrimary
-                                else MaterialTheme.colorScheme.surfaceVariant
-                            )
-                            .testTag("ctrl_support_send_reply_${ticket.id}")
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "إرسال الرد",
-                            tint = if (canReply && replyDraft.trim().isNotEmpty()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(19.dp)
+                        OutlinedTextField(
+                            value = replyDraft,
+                            onValueChange = { replyDraft = it },
+                            placeholder = {
+                                Text(
+                                    "اكتب رسالتك إلى $displayUserName...",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            },
+                            enabled = canReply,
+                            minLines = 1,
+                            maxLines = 3,
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp)
+                                .testTag("ctrl_support_reply_input_${ticket.id}")
                         )
+                        IconButton(
+                            onClick = {
+                                val txt = replyDraft.trim()
+                                if (txt.isNotEmpty()) {
+                                    onSendReply(txt)
+                                    replyDraft = ""
+                                }
+                            },
+                            enabled = canReply && replyDraft.trim().isNotEmpty(),
+                            modifier = Modifier
+                                .size(46.dp)
+                                .minimumInteractiveComponentSize()
+                                .clip(CircleShape)
+                                .background(
+                                    if (canReply && replyDraft.trim().isNotEmpty()) EmeraldPrimary
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                                .testTag("ctrl_support_send_reply_${ticket.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "إرسال الرد",
+                                tint = if (canReply && replyDraft.trim().isNotEmpty()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
                     }
                 }
             }

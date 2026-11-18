@@ -46,10 +46,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,8 +70,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.cloud.GoogleAuthManager
+import com.example.data.cloud.UserCancelledSignInException
 import com.example.data.model.AdminPermissionType
 import com.example.data.model.SupportTicketStatus
+import com.example.ui.components.DoriAuthScreen
 import com.example.ui.components.LiveOverlayAlertBanner
 import com.example.ui.components.TopStickyHeader
 import com.example.ui.screens.ControlPanelScreen
@@ -83,8 +89,10 @@ import com.example.ui.viewmodel.DoriAppMode
 import com.example.ui.viewmodel.DoriViewModel
 import com.example.ui.viewmodel.DoriViewModelFactory
 import com.example.util.DoriNotificationHelper
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 class ControlMainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -92,18 +100,86 @@ class ControlMainActivity : ComponentActivity() {
         enableEdgeToEdge()
         DoriNotificationHelper.ensureChannel(this)
 
+        val firestoreDatabaseId = getString(R.string.firestore_database_id)
+        val webClientId = getString(R.string.default_web_client_id)
+
         setContent {
             val app = applicationContext as Application
-            val factory = remember(app) {
-                DoriViewModelFactory(
-                    application = app,
-                    appMode = DoriAppMode.CONTROL_APP
-                )
+            val auth = remember { FirebaseAuth.getInstance() }
+            var currentUser by remember { mutableStateOf(auth.currentUser) }
+            var isSigningIn by remember { mutableStateOf(false) }
+            var authError by remember { mutableStateOf<String?>(null) }
+            val scope = rememberCoroutineScope()
+
+            DisposableEffect(auth) {
+                val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+                    currentUser = firebaseAuth.currentUser
+                }
+                auth.addAuthStateListener(listener)
+                onDispose { auth.removeAuthStateListener(listener) }
             }
-            val viewModel: DoriViewModel = viewModel(factory = factory)
+
+            LaunchedEffect(Unit) {
+                if (auth.currentUser == null) {
+                    isSigningIn = true
+                    val silentUser = GoogleAuthManager.attemptSilentSignIn(this@ControlMainActivity, webClientId)
+                    if (silentUser != null) {
+                        currentUser = silentUser
+                    }
+                    isSigningIn = false
+                }
+            }
 
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                ControlAppRoot(viewModel = viewModel)
+                val signedInUser = currentUser
+                if (signedInUser == null) {
+                    DoriTheme(darkTheme = true) {
+                        DoriAuthScreen(
+                            isControlApp = true,
+                            isLoading = isSigningIn,
+                            errorMessage = authError,
+                            onSignInClick = {
+                                if (isSigningIn) return@DoriAuthScreen
+                                scope.launch {
+                                    isSigningIn = true
+                                    authError = null
+                                    GoogleAuthManager.signInInteractive(this@ControlMainActivity, webClientId)
+                                        .onSuccess { user -> currentUser = user }
+                                        .onFailure { err ->
+                                            if (err !is UserCancelledSignInException) {
+                                                authError = err.message ?: "تعذر تسجيل الدخول"
+                                            }
+                                        }
+                                    isSigningIn = false
+                                }
+                            }
+                        )
+                    }
+                } else {
+                    key(signedInUser.uid) {
+                        val factory = remember(app, signedInUser.uid, firestoreDatabaseId) {
+                            DoriViewModelFactory(
+                                application = app,
+                                appMode = DoriAppMode.CONTROL_APP,
+                                firestoreDatabaseId = firestoreDatabaseId
+                            )
+                        }
+                        val viewModel: DoriViewModel = viewModel(
+                            key = "ctrl_${signedInUser.uid}",
+                            factory = factory
+                        )
+                        ControlAppRoot(
+                            viewModel = viewModel,
+                            onSignOut = {
+                                scope.launch {
+                                    GoogleAuthManager.signOut(this@ControlMainActivity)
+                                    authError = null
+                                    currentUser = null
+                                }
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -111,7 +187,8 @@ class ControlMainActivity : ComponentActivity() {
 
 @Composable
 private fun ControlAppRoot(
-    viewModel: DoriViewModel
+    viewModel: DoriViewModel,
+    onSignOut: () -> Unit = {}
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -127,11 +204,13 @@ private fun ControlAppRoot(
         }
     }
 
-    LaunchedEffect(lifecycleOwner) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (isActive) {
-                viewModel.syncLocalBridge(silent = true)
-                delay(3500L)
+    LaunchedEffect(lifecycleOwner, viewModel.isCloudSyncEnabled) {
+        if (!viewModel.isCloudSyncEnabled) {
+            lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (isActive) {
+                    viewModel.syncLocalBridge(silent = true)
+                    delay(3500L)
+                }
             }
         }
     }
@@ -245,7 +324,8 @@ private fun ControlAppRoot(
                             onAdjustLoyaltyPoints = viewModel::adjustLoyaltyPoints,
                             onResetLoyaltyPoints = viewModel::resetLoyaltyPoints,
                             onFactoryReset = viewModel::factoryResetAllData,
-                            onSyncBridge = { viewModel.syncLocalBridge(silent = false) }
+                            onSyncBridge = { viewModel.syncLocalBridge(silent = false) },
+                            onSignOut = onSignOut
                         )
                     }
 

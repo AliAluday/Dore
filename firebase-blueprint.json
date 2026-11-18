@@ -2,7 +2,7 @@
   "entities": {
     "CloudConfig": {
       "title": "CloudConfig",
-      "description": "Shared user profile, loyalty points, and control panel feature flags synchronized between Dori User and Control apps.",
+      "description": "Shared user profile, loyalty points, revisions, and control panel feature flags synchronized between Dori User and Control apps.",
       "type": "object",
       "properties": {
         "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
@@ -26,6 +26,9 @@
         "pointsPerBooking": { "type": "integer", "description": "Loyalty points awarded per completed booking." },
         "disabledCategories": { "type": "array", "description": "List of category display names hidden by control app." },
         "broadcastMessage": { "type": "string", "description": "Global announcement banner shown in User app." },
+        "controlRevision": { "type": "integer", "description": "Monotonic revision counter for control settings." },
+        "queueResetRevision": { "type": "integer", "description": "Monotonic revision counter for queue resets." },
+        "loyaltyRevision": { "type": "integer", "description": "Monotonic revision counter for loyalty adjustments." },
         "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation (FieldValue.serverTimestamp())." },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update (FieldValue.serverTimestamp())." }
       },
@@ -33,7 +36,8 @@
         "userId", "selectedDistrict", "isDarkMode", "userName", "userPhone", "userAge", "optionalNote",
         "loyaltyPoints", "muteSound", "muteVibration", "allowNewBookings", "enableFastestTurn",
         "enableQrCode", "enableWhatsAppShare", "enableReviews", "enableLoyalty", "enableOptionalFields",
-        "enableLiveAlerts", "pointsPerBooking", "disabledCategories", "broadcastMessage", "createdAt", "updatedAt"
+        "enableLiveAlerts", "pointsPerBooking", "disabledCategories", "broadcastMessage",
+        "controlRevision", "queueResetRevision", "loyaltyRevision", "createdAt", "updatedAt"
       ]
     },
     "CloudVenue": {
@@ -100,6 +104,9 @@
         "priceDinar": { "type": "integer" },
         "status": { "type": "string", "enum": ["ACTIVE", "COMPLETED", "CANCELLED"] },
         "stage": { "type": "string", "enum": ["MONITORED", "APPROACHING", "YOUR_TURN"] },
+        "approvalStatus": { "type": "string", "enum": ["PENDING", "ACCEPTED", "REJECTED"] },
+        "handledByProvider": { "type": "string" },
+        "approvalNote": { "type": "string" },
         "peopleAhead": { "type": "integer" },
         "estimatedMinutes": { "type": "integer" },
         "createdAtMillis": { "type": "integer" },
@@ -113,6 +120,7 @@
         "userId", "bookingId", "ticketCode", "queueNumber", "venueId", "venueName",
         "venueCity", "venueCategory", "venuePhone", "customerName", "customerPhone",
         "selectedOption", "notes", "optionalInfo", "priceDinar", "status", "stage",
+        "approvalStatus", "handledByProvider", "approvalNote",
         "peopleAhead", "estimatedMinutes", "createdAtMillis", "createdAt", "updatedAt"
       ]
     },
@@ -131,6 +139,7 @@
         "selectedOption": { "type": "string" },
         "status": { "type": "string", "enum": ["WAITING", "SERVING", "DONE", "SKIPPED", "NO_SHOW"] },
         "bookingId": { "type": "integer" },
+        "bookingTicketCode": { "type": "string" },
         "createdAtMillis": { "type": "integer" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." }
@@ -160,6 +169,112 @@
         "userId", "reviewId", "venueId", "authorName", "rating", "comment",
         "createdAtMillis", "createdAt", "updatedAt"
       ]
+    },
+    "CloudSupportTicket": {
+      "title": "CloudSupportTicket",
+      "description": "Support conversation or complaint ticket synced between User and Control apps.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "externalId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderPhone": { "type": "string" },
+        "category": { "type": "string", "enum": ["COMPLAINT", "BOOKING_ISSUE", "TECHNICAL", "VENUE_REPORT", "SUGGESTION", "GENERAL"] },
+        "requestType": { "type": "string", "enum": ["CHAT", "COMPLAINT"] },
+        "relatedVenueName": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["SENT", "DELIVERED", "IN_REVIEW", "REPLIED", "CLOSED"] },
+        "adminReply": { "type": "string" },
+        "repliedByAdmin": { "type": "string" },
+        "createdAtMillis": { "type": "integer" },
+        "updatedAtMillis": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "externalId", "senderName", "senderPhone", "category", "requestType",
+        "relatedVenueName", "subject", "message", "status", "adminReply", "repliedByAdmin",
+        "createdAtMillis", "updatedAtMillis", "createdAt", "updatedAt"
+      ]
+    },
+    "CloudSupportMessage": {
+      "title": "CloudSupportMessage",
+      "description": "Individual message inside a support thread.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "externalMessageId": { "type": "string" },
+        "ticketExternalId": { "type": "string" },
+        "fromAdmin": { "type": "boolean" },
+        "senderName": { "type": "string" },
+        "body": { "type": "string" },
+        "createdAtMillis": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "externalMessageId", "ticketExternalId", "fromAdmin",
+        "senderName", "body", "createdAtMillis", "createdAt", "updatedAt"
+      ]
+    },
+    "CloudAdmin": {
+      "title": "CloudAdmin",
+      "description": "Control app administrator account and permission flags.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "adminId": { "type": "integer" },
+        "name": { "type": "string" },
+        "roleTitle": { "type": "string" },
+        "phone": { "type": "string" },
+        "active": { "type": "boolean" },
+        "superAdmin": { "type": "boolean" },
+        "canManageFeatures": { "type": "boolean" },
+        "canManageVenues": { "type": "boolean" },
+        "canManageQueues": { "type": "boolean" },
+        "canReplySupport": { "type": "boolean" },
+        "canManageProviders": { "type": "boolean" },
+        "canManageAdmins": { "type": "boolean" },
+        "canRunCommands": { "type": "boolean" },
+        "createdAtMillis": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "adminId", "name", "roleTitle", "phone", "active", "superAdmin",
+        "canManageFeatures", "canManageVenues", "canManageQueues", "canReplySupport",
+        "canManageProviders", "canManageAdmins", "canRunCommands",
+        "createdAtMillis", "createdAt", "updatedAt"
+      ]
+    },
+    "CloudProvider": {
+      "title": "CloudProvider",
+      "description": "Control app service provider account linked to a venue.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "providerId": { "type": "integer" },
+        "name": { "type": "string" },
+        "providerRole": { "type": "string" },
+        "customTitle": { "type": "string" },
+        "phone": { "type": "string" },
+        "venueId": { "type": "integer" },
+        "venueName": { "type": "string" },
+        "canAcceptTickets": { "type": "boolean" },
+        "canCallNext": { "type": "boolean" },
+        "canPauseVenue": { "type": "boolean" },
+        "active": { "type": "boolean" },
+        "acceptedCount": { "type": "integer" },
+        "createdAtMillis": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "providerId", "name", "providerRole", "customTitle", "phone",
+        "venueId", "venueName", "canAcceptTickets", "canCallNext", "canPauseVenue",
+        "active", "acceptedCount", "createdAtMillis", "createdAt", "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -182,6 +297,22 @@
     "/users/{userId}/reviews/{reviewDocId}": {
       "schema": { "$ref": "#/entities/CloudReview" },
       "description": "Stores verified venue reviews."
+    },
+    "/users/{userId}/support_tickets/{ticketDocId}": {
+      "schema": { "$ref": "#/entities/CloudSupportTicket" },
+      "description": "Stores support threads and complaint tickets."
+    },
+    "/users/{userId}/support_messages/{messageDocId}": {
+      "schema": { "$ref": "#/entities/CloudSupportMessage" },
+      "description": "Stores ordered chat messages for support tickets."
+    },
+    "/users/{userId}/admins/{adminDocId}": {
+      "schema": { "$ref": "#/entities/CloudAdmin" },
+      "description": "Stores Control App administrator accounts."
+    },
+    "/users/{userId}/providers/{providerDocId}": {
+      "schema": { "$ref": "#/entities/CloudProvider" },
+      "description": "Stores Control App linked service providers."
     }
   }
 }

@@ -28,19 +28,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
@@ -48,6 +50,7 @@ import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.AlertDialog
@@ -92,6 +95,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.data.cloud.CloudSyncStatus
 import com.example.data.local.ServiceProviderEntity
 import com.example.data.local.VenueEntity
 import com.example.data.model.AdminPermissionType
@@ -141,6 +145,7 @@ fun ControlPanelScreen(
     onResetLoyaltyPoints: () -> Unit,
     onFactoryReset: () -> Unit,
     onSyncBridge: () -> Unit,
+    onSignOut: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val ctrl = state.preferences.controlConfig
@@ -259,11 +264,34 @@ fun ControlPanelScreen(
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 80.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Local Trial & Cross-App Sync Card
+                        // Live Cloud Sync & Account Card
                         item {
+                            val sync = state.cloudSync
+                            val syncIcon = when (sync.status) {
+                                CloudSyncStatus.CONNECTED -> Icons.Default.CloudDone
+                                CloudSyncStatus.SYNCING -> Icons.Default.Sync
+                                CloudSyncStatus.ERROR, CloudSyncStatus.OFFLINE -> Icons.Default.CloudOff
+                            }
+                            val syncTint = when (sync.status) {
+                                CloudSyncStatus.CONNECTED -> EmeraldPrimary
+                                CloudSyncStatus.SYNCING -> MaterialTheme.colorScheme.primary
+                                CloudSyncStatus.ERROR -> StatusUrgent
+                                CloudSyncStatus.OFFLINE -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                            val syncTitle = when (sync.status) {
+                                CloudSyncStatus.CONNECTED -> "متصل بالسحابة • مزامنة فورية حية"
+                                CloudSyncStatus.SYNCING -> "جاري المزامنة السحابية..."
+                                CloudSyncStatus.ERROR -> "خطأ في المزامنة السحابية"
+                                CloudSyncStatus.OFFLINE -> "غير متصل بالسحابة"
+                            }
+                            val syncSubtitle = when {
+                                sync.errorMessage != null -> sync.errorMessage!!
+                                sync.userEmail.isNotBlank() -> "${sync.userEmail} • حفظ وتزامن مباشر"
+                                else -> "حفظ وتزامن المراكز والتذاكر والدعم عبر السحابة"
+                            }
                             Card(
                                 shape = RoundedCornerShape(14.dp),
-                                border = BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.35f)),
+                                border = BorderStroke(1.dp, syncTint.copy(alpha = 0.38f)),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                             ) {
                                 Row(
@@ -279,19 +307,19 @@ fun ControlPanelScreen(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.PhoneAndroid,
+                                            imageVector = syncIcon,
                                             contentDescription = null,
-                                            tint = EmeraldPrimary,
+                                            tint = syncTint,
                                             modifier = Modifier.size(19.dp)
                                         )
                                         Column {
                                             Text(
-                                                text = "وضع تجريبي محلي • الجسر مفعّل",
+                                                text = syncTitle,
                                                 style = MaterialTheme.typography.labelLarge,
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Text(
-                                                text = "مزامنة الدعم والتذاكر مباشرة مع نسخة المستخدم",
+                                                text = syncSubtitle,
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 maxLines = 1,
@@ -300,17 +328,36 @@ fun ControlPanelScreen(
                                         }
                                     }
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    OutlinedButton(
-                                        onClick = onSyncBridge,
-                                        shape = RoundedCornerShape(10.dp),
-                                        contentPadding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
-                                        modifier = Modifier
-                                            .height(34.dp)
-                                            .testTag("ctrl_sync_bridge_button")
-                                    ) {
-                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text("مزامنة", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        OutlinedButton(
+                                            onClick = onSyncBridge,
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                            modifier = Modifier
+                                                .height(34.dp)
+                                                .testTag("ctrl_sync_bridge_button")
+                                        ) {
+                                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(3.dp))
+                                            Text("مزامنة", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                        }
+                                        if (sync.userEmail.isNotBlank() || sync.status != CloudSyncStatus.OFFLINE) {
+                                            OutlinedButton(
+                                                onClick = onSignOut,
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
+                                                shape = RoundedCornerShape(10.dp),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                                modifier = Modifier
+                                                    .height(34.dp)
+                                                    .testTag("ctrl_sign_out_button")
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.Logout,
+                                                    contentDescription = "تسجيل الخروج",
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }

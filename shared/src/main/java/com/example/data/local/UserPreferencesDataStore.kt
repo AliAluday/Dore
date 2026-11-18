@@ -271,6 +271,32 @@ class UserPreferencesDataStore(context: Context) {
         }
     }
 
+    suspend fun applyCloudConfigSnapshot(
+        settings: UserProfileSettings,
+        controlRevision: Long,
+        queueResetRevision: Long,
+        loyaltyRevision: Long
+    ) {
+        appContext.dataStore.edit {
+            it[Keys.SELECTED_DISTRICT] = settings.selectedDistrict.displayName
+            it[Keys.IS_DARK_MODE] = settings.isDarkMode
+            it[Keys.USER_NAME] = settings.userName
+            it[Keys.USER_PHONE] = settings.userPhone
+            it[Keys.USER_AGE] = settings.userAge
+            it[Keys.OPTIONAL_NOTE] = settings.optionalNote
+            it[Keys.LOYALTY_POINTS] = settings.loyaltyPoints.coerceAtLeast(0)
+            it[Keys.MUTE_SOUND] = settings.muteSound
+            it[Keys.MUTE_VIBRATION] = settings.muteVibration
+            writeControlConfig(it, settings.controlConfig)
+            it[Keys.CTRL_REVISION] = maxOf(it[Keys.CTRL_REVISION] ?: 0L, controlRevision)
+            it[Keys.CTRL_QUEUE_RESET_REVISION] = maxOf(it[Keys.CTRL_QUEUE_RESET_REVISION] ?: 0L, queueResetRevision)
+            it[Keys.CTRL_LOYALTY_REVISION] = maxOf(it[Keys.CTRL_LOYALTY_REVISION] ?: 0L, loyaltyRevision)
+            it[Keys.APPLIED_CTRL_REVISION] = maxOf(it[Keys.APPLIED_CTRL_REVISION] ?: 0L, controlRevision)
+            it[Keys.APPLIED_QUEUE_RESET_REVISION] = maxOf(it[Keys.APPLIED_QUEUE_RESET_REVISION] ?: 0L, queueResetRevision)
+            it[Keys.APPLIED_LOYALTY_REVISION] = maxOf(it[Keys.APPLIED_LOYALTY_REVISION] ?: 0L, loyaltyRevision)
+        }
+    }
+
     private fun writeControlConfig(
         prefs: androidx.datastore.preferences.core.MutablePreferences,
         config: UserAppControlConfig

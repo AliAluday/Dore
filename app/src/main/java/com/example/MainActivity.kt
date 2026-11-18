@@ -46,8 +46,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -68,6 +70,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.cloud.GoogleAuthManager
+import com.example.data.cloud.UserCancelledSignInException
+import com.example.ui.components.DoriAuthScreen
 import com.example.ui.components.InstantTicketPassDialog
 import com.example.ui.components.LiveOverlayAlertBanner
 import com.example.ui.components.SupportCenterSheet
@@ -82,6 +87,7 @@ import com.example.ui.viewmodel.DoriAppMode
 import com.example.ui.viewmodel.DoriViewModel
 import com.example.ui.viewmodel.DoriViewModelFactory
 import com.example.util.DoriNotificationHelper
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -92,18 +98,86 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         DoriNotificationHelper.ensureChannel(this)
 
+        val firestoreDatabaseId = getString(R.string.firestore_database_id)
+        val webClientId = getString(R.string.default_web_client_id)
+
         setContent {
             val app = applicationContext as Application
-            val factory = remember(app) {
-                DoriViewModelFactory(
-                    application = app,
-                    appMode = DoriAppMode.USER_APP
-                )
+            val auth = remember { FirebaseAuth.getInstance() }
+            var currentUser by remember { mutableStateOf(auth.currentUser) }
+            var isSigningIn by remember { mutableStateOf(false) }
+            var authError by remember { mutableStateOf<String?>(null) }
+            val scope = rememberCoroutineScope()
+
+            DisposableEffect(auth) {
+                val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+                    currentUser = firebaseAuth.currentUser
+                }
+                auth.addAuthStateListener(listener)
+                onDispose { auth.removeAuthStateListener(listener) }
             }
-            val viewModel: DoriViewModel = viewModel(factory = factory)
+
+            LaunchedEffect(Unit) {
+                if (auth.currentUser == null) {
+                    isSigningIn = true
+                    val silentUser = GoogleAuthManager.attemptSilentSignIn(this@MainActivity, webClientId)
+                    if (silentUser != null) {
+                        currentUser = silentUser
+                    }
+                    isSigningIn = false
+                }
+            }
 
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                DoriAppRoot(viewModel = viewModel)
+                val signedInUser = currentUser
+                if (signedInUser == null) {
+                    DoriTheme(darkTheme = true) {
+                        DoriAuthScreen(
+                            isControlApp = false,
+                            isLoading = isSigningIn,
+                            errorMessage = authError,
+                            onSignInClick = {
+                                if (isSigningIn) return@DoriAuthScreen
+                                scope.launch {
+                                    isSigningIn = true
+                                    authError = null
+                                    GoogleAuthManager.signInInteractive(this@MainActivity, webClientId)
+                                        .onSuccess { user -> currentUser = user }
+                                        .onFailure { err ->
+                                            if (err !is UserCancelledSignInException) {
+                                                authError = err.message ?: "تعذر تسجيل الدخول"
+                                            }
+                                        }
+                                    isSigningIn = false
+                                }
+                            }
+                        )
+                    }
+                } else {
+                    key(signedInUser.uid) {
+                        val factory = remember(app, signedInUser.uid, firestoreDatabaseId) {
+                            DoriViewModelFactory(
+                                application = app,
+                                appMode = DoriAppMode.USER_APP,
+                                firestoreDatabaseId = firestoreDatabaseId
+                            )
+                        }
+                        val viewModel: DoriViewModel = viewModel(
+                            key = "user_${signedInUser.uid}",
+                            factory = factory
+                        )
+                        DoriAppRoot(
+                            viewModel = viewModel,
+                            onSignOut = {
+                                scope.launch {
+                                    GoogleAuthManager.signOut(this@MainActivity)
+                                    authError = null
+                                    currentUser = null
+                                }
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -111,7 +185,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun DoriAppRoot(
-    viewModel: DoriViewModel
+    viewModel: DoriViewModel,
+    onSignOut: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -159,11 +234,13 @@ fun DoriAppRoot(
         }
     }
 
-    LaunchedEffect(lifecycleOwner) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (isActive) {
-                viewModel.syncLocalBridge(silent = true)
-                delay(2500L)
+    LaunchedEffect(lifecycleOwner, viewModel.isCloudSyncEnabled) {
+        if (!viewModel.isCloudSyncEnabled) {
+            lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (isActive) {
+                    viewModel.syncLocalBridge(silent = true)
+                    delay(2500L)
+                }
             }
         }
     }
@@ -283,7 +360,8 @@ fun DoriAppRoot(
                                 viewModel.syncLocalBridge(silent = true)
                                 showSupportSheet = true
                             },
-                            onTestAlert = viewModel::testTurnAlert
+                            onTestAlert = viewModel::testTurnAlert,
+                            onSignOut = onSignOut
                         )
                     }
 

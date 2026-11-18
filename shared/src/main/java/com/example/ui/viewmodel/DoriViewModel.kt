@@ -6,6 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.bridge.DoriLocalBridgeClient
+import com.example.data.cloud.CloudSyncStatus
+import com.example.data.cloud.CloudSyncUiState
+import com.example.data.cloud.DoriCloudSyncManager
 import com.example.data.local.AdminAccountEntity
 import com.example.data.local.BookingEntity
 import com.example.data.local.DoriDatabase
@@ -34,6 +37,8 @@ import com.example.data.model.UserProfileSettings
 import com.example.data.repository.DoriRepository
 import com.example.util.AlertNotifier
 import com.example.util.DoriNotificationHelper
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -107,7 +112,8 @@ data class DoriUiState(
     val activeTurnAlert: LiveTurnAlert? = null,
     val selectedVenueForDetails: VenueEntity? = null,
     val bookingSessionId: Long = 0L,
-    val newlyBookedTicket: BookingEntity? = null
+    val newlyBookedTicket: BookingEntity? = null,
+    val cloudSync: CloudSyncUiState = CloudSyncUiState()
 )
 
 private data class FilterState(
@@ -129,12 +135,35 @@ private data class FilterState(
 
 class DoriViewModel(
     application: Application,
-    private val appMode: DoriAppMode = DoriAppMode.USER_APP
+    private val appMode: DoriAppMode = DoriAppMode.USER_APP,
+    private val firestoreDatabaseId: String = ""
 ) : AndroidViewModel(application) {
 
     private val database = DoriDatabase.getInstance(application)
     private val prefs = UserPreferencesDataStore(application)
-    private val repository = DoriRepository(database.doriDao(), prefs)
+    private val cloudSyncManager: DoriCloudSyncManager? = if (firestoreDatabaseId.isNotBlank()) {
+        runCatching {
+            val auth = FirebaseAuth.getInstance()
+            if (auth.currentUser != null) {
+                DoriCloudSyncManager(
+                    firestore = FirebaseFirestore.getInstance(firestoreDatabaseId),
+                    auth = auth,
+                    dao = database.doriDao(),
+                    prefs = prefs,
+                    isControlApp = appMode == DoriAppMode.CONTROL_APP,
+                    scope = viewModelScope
+                )
+            } else {
+                null
+            }
+        }.getOrNull()
+    } else {
+        null
+    }
+    private val repository = DoriRepository(database.doriDao(), prefs, cloudSyncManager)
+
+    val isCloudSyncEnabled: Boolean
+        get() = cloudSyncManager != null
 
     private val initialTab = if (appMode == DoriAppMode.CONTROL_APP) {
         AppTab.CONTROL_FEATURES
@@ -146,17 +175,23 @@ class DoriViewModel(
     private val _toastMessage = MutableSharedFlow<String>()
     val toastMessage = _toastMessage.asSharedFlow()
     private val bridgeSyncMutex = Mutex()
+    private val fallbackCloudState = MutableStateFlow(CloudSyncUiState(status = CloudSyncStatus.OFFLINE))
 
     private var simulationJob: Job? = null
 
     init {
         viewModelScope.launch {
             repository.ensureSeeded()
-            syncLocalBridgeInternal(silent = true)
+            if (cloudSyncManager != null) {
+                cloudSyncManager.start()
+            } else {
+                syncLocalBridgeInternal(silent = true)
+            }
         }
     }
 
     override fun onCleared() {
+        cloudSyncManager?.stop()
         simulationJob?.cancel()
         super.onCleared()
     }
@@ -171,7 +206,8 @@ class DoriViewModel(
         repository.supportTickets,
         repository.admins,
         repository.providers,
-        repository.supportMessages
+        repository.supportMessages,
+        cloudSyncManager?.syncState ?: fallbackCloudState
     ) { values ->
         val filters = values[0] as FilterState
         val userPrefs = values[1] as UserProfileSettings
@@ -191,6 +227,7 @@ class DoriViewModel(
         val providers = values[8] as List<ServiceProviderEntity>
         @Suppress("UNCHECKED_CAST")
         val supportMessages = values[9] as List<SupportMessageEntity>
+        val cloudSyncState = values[10] as CloudSyncUiState
 
         val district = userPrefs.selectedDistrict
         val districtVenues = if (district == NinevehDistrict.ALL_NINEVEH) {
@@ -321,7 +358,8 @@ class DoriViewModel(
             activeTurnAlert = filters.activeTurnAlert,
             selectedVenueForDetails = detailVenue,
             bookingSessionId = filters.bookingSessionId,
-            newlyBookedTicket = filters.newlyBookedTicket
+            newlyBookedTicket = filters.newlyBookedTicket,
+            cloudSync = cloudSyncState
         )
     }.stateIn(
         scope = viewModelScope,
@@ -368,7 +406,9 @@ class DoriViewModel(
 
     fun selectTab(tab: AppTab) {
         filterState.update { it.copy(currentTab = tab) }
-        viewModelScope.launch { syncLocalBridgeInternal(silent = true) }
+        if (cloudSyncManager == null) {
+            viewModelScope.launch { syncLocalBridgeInternal(silent = true) }
+        }
     }
 
     fun syncLocalBridge(silent: Boolean = false) {
@@ -378,6 +418,7 @@ class DoriViewModel(
     }
 
     private suspend fun pushControlSnapshotToUserApp(includeBookings: Boolean = false) {
+        if (cloudSyncManager != null) return
         if (appMode != DoriAppMode.CONTROL_APP) return
         val ctx = getApplication<Application>()
         withContext(Dispatchers.IO) {
@@ -404,6 +445,21 @@ class DoriViewModel(
     }
 
     private suspend fun syncLocalBridgeInternal(silent: Boolean) = bridgeSyncMutex.withLock {
+        val cloud = cloudSyncManager
+        if (cloud != null) {
+            val result = cloud.syncNow()
+            if (!silent) {
+                result.onSuccess { count ->
+                    _toastMessage.emit(
+                        if (count > 0) "تمت المزامنة السحابية بنجاح ✓"
+                        else "جميع البيانات متزامنة مع السحابة ✓"
+                    )
+                }.onFailure { err ->
+                    _toastMessage.emit(err.message ?: "تعذر المزامنة مع السحابة")
+                }
+            }
+            return@withLock
+        }
         val ctx = getApplication<Application>()
         val isCtrl = appMode == DoriAppMode.CONTROL_APP
         val changedCount = withContext(Dispatchers.IO) {
@@ -629,8 +685,10 @@ class DoriViewModel(
                 if (uiState.value.preferences.controlConfig.enableLiveAlerts) {
                     DoriNotificationHelper.showBookingCreatedNotification(getApplication(), booking)
                 }
-                withContext(Dispatchers.IO) {
-                    DoriLocalBridgeClient.pushBookingToControl(getApplication(), booking)
+                if (cloudSyncManager == null) {
+                    withContext(Dispatchers.IO) {
+                        DoriLocalBridgeClient.pushBookingToControl(getApplication(), booking)
+                    }
                 }
                 filterState.update {
                     it.copy(
@@ -681,9 +739,11 @@ class DoriViewModel(
     fun completeBooking(bookingId: Long, rating: Int?, comment: String?) {
         viewModelScope.launch {
             val earned = repository.completeBookingWithOptionalReview(bookingId, rating, comment)
-            repository.getBookingById(bookingId)?.let { updated ->
-                withContext(Dispatchers.IO) {
-                    DoriLocalBridgeClient.pushBookingToControl(getApplication(), updated)
+            if (cloudSyncManager == null) {
+                repository.getBookingById(bookingId)?.let { updated ->
+                    withContext(Dispatchers.IO) {
+                        DoriLocalBridgeClient.pushBookingToControl(getApplication(), updated)
+                    }
                 }
             }
             _toastMessage.emit(
@@ -703,9 +763,11 @@ class DoriViewModel(
     fun cancelBooking(bookingId: Long) {
         viewModelScope.launch {
             repository.cancelBooking(bookingId)
-            repository.getBookingById(bookingId)?.let { updated ->
-                withContext(Dispatchers.IO) {
-                    DoriLocalBridgeClient.pushBookingToControl(getApplication(), updated)
+            if (cloudSyncManager == null) {
+                repository.getBookingById(bookingId)?.let { updated ->
+                    withContext(Dispatchers.IO) {
+                        DoriLocalBridgeClient.pushBookingToControl(getApplication(), updated)
+                    }
                 }
             }
             _toastMessage.emit("تم إلغاء الحجز ونقله إلى السجل")
@@ -751,27 +813,35 @@ class DoriViewModel(
                 relatedVenueName = relatedVenueName
             )
             result.onSuccess { ticket ->
-                val pushed = withContext(Dispatchers.IO) {
-                    val msgs = repository.getAllSupportMessagesSnapshot()
-                        .filter { it.ticketExternalId == ticket.externalId && !it.isFromAdmin && !it.syncedToPeer }
-                    msgs.forEach { m ->
-                        if (DoriLocalBridgeClient.pushSupportMessageToControl(getApplication(), m)) {
-                            repository.markSupportMessageSynced(m.id)
-                        }
-                    }
-                    DoriLocalBridgeClient.pushSupportTicketToControl(getApplication(), ticket)
-                }
-                if (pushed) {
+                if (cloudSyncManager != null) {
                     repository.markSupportTicketDelivered(ticket.id)
                     _toastMessage.emit(
-                        if (requestType == SupportRequestType.COMPLAINT) "تم إرسال طلب الشكوى بنجاح ✓"
+                        if (requestType == SupportRequestType.COMPLAINT) "تم إرسال وحفظ طلب الشكوى بنجاح ✓"
                         else "تم إرسال رسالتك إلى الدعم الفني ✓"
                     )
                 } else {
-                    _toastMessage.emit(
-                        if (requestType == SupportRequestType.COMPLAINT) "تم تسجيل طلب الشكوى بنجاح ✓"
-                        else "تم تسجيل رسالتك — ستصلك الإجابة في المحادثة ✓"
-                    )
+                    val pushed = withContext(Dispatchers.IO) {
+                        val msgs = repository.getAllSupportMessagesSnapshot()
+                            .filter { it.ticketExternalId == ticket.externalId && !it.isFromAdmin && !it.syncedToPeer }
+                        msgs.forEach { m ->
+                            if (DoriLocalBridgeClient.pushSupportMessageToControl(getApplication(), m)) {
+                                repository.markSupportMessageSynced(m.id)
+                            }
+                        }
+                        DoriLocalBridgeClient.pushSupportTicketToControl(getApplication(), ticket)
+                    }
+                    if (pushed) {
+                        repository.markSupportTicketDelivered(ticket.id)
+                        _toastMessage.emit(
+                            if (requestType == SupportRequestType.COMPLAINT) "تم إرسال طلب الشكوى بنجاح ✓"
+                            else "تم إرسال رسالتك إلى الدعم الفني ✓"
+                        )
+                    } else {
+                        _toastMessage.emit(
+                            if (requestType == SupportRequestType.COMPLAINT) "تم تسجيل طلب الشكوى بنجاح ✓"
+                            else "تم تسجيل رسالتك — ستصلك الإجابة في المحادثة ✓"
+                        )
+                    }
                 }
             }.onFailure { err ->
                 _toastMessage.emit(err.message ?: "تعذر الإرسال")
@@ -790,13 +860,17 @@ class DoriViewModel(
                 senderName = senderName,
                 messageBody = messageBody
             ).onSuccess { (updatedTicket, msgEntity) ->
-                val pushed = withContext(Dispatchers.IO) {
-                    val mOk = DoriLocalBridgeClient.pushSupportMessageToControl(getApplication(), msgEntity)
-                    if (mOk) repository.markSupportMessageSynced(msgEntity.id)
-                    val tOk = DoriLocalBridgeClient.pushSupportTicketToControl(getApplication(), updatedTicket)
-                    tOk && mOk
-                }
-                if (pushed) {
+                if (cloudSyncManager == null) {
+                    val pushed = withContext(Dispatchers.IO) {
+                        val mOk = DoriLocalBridgeClient.pushSupportMessageToControl(getApplication(), msgEntity)
+                        if (mOk) repository.markSupportMessageSynced(msgEntity.id)
+                        val tOk = DoriLocalBridgeClient.pushSupportTicketToControl(getApplication(), updatedTicket)
+                        tOk && mOk
+                    }
+                    if (pushed) {
+                        repository.markSupportTicketDelivered(updatedTicket.id)
+                    }
+                } else {
                     repository.markSupportTicketDelivered(updatedTicket.id)
                 }
             }.onFailure { err ->
@@ -812,20 +886,24 @@ class DoriViewModel(
             val adminLabel = admin?.name?.takeIf { it.isNotBlank() } ?: "فريق الدعم الفني"
             repository.replyToSupportTicket(ticketId, replyText, adminLabel)
                 .onSuccess { updated ->
-                    val pushed = withContext(Dispatchers.IO) {
-                        val msgs = repository.getAllSupportMessagesSnapshot()
-                            .filter { it.ticketExternalId == updated.externalId && it.isFromAdmin && !it.syncedToPeer }
-                        msgs.forEach { m ->
-                            if (DoriLocalBridgeClient.pushSupportMessageToUser(getApplication(), m)) {
-                                repository.markSupportMessageSynced(m.id)
+                    if (cloudSyncManager != null) {
+                        _toastMessage.emit("تم إرسال الرد وحفظه سحابياً ✓")
+                    } else {
+                        val pushed = withContext(Dispatchers.IO) {
+                            val msgs = repository.getAllSupportMessagesSnapshot()
+                                .filter { it.ticketExternalId == updated.externalId && it.isFromAdmin && !it.syncedToPeer }
+                            msgs.forEach { m ->
+                                if (DoriLocalBridgeClient.pushSupportMessageToUser(getApplication(), m)) {
+                                    repository.markSupportMessageSynced(m.id)
+                                }
                             }
+                            DoriLocalBridgeClient.pushSupportReplyToUser(getApplication(), updated)
                         }
-                        DoriLocalBridgeClient.pushSupportReplyToUser(getApplication(), updated)
+                        _toastMessage.emit(
+                            if (pushed) "تم إرسال الرد وإشعار المستخدم ✓"
+                            else "تم حفظ الرد وسيظهر للمستخدم عند المزامنة"
+                        )
                     }
-                    _toastMessage.emit(
-                        if (pushed) "تم إرسال الرد وإشعار المستخدم ✓"
-                        else "تم حفظ الرد وسيظهر للمستخدم عند المزامنة"
-                    )
                 }
                 .onFailure { err ->
                     _toastMessage.emit(err.message ?: "تعذر إرسال الرد")
@@ -837,8 +915,10 @@ class DoriViewModel(
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.REPLY_SUPPORT)) return@launch
             val updated = repository.updateSupportTicketStatus(ticketId, status) ?: return@launch
-            withContext(Dispatchers.IO) {
-                DoriLocalBridgeClient.pushSupportReplyToUser(getApplication(), updated)
+            if (cloudSyncManager == null) {
+                withContext(Dispatchers.IO) {
+                    DoriLocalBridgeClient.pushSupportReplyToUser(getApplication(), updated)
+                }
             }
             _toastMessage.emit("تم تحديث حالة التذكرة إلى: ${status.label}")
         }
@@ -1021,20 +1101,22 @@ class DoriViewModel(
                 note = note,
                 providerId = prov?.id
             ) ?: return@launch
-            withContext(Dispatchers.IO) {
-                DoriLocalBridgeClient.pushBookingDecisionToUser(
-                    context = getApplication(),
-                    ticketCode = updated.ticketCode,
-                    approvalStatus = updated.approvalStatus,
-                    handledByProvider = updated.handledByProvider,
-                    approvalNote = updated.approvalNote,
-                    status = updated.status,
-                    stage = updated.stage,
-                    peopleAhead = updated.peopleAhead,
-                    estimatedMinutes = updated.estimatedMinutes
-                )
+            if (cloudSyncManager == null) {
+                withContext(Dispatchers.IO) {
+                    DoriLocalBridgeClient.pushBookingDecisionToUser(
+                        context = getApplication(),
+                        ticketCode = updated.ticketCode,
+                        approvalStatus = updated.approvalStatus,
+                        handledByProvider = updated.handledByProvider,
+                        approvalNote = updated.approvalNote,
+                        status = updated.status,
+                        stage = updated.stage,
+                        peopleAhead = updated.peopleAhead,
+                        estimatedMinutes = updated.estimatedMinutes
+                    )
+                }
+                pushControlSnapshotToUserApp()
             }
-            pushControlSnapshotToUserApp()
             _toastMessage.emit("تم قبول التذكرة ${updated.ticketCode} بواسطة $actorName ✓")
         }
     }
@@ -1055,20 +1137,22 @@ class DoriViewModel(
                 actorName = actorName,
                 note = note
             ) ?: return@launch
-            withContext(Dispatchers.IO) {
-                DoriLocalBridgeClient.pushBookingDecisionToUser(
-                    context = getApplication(),
-                    ticketCode = updated.ticketCode,
-                    approvalStatus = updated.approvalStatus,
-                    handledByProvider = updated.handledByProvider,
-                    approvalNote = updated.approvalNote,
-                    status = updated.status,
-                    stage = updated.stage,
-                    peopleAhead = updated.peopleAhead,
-                    estimatedMinutes = updated.estimatedMinutes
-                )
+            if (cloudSyncManager == null) {
+                withContext(Dispatchers.IO) {
+                    DoriLocalBridgeClient.pushBookingDecisionToUser(
+                        context = getApplication(),
+                        ticketCode = updated.ticketCode,
+                        approvalStatus = updated.approvalStatus,
+                        handledByProvider = updated.handledByProvider,
+                        approvalNote = updated.approvalNote,
+                        status = updated.status,
+                        stage = updated.stage,
+                        peopleAhead = updated.peopleAhead,
+                        estimatedMinutes = updated.estimatedMinutes
+                    )
+                }
+                pushControlSnapshotToUserApp()
             }
-            pushControlSnapshotToUserApp()
             _toastMessage.emit("تم الاعتذار عن التذكرة ${updated.ticketCode}")
         }
     }
@@ -1418,7 +1502,10 @@ class DoriViewModel(
                 return@launch
             }
             repository.updateProfile(name.trim(), cleanPhone, district, age.trim(), optionalNote.trim())
-            _toastMessage.emit("تم حفظ معلوماتك محلياً ✓")
+            _toastMessage.emit(
+                if (cloudSyncManager != null) "تم حفظ ومزامنة معلوماتك السحابية ✓"
+                else "تم حفظ معلوماتك ✓"
+            )
         }
     }
 
@@ -1452,14 +1539,16 @@ class DoriViewModel(
 
 class DoriViewModelFactory(
     private val application: Application,
-    private val appMode: DoriAppMode
+    private val appMode: DoriAppMode,
+    private val firestoreDatabaseId: String = ""
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(DoriViewModel::class.java)) {
             return DoriViewModel(
                 application = application,
-                appMode = appMode
+                appMode = appMode,
+                firestoreDatabaseId = firestoreDatabaseId
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

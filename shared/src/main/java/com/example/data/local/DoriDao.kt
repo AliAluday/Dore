@@ -64,6 +64,9 @@ interface DoriDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReview(review: ReviewEntity): Long
 
+    @Query("DELETE FROM reviews WHERE id = :reviewId")
+    suspend fun deleteReviewById(reviewId: Long)
+
     @Transaction
     suspend fun replaceAllReviews(reviews: List<ReviewEntity>) {
         deleteAllReviews()
@@ -101,6 +104,9 @@ interface DoriDao {
     @Query("DELETE FROM bookings WHERE status = 'ACTIVE' AND createdAt <= :cutoffTimestamp")
     suspend fun deleteActiveBookingsCreatedAtOrBefore(cutoffTimestamp: Long)
 
+    @Query("DELETE FROM bookings WHERE id = :bookingId")
+    suspend fun deleteBookingById(bookingId: Long)
+
     @Query("DELETE FROM bookings")
     suspend fun deleteAllBookings()
 
@@ -128,6 +134,12 @@ interface DoriDao {
 
     @Update
     suspend fun updateQueueItem(item: MerchantQueueItemEntity)
+
+    @Query("SELECT * FROM merchant_queue_items WHERE ticketCode = :ticketCode LIMIT 1")
+    suspend fun getQueueItemByTicketCode(ticketCode: String): MerchantQueueItemEntity?
+
+    @Query("DELETE FROM merchant_queue_items WHERE ticketCode = :ticketCode")
+    suspend fun deleteQueueItemByTicketCode(ticketCode: String)
 
     @Query("DELETE FROM merchant_queue_items WHERE venueId = :venueId")
     suspend fun deleteQueueItemsForVenue(venueId: Int)

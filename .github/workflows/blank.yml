@@ -38,6 +38,7 @@ jobs:
             echo "=== 1. Preparing Gradle wrapper & cleaning local.properties ==="
             rm -f local.properties
             chmod +x gradlew
+            ls -la gradlew gradle/wrapper/gradle-wrapper.jar debug.keystore.base64 app/google-services.json controlapp/google-services.json 2>&1 || true
 
             echo "=== 2. Preparing debug.keystore ==="
             rm -f debug.keystore
@@ -69,7 +70,7 @@ jobs:
             fi
             for gs_file in app/google-services.json controlapp/google-services.json; do
               if [ ! -s "$gs_file" ]; then
-                echo "::error::Missing $gs_file. Ensure app/google-services.json is pushed to GitHub or add GOOGLE_SERVICES_JSON_BASE64 secret."
+                echo "::error::Missing $gs_file. Commit google-services.json to GitHub or configure GOOGLE_SERVICES_JSON_BASE64 secret."
                 exit 1
               fi
               python3 -m json.tool "$gs_file" >/dev/null
@@ -82,9 +83,6 @@ jobs:
               SDK_DIR="$HOME/android-sdk"
               mkdir -p "$SDK_DIR"
             fi
-            if [ ! -w "$SDK_DIR" ] && command -v sudo >/dev/null 2>&1; then
-              sudo chown -R "$(id -u):$(id -g)" "$SDK_DIR"
-            fi
 
             export ANDROID_HOME="$SDK_DIR"
             export ANDROID_SDK_ROOT="$SDK_DIR"
@@ -94,35 +92,62 @@ jobs:
             mkdir -p "$HOME/.android"
             touch "$HOME/.android/repositories.cfg"
 
-            SDKMANAGER="$(find "$SDK_DIR/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1 || command -v sdkmanager || true)"
+            # Locate sdkmanager cleanly without pipeline SIGPIPE issues
+            SDKMANAGER=""
+            for candidate in \
+              "$SDK_DIR/cmdline-tools/latest/bin/sdkmanager" \
+              "$SDK_DIR"/cmdline-tools/*/bin/sdkmanager; do
+              if [ -x "$candidate" ]; then
+                SDKMANAGER="$candidate"
+                break
+              fi
+            done
+            if [ -z "$SDKMANAGER" ]; then
+              SDKMANAGER="$(command -v sdkmanager 2>/dev/null || true)"
+            fi
+
             if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
               echo "Downloading Android cmdline-tools..."
-              mkdir -p "$SDK_DIR/cmdline-tools"
-              curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdline-tools.zip
+              CMD_PARENT="$SDK_DIR/cmdline-tools"
+              if [ ! -w "$SDK_DIR" ] && command -v sudo >/dev/null 2>&1; then
+                sudo mkdir -p "$CMD_PARENT"
+                sudo chown -R "$(id -u):$(id -g)" "$CMD_PARENT"
+              else
+                mkdir -p "$CMD_PARENT"
+              fi
+              curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip -o /tmp/cmdline-tools.zip
               unzip -qo /tmp/cmdline-tools.zip -d /tmp/cmdline-extract
-              rm -rf "$SDK_DIR/cmdline-tools/latest"
-              mv /tmp/cmdline-extract/cmdline-tools "$SDK_DIR/cmdline-tools/latest"
+              rm -rf "$CMD_PARENT/latest"
+              mv /tmp/cmdline-extract/cmdline-tools "$CMD_PARENT/latest"
               rm -rf /tmp/cmdline-tools.zip /tmp/cmdline-extract
-              SDKMANAGER="$SDK_DIR/cmdline-tools/latest/bin/sdkmanager"
+              SDKMANAGER="$CMD_PARENT/latest/bin/sdkmanager"
               chmod +x "$SDKMANAGER"
             fi
 
+            echo "Using sdkmanager: $SDKMANAGER"
             echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
             echo "$SDK_DIR/platform-tools" >> "$GITHUB_PATH"
 
+            # Use sudo for sdkmanager if pre-installed SDK directory is root-owned
+            SDK_PREFIX=()
+            if [ ! -w "$SDK_DIR" ] && command -v sudo >/dev/null 2>&1; then
+              SDK_PREFIX=(sudo env "JAVA_HOME=${JAVA_HOME:-}" "PATH=$PATH")
+            fi
+
             if [ -d "$SDK_DIR/platforms/android-36.0" ] && [ ! -e "$SDK_DIR/platforms/android-36" ]; then
-              ln -s "$SDK_DIR/platforms/android-36.0" "$SDK_DIR/platforms/android-36"
+              ${SDK_PREFIX[@]+"${SDK_PREFIX[@]}"} ln -s "$SDK_DIR/platforms/android-36.0" "$SDK_DIR/platforms/android-36"
             fi
 
             set +o pipefail
-            yes | "$SDKMANAGER" --sdk_root="$SDK_DIR" --licenses >/dev/null 2>&1 || true
+            yes | ${SDK_PREFIX[@]+"${SDK_PREFIX[@]}"} "$SDKMANAGER" --sdk_root="$SDK_DIR" --licenses >/dev/null 2>&1 || true
             if [ ! -f "$SDK_DIR/platforms/android-36/android.jar" ] || [ ! -d "$SDK_DIR/build-tools/36.0.0" ] || [ ! -d "$SDK_DIR/platform-tools" ]; then
-              yes | "$SDKMANAGER" --sdk_root="$SDK_DIR" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+              echo "Installing platform-tools, platforms;android-36, build-tools;36.0.0..."
+              yes | ${SDK_PREFIX[@]+"${SDK_PREFIX[@]}"} "$SDKMANAGER" --sdk_root="$SDK_DIR" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
             fi
             set -o pipefail
 
             if [ -d "$SDK_DIR/platforms/android-36.0" ] && [ ! -e "$SDK_DIR/platforms/android-36" ]; then
-              ln -s "$SDK_DIR/platforms/android-36.0" "$SDK_DIR/platforms/android-36"
+              ${SDK_PREFIX[@]+"${SDK_PREFIX[@]}"} ln -s "$SDK_DIR/platforms/android-36.0" "$SDK_DIR/platforms/android-36"
             fi
 
             if [ ! -f "$SDK_DIR/platforms/android-36/android.jar" ] || [ ! -d "$SDK_DIR/build-tools/36.0.0" ]; then

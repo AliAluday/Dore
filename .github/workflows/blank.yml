@@ -23,100 +23,122 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Set up Android SDK 36
-        uses: android-actions/setup-android@v4
-        with:
-          packages: |
-            platform-tools
-            platforms;android-36
-            build-tools;36.0.0
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-provider: 'basic'
 
-      - name: Prepare wrapper, keystore, Firebase config, and SDK environment
+      - name: Prepare Android SDK 36, keystore, and Firebase config
         shell: bash
         env:
           GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           set -euo pipefail
-          rm -f local.properties
-          chmod +x gradlew
+          {
+            echo "=== 1. Preparing Gradle wrapper & cleaning local.properties ==="
+            rm -f local.properties
+            chmod +x gradlew
 
-          # 1. Decode and validate debug.keystore (immune to CRLF/whitespace)
-          rm -f debug.keystore
-          if [ -s debug.keystore.base64 ]; then
-            tr -d '\r\n ' < debug.keystore.base64 | base64 -d > debug.keystore || rm -f debug.keystore
-          fi
-          if [ ! -s debug.keystore ] || ! keytool -list -keystore debug.keystore -storepass android -alias androiddebugkey >/dev/null 2>&1; then
-            echo "Generating fresh debug.keystore..."
+            echo "=== 2. Preparing debug.keystore ==="
             rm -f debug.keystore
-            keytool -genkeypair -v -keystore debug.keystore -storepass android \
-              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
-              -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          fi
-
-          # 2. Ensure Firebase google-services.json exists for both :app and :controlapp
-          if [ -n "${GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
-            if [ ! -s app/google-services.json ]; then
-              printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | tr -d '\r\n ' | base64 -d > app/google-services.json
+            if [ -s debug.keystore.base64 ]; then
+              tr -d '\r\n ' < debug.keystore.base64 | base64 -d > debug.keystore || rm -f debug.keystore
             fi
-            if [ ! -s controlapp/google-services.json ]; then
-              printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | tr -d '\r\n ' | base64 -d > controlapp/google-services.json
+            if [ ! -s debug.keystore ] || ! keytool -list -keystore debug.keystore -storepass android -alias androiddebugkey >/dev/null 2>&1; then
+              echo "Generating fresh debug.keystore..."
+              rm -f debug.keystore
+              keytool -genkeypair -v -keystore debug.keystore -storepass android \
+                -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+                -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
             fi
-          fi
-          if [ -s app/google-services.json ] && [ ! -s controlapp/google-services.json ]; then
-            cp app/google-services.json controlapp/google-services.json
-          elif [ -s controlapp/google-services.json ] && [ ! -s app/google-services.json ]; then
-            cp controlapp/google-services.json app/google-services.json
-          fi
-          for gs_file in app/google-services.json controlapp/google-services.json; do
-            if [ ! -s "$gs_file" ]; then
-              echo "::error::Missing $gs_file. Commit google-services.json or set GOOGLE_SERVICES_JSON_BASE64 secret."
-              exit 1
+            echo "debug.keystore verified."
+
+            echo "=== 3. Checking Firebase google-services.json ==="
+            if [ -n "${GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
+              if [ ! -s app/google-services.json ]; then
+                printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | tr -d '\r\n ' | base64 -d > app/google-services.json
+              fi
+              if [ ! -s controlapp/google-services.json ]; then
+                printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | tr -d '\r\n ' | base64 -d > controlapp/google-services.json
+              fi
             fi
-            python3 -m json.tool "$gs_file" >/dev/null
-          done
+            if [ -s app/google-services.json ] && [ ! -s controlapp/google-services.json ]; then
+              cp app/google-services.json controlapp/google-services.json
+            elif [ -s controlapp/google-services.json ] && [ ! -s app/google-services.json ]; then
+              cp controlapp/google-services.json app/google-services.json
+            fi
+            for gs_file in app/google-services.json controlapp/google-services.json; do
+              if [ ! -s "$gs_file" ]; then
+                echo "::error::Missing $gs_file. Ensure app/google-services.json is pushed to GitHub or add GOOGLE_SERVICES_JSON_BASE64 secret."
+                exit 1
+              fi
+              python3 -m json.tool "$gs_file" >/dev/null
+            done
+            echo "Firebase google-services.json verified for :app and :controlapp."
 
-          # 3. Verify Android SDK 36 & Build-Tools 36.0.0
-          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          export ANDROID_HOME="$SDK_DIR"
-          export ANDROID_SDK_ROOT="$SDK_DIR"
-          echo "ANDROID_HOME=$SDK_DIR" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"
+            echo "=== 4. Setting up Android SDK 36 & Build-Tools 36.0.0 ==="
+            SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+            if [ ! -d "$SDK_DIR" ]; then
+              SDK_DIR="$HOME/android-sdk"
+              mkdir -p "$SDK_DIR"
+            fi
+            if [ ! -w "$SDK_DIR" ] && command -v sudo >/dev/null 2>&1; then
+              sudo chown -R "$(id -u):$(id -g)" "$SDK_DIR"
+            fi
 
-          mkdir -p "$HOME/.android"
-          touch "$HOME/.android/repositories.cfg"
+            export ANDROID_HOME="$SDK_DIR"
+            export ANDROID_SDK_ROOT="$SDK_DIR"
+            echo "ANDROID_HOME=$SDK_DIR" >> "$GITHUB_ENV"
+            echo "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"
 
-          if [ -d "$SDK_DIR/platforms/android-36.0" ] && [ ! -e "$SDK_DIR/platforms/android-36" ]; then
-            ln -s "$SDK_DIR/platforms/android-36.0" "$SDK_DIR/platforms/android-36"
-          fi
+            mkdir -p "$HOME/.android"
+            touch "$HOME/.android/repositories.cfg"
 
-          SDKMANAGER="$(command -v sdkmanager || find "$SDK_DIR/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1 || true)"
-          if [ -n "$SDKMANAGER" ] && [ -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$SDK_DIR/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1 || command -v sdkmanager || true)"
+            if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
+              echo "Downloading Android cmdline-tools..."
+              mkdir -p "$SDK_DIR/cmdline-tools"
+              curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdline-tools.zip
+              unzip -qo /tmp/cmdline-tools.zip -d /tmp/cmdline-extract
+              rm -rf "$SDK_DIR/cmdline-tools/latest"
+              mv /tmp/cmdline-extract/cmdline-tools "$SDK_DIR/cmdline-tools/latest"
+              rm -rf /tmp/cmdline-tools.zip /tmp/cmdline-extract
+              SDKMANAGER="$SDK_DIR/cmdline-tools/latest/bin/sdkmanager"
+              chmod +x "$SDKMANAGER"
+            fi
+
+            echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+            echo "$SDK_DIR/platform-tools" >> "$GITHUB_PATH"
+
+            if [ -d "$SDK_DIR/platforms/android-36.0" ] && [ ! -e "$SDK_DIR/platforms/android-36" ]; then
+              ln -s "$SDK_DIR/platforms/android-36.0" "$SDK_DIR/platforms/android-36"
+            fi
+
             set +o pipefail
             yes | "$SDKMANAGER" --sdk_root="$SDK_DIR" --licenses >/dev/null 2>&1 || true
-            if [ ! -f "$SDK_DIR/platforms/android-36/android.jar" ] || [ ! -d "$SDK_DIR/build-tools/36.0.0" ]; then
+            if [ ! -f "$SDK_DIR/platforms/android-36/android.jar" ] || [ ! -d "$SDK_DIR/build-tools/36.0.0" ] || [ ! -d "$SDK_DIR/platform-tools" ]; then
               yes | "$SDKMANAGER" --sdk_root="$SDK_DIR" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
             fi
             set -o pipefail
-          fi
 
-          if [ ! -f "$SDK_DIR/platforms/android-36/android.jar" ] || [ ! -d "$SDK_DIR/build-tools/36.0.0" ]; then
-            echo "::error::Android SDK 36 or build-tools 36.0.0 is missing in $SDK_DIR"
-            ls -la "$SDK_DIR/platforms" "$SDK_DIR/build-tools" 2>&1 || true
-            exit 1
-          fi
+            if [ -d "$SDK_DIR/platforms/android-36.0" ] && [ ! -e "$SDK_DIR/platforms/android-36" ]; then
+              ln -s "$SDK_DIR/platforms/android-36.0" "$SDK_DIR/platforms/android-36"
+            fi
 
-          echo "SDK verified at $SDK_DIR (android-36 & build-tools 36.0.0 ready)"
-          free -h || true
+            if [ ! -f "$SDK_DIR/platforms/android-36/android.jar" ] || [ ! -d "$SDK_DIR/build-tools/36.0.0" ]; then
+              echo "::error::Android SDK 36 or build-tools 36.0.0 is missing in $SDK_DIR"
+              ls -la "$SDK_DIR/platforms" "$SDK_DIR/build-tools" 2>&1 || true
+              exit 1
+            fi
+
+            echo "Android SDK ready at $SDK_DIR (android-36 & build-tools 36.0.0)"
+            free -h || true
+          } 2>&1 | tee prepare-build.log
 
       - name: Build User (:app) & Control (:controlapp) Debug APKs
         shell: bash
         env:
-          # Keep Gradle wrapper client lightweight so memory goes to the single daemon JVM
+          # Keep Gradle wrapper launcher lightweight; allocate main heap to the single daemon JVM
           GRADLE_OPTS: "-Xmx512m -Dfile.encoding=UTF-8"
         run: |
           set -o pipefail
@@ -125,15 +147,15 @@ jobs:
             -Dkotlin.compiler.execution.strategy=in-process \
             --no-parallel \
             --no-configuration-cache \
-            --max-workers=2 \
+            --max-workers=1 \
             --console=plain \
             --stacktrace 2>&1 | tee gradle-build.log
 
-      - name: Print Gradle failure details
+      - name: Print build failure details
         if: failure()
         shell: bash
         run: |
-          echo "=== GRADLE FAILURE SUMMARY ==="
+          echo "=== BUILD FAILURE SUMMARY ==="
           if [ -f gradle-build.log ]; then
             echo "--- Failed Tasks & Root Causes ---"
             grep -nE "> Task .* FAILED|FAILURE:|What went wrong:|Execution failed|OutOfMemoryError|ERROR:" gradle-build.log | head -n 40 || true
@@ -152,16 +174,27 @@ jobs:
               awk '/FAILURE: Build failed/{flag=1} flag{print; count++} count>80{exit}' gradle-build.log || true
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
+          elif [ -f prepare-build.log ]; then
+            echo "--- Prepare Step Failure Log ---"
+            tail -n 80 prepare-build.log
+            {
+              echo "## Prepare Step Failure Log"
+              echo '```text'
+              tail -n 80 prepare-build.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "gradle-build.log not found." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "Build failed before Prepare/Gradle logs were created." | tee -a "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Upload Gradle failure log
+      - name: Upload failure logs
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: gradle-failure-log
-          path: gradle-build.log
+          name: build-failure-logs
+          path: |
+            prepare-build.log
+            gradle-build.log
           if-no-files-found: ignore
           retention-days: 7
 

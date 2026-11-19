@@ -70,7 +70,6 @@ fun TopStickyHeader(
     selectedDistrict: NinevehDistrict,
     isDarkMode: Boolean,
     activeBookingCount: Int,
-    isSimulationRunning: Boolean,
     searchQuery: String,
     isSearchExpanded: Boolean,
     onToggleSearch: () -> Unit,
@@ -147,15 +146,6 @@ fun TopStickyHeader(
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold
                             )
-                            if (isSimulationRunning) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(AmberGold)
-                                )
-                            }
                         }
                     }
 

@@ -35,13 +35,14 @@ import com.example.data.model.TicketStage
 import com.example.data.model.UserAppControlConfig
 import com.example.data.model.UserProfileSettings
 import com.example.data.repository.DoriRepository
+import android.util.Log
 import com.example.util.AlertNotifier
 import com.example.util.DoriNotificationHelper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.firestoreSettings
+import com.google.firebase.firestore.persistentCacheSettings
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -50,7 +51,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -108,7 +108,6 @@ data class DoriUiState(
     val activeAdmin: AdminAccountEntity? = null,
     val providers: List<ServiceProviderEntity> = emptyList(),
     val activeProvider: ServiceProviderEntity? = null,
-    val isLiveSimulationRunning: Boolean = false,
     val activeTurnAlert: LiveTurnAlert? = null,
     val selectedVenueForDetails: VenueEntity? = null,
     val bookingSessionId: Long = 0L,
@@ -126,7 +125,6 @@ private data class FilterState(
     val sortOption: SortOption = SortOption.HIGHEST_RATED,
     val selectedActiveBookingId: Long? = null,
     val selectedMerchantVenueId: Int = 1,
-    val isLiveSimulationRunning: Boolean = false,
     val activeTurnAlert: LiveTurnAlert? = null,
     val selectedVenueIdForDetails: Int? = null,
     val bookingSessionId: Long = 0L,
@@ -141,21 +139,40 @@ class DoriViewModel(
 
     private val database = DoriDatabase.getInstance(application)
     private val prefs = UserPreferencesDataStore(application)
+    private val fallbackCloudState = MutableStateFlow(CloudSyncUiState(status = CloudSyncStatus.OFFLINE))
+
     private val cloudSyncManager: DoriCloudSyncManager? = if (firestoreDatabaseId.isNotBlank()) {
         runCatching {
             val auth = FirebaseAuth.getInstance()
             if (auth.currentUser != null) {
+                val firestore = FirebaseFirestore.getInstance(firestoreDatabaseId)
+                runCatching {
+                    firestore.firestoreSettings = firestoreSettings {
+                        setLocalCacheSettings(persistentCacheSettings {})
+                    }
+                }
                 DoriCloudSyncManager(
-                    firestore = FirebaseFirestore.getInstance(firestoreDatabaseId),
+                    firestore = firestore,
                     auth = auth,
                     dao = database.doriDao(),
                     prefs = prefs,
                     isControlApp = appMode == DoriAppMode.CONTROL_APP,
-                    scope = viewModelScope
+                    scope = viewModelScope,
+                    onRealtimeBookingAlert = if (appMode == DoriAppMode.USER_APP) {
+                        { alert -> viewModelScope.launch { handleTurnAlerts(listOf(alert)) } }
+                    } else {
+                        null
+                    }
                 )
             } else {
                 null
             }
+        }.onFailure { err ->
+            Log.e("DoriViewModel", "Failed to initialize Firebase Cloud Sync", err)
+            fallbackCloudState.value = CloudSyncUiState(
+                status = CloudSyncStatus.ERROR,
+                errorMessage = "تعذر تهيئة الاتصال السحابي: ${err.localizedMessage ?: "خطأ غير معروف"}"
+            )
         }.getOrNull()
     } else {
         null
@@ -175,25 +192,57 @@ class DoriViewModel(
     private val _toastMessage = MutableSharedFlow<String>()
     val toastMessage = _toastMessage.asSharedFlow()
     private val bridgeSyncMutex = Mutex()
-    private val fallbackCloudState = MutableStateFlow(CloudSyncUiState(status = CloudSyncStatus.OFFLINE))
-
-    private var simulationJob: Job? = null
 
     init {
         viewModelScope.launch {
-            repository.ensureSeeded()
             if (cloudSyncManager != null) {
                 cloudSyncManager.start()
             } else {
+                repository.ensureSeeded()
                 syncLocalBridgeInternal(silent = true)
             }
         }
     }
 
+    fun ensureCloudSyncStarted() {
+        cloudSyncManager?.start()
+    }
+
     override fun onCleared() {
         cloudSyncManager?.stop()
-        simulationJob?.cancel()
         super.onCleared()
+    }
+
+    suspend fun prepareSignOut() {
+        cloudSyncManager?.clearLocalSessionCache()
+    }
+
+    fun retryAdminAccessCheck() {
+        cloudSyncManager?.retryAdminAccessCheck()
+    }
+
+    fun authorizeCloudAdmin(targetUid: String, email: String, displayName: String) {
+        viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_ADMINS)) return@launch
+            val cloud = cloudSyncManager
+            if (cloud == null) {
+                _toastMessage.emit("المزامنة السحابية غير مفعلة حالياً")
+                return@launch
+            }
+            cloud.authorizeCloudAdmin(targetUid, email, displayName)
+                .onSuccess { _toastMessage.emit("تم منح صلاحية الدخول السحابي لنسخة التحكم ✓") }
+                .onFailure { err -> _toastMessage.emit(err.message ?: "تعذر منح الصلاحية") }
+        }
+    }
+
+    fun revokeCloudAdmin(targetUid: String) {
+        viewModelScope.launch {
+            if (!requireAdminPermission(AdminPermissionType.MANAGE_ADMINS)) return@launch
+            val cloud = cloudSyncManager ?: return@launch
+            cloud.revokeCloudAdmin(targetUid)
+                .onSuccess { _toastMessage.emit("تم سحب صلاحية الدخول السحابي ✓") }
+                .onFailure { err -> _toastMessage.emit(err.message ?: "تعذر سحب الصلاحية") }
+        }
     }
 
     val uiState: StateFlow<DoriUiState> = combine(
@@ -354,7 +403,6 @@ class DoriViewModel(
             activeAdmin = activeAdmin,
             providers = providers,
             activeProvider = activeProvider,
-            isLiveSimulationRunning = filters.isLiveSimulationRunning,
             activeTurnAlert = filters.activeTurnAlert,
             selectedVenueForDetails = detailVenue,
             bookingSessionId = filters.bookingSessionId,
@@ -814,10 +862,9 @@ class DoriViewModel(
             )
             result.onSuccess { ticket ->
                 if (cloudSyncManager != null) {
-                    repository.markSupportTicketDelivered(ticket.id)
                     _toastMessage.emit(
-                        if (requestType == SupportRequestType.COMPLAINT) "تم إرسال وحفظ طلب الشكوى بنجاح ✓"
-                        else "تم إرسال رسالتك إلى الدعم الفني ✓"
+                        if (requestType == SupportRequestType.COMPLAINT) "تم إرسال وحفظ طلب الشكوى سحابياً ✓"
+                        else "تم إرسال رسالتك إلى الدعم الفني سحابياً ✓"
                     )
                 } else {
                     val pushed = withContext(Dispatchers.IO) {
@@ -870,8 +917,6 @@ class DoriViewModel(
                     if (pushed) {
                         repository.markSupportTicketDelivered(updatedTicket.id)
                     }
-                } else {
-                    repository.markSupportTicketDelivered(updatedTicket.id)
                 }
             }.onFailure { err ->
                 _toastMessage.emit(err.message ?: "تعذر إرسال الرسالة")
@@ -1255,43 +1300,6 @@ class DoriViewModel(
         }
     }
 
-    fun toggleLiveSimulation() {
-        val currentlyRunning = filterState.value.isLiveSimulationRunning
-        if (currentlyRunning) {
-            simulationJob?.cancel()
-            simulationJob = null
-            filterState.update { it.copy(isLiveSimulationRunning = false) }
-            viewModelScope.launch { _toastMessage.emit("تم إيقاف المحاكاة التلقائية") }
-        } else {
-            viewModelScope.launch {
-                val prov = uiState.value.activeProvider
-                if (prov != null) {
-                    if (!prov.isActive || !prov.canCallNext) {
-                        _toastMessage.emit("حساب ${prov.name} لا يملك صلاحية تشغيل محاكاة الدور")
-                        return@launch
-                    }
-                } else if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) {
-                    return@launch
-                }
-                filterState.update { it.copy(isLiveSimulationRunning = true) }
-                simulationJob = viewModelScope.launch {
-                    _toastMessage.emit("بدأت المحاكاة الحية للطابور مع تنبيهات الصوت والاهتزاز")
-                    while (isActive) {
-                        delay(3500L)
-                        val activeVenueId = filterState.value.selectedMerchantVenueId
-                        val activeTickets = uiState.value.activeBookings
-                        val alerts = if (activeTickets.isNotEmpty()) {
-                            repository.advanceActiveUserTicketDemoStep()
-                        } else {
-                            repository.callNextCustomer(activeVenueId)
-                        }
-                        handleTurnAlerts(alerts)
-                    }
-                }
-            }
-        }
-    }
-
     fun dismissTurnAlert() {
         filterState.update { it.copy(activeTurnAlert = null) }
     }
@@ -1424,7 +1432,7 @@ class DoriViewModel(
     fun advanceAllQueuesNow() {
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
-            val alerts = repository.advanceActiveUserTicketDemoStep()
+            val alerts = repository.advanceActiveVenuesOneStep()
             handleTurnAlerts(alerts)
             pushControlSnapshotToUserApp(includeBookings = true)
             _toastMessage.emit("تم تقديم جميع الأدوار النشطة خطوة للأمام")
@@ -1479,9 +1487,7 @@ class DoriViewModel(
     fun factoryResetAllData() {
         viewModelScope.launch {
             if (!requireAdminPermission(AdminPermissionType.RUN_COMMANDS)) return@launch
-            simulationJob?.cancel()
-            simulationJob = null
-            filterState.update { it.copy(isLiveSimulationRunning = false, activeTurnAlert = null) }
+            filterState.update { it.copy(activeTurnAlert = null) }
             repository.factoryResetAllData()
             pushControlSnapshotToUserApp()
             _toastMessage.emit("تمت استعادة الإعدادات والبيانات الافتراضية بالكامل")

@@ -38,7 +38,6 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material.icons.filled.Refresh
@@ -113,7 +112,6 @@ fun MerchantDashboardScreen(
     onTogglePauseQueue: (Int) -> Unit,
     onToggleAcceptingBookings: (Int) -> Unit,
     onAddWalkIn: (Int, String, String) -> Unit,
-    onToggleLiveSimulation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val cityAndAllVenues = remember(state.allVenues, state.preferences.selectedDistrict) {
@@ -556,7 +554,7 @@ fun MerchantDashboardScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "لا توجد تذاكر محجوزة حالياً لهذا المركز — اضغط (مزامنة) لسحب الحجوزات الجديدة من نسخة المستخدم.",
+                            text = "لا توجد تذاكر محجوزة حالياً لهذا المركز — التذاكر الجديدة تصل تلقائياً عبر السحابة فور حجزها.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(14.dp)
@@ -577,52 +575,6 @@ fun MerchantDashboardScreen(
                             rejectingBooking = booking
                         }
                     )
-                }
-            }
-
-            // Live Simulation Toggle Row
-            item {
-                Surface(
-                    shape = RoundedCornerShape(13.dp),
-                    color = if (state.isLiveSimulationRunning) AmberGold.copy(alpha = 0.16f)
-                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = BorderStroke(
-                        1.dp,
-                        if (state.isLiveSimulationRunning) AmberGold.copy(alpha = 0.45f)
-                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 11.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.NotificationsActive,
-                                contentDescription = null,
-                                tint = if (state.isLiveSimulationRunning) AmberAccent else EmeraldPrimary,
-                                modifier = Modifier.size(19.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "محاكاة التنبيهات الحية",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Switch(
-                            checked = state.isLiveSimulationRunning,
-                            onCheckedChange = { onToggleLiveSimulation() },
-                            modifier = Modifier.testTag("live_simulation_toggle")
-                        )
-                    }
                 }
             }
 

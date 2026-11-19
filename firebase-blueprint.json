@@ -1,52 +1,65 @@
 {
   "entities": {
-    "CloudConfig": {
-      "title": "CloudConfig",
-      "description": "Shared user profile, loyalty points, revisions, and control panel feature flags synchronized between Dori User and Control apps.",
+    "PlatformConfig": {
+      "title": "PlatformConfig",
+      "description": "Global platform feature toggles, disabled categories, and live announcements managed by Control App admins and read by all users.",
       "type": "object",
       "properties": {
-        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
-        "selectedDistrict": { "type": "string", "description": "Selected Nineveh district display name." },
-        "isDarkMode": { "type": "boolean", "description": "Dark mode preference." },
-        "userName": { "type": "string", "description": "Saved customer full name." },
-        "userPhone": { "type": "string", "description": "Saved customer phone." },
-        "userAge": { "type": "string", "description": "Saved optional age." },
-        "optionalNote": { "type": "string", "description": "Saved optional note." },
-        "loyaltyPoints": { "type": "integer", "description": "Accumulated loyalty points." },
-        "muteSound": { "type": "boolean", "description": "Mute alert sound preference." },
-        "muteVibration": { "type": "boolean", "description": "Mute vibration preference." },
-        "allowNewBookings": { "type": "boolean", "description": "Control switch allowing new bookings." },
-        "enableFastestTurn": { "type": "boolean", "description": "Control switch showing Fastest Turn button." },
-        "enableQrCode": { "type": "boolean", "description": "Control switch enabling scannable QR codes." },
-        "enableWhatsAppShare": { "type": "boolean", "description": "Control switch enabling WhatsApp sharing." },
-        "enableReviews": { "type": "boolean", "description": "Control switch enabling ratings and reviews." },
-        "enableLoyalty": { "type": "boolean", "description": "Control switch enabling loyalty points." },
-        "enableOptionalFields": { "type": "boolean", "description": "Control switch enabling optional booking fields." },
-        "enableLiveAlerts": { "type": "boolean", "description": "Control switch enabling live alerts and notifications." },
-        "pointsPerBooking": { "type": "integer", "description": "Loyalty points awarded per completed booking." },
-        "disabledCategories": { "type": "array", "description": "List of category display names hidden by control app." },
-        "broadcastMessage": { "type": "string", "description": "Global announcement banner shown in User app." },
-        "controlRevision": { "type": "integer", "description": "Monotonic revision counter for control settings." },
-        "queueResetRevision": { "type": "integer", "description": "Monotonic revision counter for queue resets." },
-        "loyaltyRevision": { "type": "integer", "description": "Monotonic revision counter for loyalty adjustments." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation (FieldValue.serverTimestamp())." },
-        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update (FieldValue.serverTimestamp())." }
+        "allowNewBookings": { "type": "boolean" },
+        "enableFastestTurn": { "type": "boolean" },
+        "enableQrCode": { "type": "boolean" },
+        "enableWhatsAppShare": { "type": "boolean" },
+        "enableReviews": { "type": "boolean" },
+        "enableLoyalty": { "type": "boolean" },
+        "enableOptionalFields": { "type": "boolean" },
+        "enableLiveAlerts": { "type": "boolean" },
+        "pointsPerBooking": { "type": "integer" },
+        "disabledCategories": { "type": "array" },
+        "broadcastMessage": { "type": "string" },
+        "controlRevision": { "type": "integer" },
+        "queueResetRevision": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": [
-        "userId", "selectedDistrict", "isDarkMode", "userName", "userPhone", "userAge", "optionalNote",
-        "loyaltyPoints", "muteSound", "muteVibration", "allowNewBookings", "enableFastestTurn",
-        "enableQrCode", "enableWhatsAppShare", "enableReviews", "enableLoyalty", "enableOptionalFields",
-        "enableLiveAlerts", "pointsPerBooking", "disabledCategories", "broadcastMessage",
-        "controlRevision", "queueResetRevision", "loyaltyRevision", "createdAt", "updatedAt"
+        "allowNewBookings", "enableFastestTurn", "enableQrCode", "enableWhatsAppShare",
+        "enableReviews", "enableLoyalty", "enableOptionalFields", "enableLiveAlerts",
+        "pointsPerBooking", "disabledCategories", "broadcastMessage",
+        "controlRevision", "queueResetRevision", "createdAt", "updatedAt"
       ]
     },
-    "CloudVenue": {
-      "title": "CloudVenue",
-      "description": "Service center/venue state synced across User and Control apps.",
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private per-user profile, notification preferences, personal favorites, and earned loyalty points.",
       "type": "object",
       "properties": {
-        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
-        "venueId": { "type": "integer", "description": "Numeric venue identifier." },
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "selectedDistrict": { "type": "string" },
+        "isDarkMode": { "type": "boolean" },
+        "userName": { "type": "string" },
+        "userPhone": { "type": "string" },
+        "userAge": { "type": "string" },
+        "optionalNote": { "type": "string" },
+        "loyaltyPoints": { "type": "integer" },
+        "muteSound": { "type": "boolean" },
+        "muteVibration": { "type": "boolean" },
+        "favoriteVenueIds": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "email", "selectedDistrict", "isDarkMode", "userName", "userPhone",
+        "userAge", "optionalNote", "loyaltyPoints", "muteSound", "muteVibration",
+        "favoriteVenueIds", "createdAt", "updatedAt"
+      ]
+    },
+    "Venue": {
+      "title": "Venue",
+      "description": "Shared public Nineveh service center directory entry and live queue counters.",
+      "type": "object",
+      "properties": {
+        "venueId": { "type": "integer" },
         "name": { "type": "string" },
         "city": { "type": "string" },
         "category": { "type": "string" },
@@ -69,22 +82,21 @@
         "nextTicketNumber": { "type": "integer" },
         "servedTodayCount": { "type": "integer" },
         "avgMinutesPerPerson": { "type": "integer" },
-        "favorite": { "type": "boolean" },
         "waitingCount": { "type": "integer" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." },
-        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": [
-        "userId", "venueId", "name", "city", "category", "specialty", "area", "priceDinar",
+        "venueId", "name", "city", "category", "specialty", "area", "priceDinar",
         "rating", "reviewCount", "workingHours", "phone", "whatsapp", "latitude", "longitude",
         "description", "customOptionsCsv", "open", "paused", "acceptingBookings",
         "currentServingNumber", "nextTicketNumber", "servedTodayCount", "avgMinutesPerPerson",
-        "favorite", "waitingCount", "createdAt", "updatedAt"
+        "waitingCount", "createdAt", "updatedAt"
       ]
     },
-    "CloudBooking": {
-      "title": "CloudBooking",
-      "description": "Same-day ticket booking synced across User and Control apps.",
+    "Booking": {
+      "title": "Booking",
+      "description": "Customer queue ticket booking owned by userId and managed in real time by Control App admins.",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -113,8 +125,8 @@
         "completedAtMillis": { "type": "integer" },
         "userRating": { "type": "integer" },
         "userReview": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." },
-        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": [
         "userId", "bookingId", "ticketCode", "queueNumber", "venueId", "venueName",
@@ -124,9 +136,9 @@
         "peopleAhead", "estimatedMinutes", "createdAtMillis", "createdAt", "updatedAt"
       ]
     },
-    "CloudQueueItem": {
-      "title": "CloudQueueItem",
-      "description": "Venue queue ticket entry managed by Control app and reflected in User app.",
+    "QueueItem": {
+      "title": "QueueItem",
+      "description": "Live venue queue entry linked to a customer booking or walk-in customer.",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -141,8 +153,8 @@
         "bookingId": { "type": "integer" },
         "bookingTicketCode": { "type": "string" },
         "createdAtMillis": { "type": "integer" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." },
-        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": [
         "userId", "queueItemId", "venueId", "ticketNumber", "ticketCode",
@@ -150,9 +162,9 @@
         "createdAtMillis", "createdAt", "updatedAt"
       ]
     },
-    "CloudReview": {
-      "title": "CloudReview",
-      "description": "Customer rating and comment for a venue.",
+    "Review": {
+      "title": "Review",
+      "description": "Public verified customer rating and comment for a Nineveh venue.",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -162,17 +174,17 @@
         "rating": { "type": "integer" },
         "comment": { "type": "string" },
         "createdAtMillis": { "type": "integer" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." },
-        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()." }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": [
         "userId", "reviewId", "venueId", "authorName", "rating", "comment",
         "createdAtMillis", "createdAt", "updatedAt"
       ]
     },
-    "CloudSupportTicket": {
-      "title": "CloudSupportTicket",
-      "description": "Support conversation or complaint ticket synced between User and Control apps.",
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Customer support conversation or complaint ticket visible only to its owner (userId) and Control App admins.",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -198,9 +210,9 @@
         "createdAtMillis", "updatedAtMillis", "createdAt", "updatedAt"
       ]
     },
-    "CloudSupportMessage": {
-      "title": "CloudSupportMessage",
-      "description": "Individual message inside a support thread.",
+    "SupportMessage": {
+      "title": "SupportMessage",
+      "description": "Append-only chat message in a support thread carrying the customer owner's userId.",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -218,12 +230,25 @@
         "senderName", "body", "createdAtMillis", "createdAt", "updatedAt"
       ]
     },
-    "CloudAdmin": {
-      "title": "CloudAdmin",
-      "description": "Control app administrator account and permission flags.",
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized Firebase Auth UID granted access to the Dori Control App.",
       "type": "object",
       "properties": {
-        "userId": { "type": "string" },
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["SUPER_ADMIN", "ADMIN"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "role", "createdAt", "updatedAt"]
+    },
+    "AdminProfile": {
+      "title": "AdminProfile",
+      "description": "Control app operator profile and granular UI permissions.",
+      "type": "object",
+      "properties": {
         "adminId": { "type": "integer" },
         "name": { "type": "string" },
         "roleTitle": { "type": "string" },
@@ -242,18 +267,17 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": [
-        "userId", "adminId", "name", "roleTitle", "phone", "active", "superAdmin",
+        "adminId", "name", "roleTitle", "phone", "active", "superAdmin",
         "canManageFeatures", "canManageVenues", "canManageQueues", "canReplySupport",
         "canManageProviders", "canManageAdmins", "canRunCommands",
         "createdAtMillis", "createdAt", "updatedAt"
       ]
     },
-    "CloudProvider": {
-      "title": "CloudProvider",
-      "description": "Control app service provider account linked to a venue.",
+    "ServiceProvider": {
+      "title": "ServiceProvider",
+      "description": "Control app service provider account linked to a Nineveh venue.",
       "type": "object",
       "properties": {
-        "userId": { "type": "string" },
         "providerId": { "type": "integer" },
         "name": { "type": "string" },
         "providerRole": { "type": "string" },
@@ -271,48 +295,56 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": [
-        "userId", "providerId", "name", "providerRole", "customTitle", "phone",
+        "providerId", "name", "providerRole", "customTitle", "phone",
         "venueId", "venueName", "canAcceptTickets", "canCallNext", "canPauseVenue",
         "active", "acceptedCount", "createdAtMillis", "createdAt", "updatedAt"
       ]
     }
   },
   "firestore": {
-    "/users/{userId}/config/{configId}": {
-      "schema": { "$ref": "#/entities/CloudConfig" },
-      "description": "Stores shared user preferences and Control App feature toggles under config/settings."
+    "/platform/{configId}": {
+      "schema": { "$ref": "#/entities/PlatformConfig" },
+      "description": "Global platform configuration under /platform/settings."
     },
-    "/users/{userId}/venues/{venueDocId}": {
-      "schema": { "$ref": "#/entities/CloudVenue" },
-      "description": "Stores venues and live queue counters."
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private per-user profile, preferences, favorites, and loyalty points."
     },
-    "/users/{userId}/bookings/{bookingDocId}": {
-      "schema": { "$ref": "#/entities/CloudBooking" },
-      "description": "Stores active and completed ticket bookings."
+    "/venues/{venueDocId}": {
+      "schema": { "$ref": "#/entities/Venue" },
+      "description": "Shared public Nineveh service centers and real-time queue counters."
     },
-    "/users/{userId}/queue_items/{queueDocId}": {
-      "schema": { "$ref": "#/entities/CloudQueueItem" },
-      "description": "Stores ordered venue queue entries."
+    "/bookings/{bookingDocId}": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "Top-level customer bookings scoped by userId (owner) and accessible to Control App admins."
     },
-    "/users/{userId}/reviews/{reviewDocId}": {
-      "schema": { "$ref": "#/entities/CloudReview" },
-      "description": "Stores verified venue reviews."
+    "/queue_items/{queueDocId}": {
+      "schema": { "$ref": "#/entities/QueueItem" },
+      "description": "Top-level live queue items scoped by userId (owner) and managed by Control App admins."
     },
-    "/users/{userId}/support_tickets/{ticketDocId}": {
-      "schema": { "$ref": "#/entities/CloudSupportTicket" },
-      "description": "Stores support threads and complaint tickets."
+    "/reviews/{reviewDocId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Public customer reviews for Nineveh venues."
     },
-    "/users/{userId}/support_messages/{messageDocId}": {
-      "schema": { "$ref": "#/entities/CloudSupportMessage" },
-      "description": "Stores ordered chat messages for support tickets."
+    "/support_tickets/{ticketDocId}": {
+      "schema": { "$ref": "#/entities/SupportTicket" },
+      "description": "Two-way customer support threads scoped by customer userId and accessible to Control App admins."
     },
-    "/users/{userId}/admins/{adminDocId}": {
-      "schema": { "$ref": "#/entities/CloudAdmin" },
-      "description": "Stores Control App administrator accounts."
+    "/support_messages/{messageDocId}": {
+      "schema": { "$ref": "#/entities/SupportMessage" },
+      "description": "Append-only chat messages scoped by customer userId and accessible to Control App admins."
     },
-    "/users/{userId}/providers/{providerDocId}": {
-      "schema": { "$ref": "#/entities/CloudProvider" },
-      "description": "Stores Control App linked service providers."
+    "/admin_users/{adminUid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "RBAC registry of authorized Control App admin Google accounts."
+    },
+    "/admins/{adminDocId}": {
+      "schema": { "$ref": "#/entities/AdminProfile" },
+      "description": "Control App staff operator profiles."
+    },
+    "/providers/{providerDocId}": {
+      "schema": { "$ref": "#/entities/ServiceProvider" },
+      "description": "Control App linked doctors, merchants, and venue providers."
     }
   }
 }

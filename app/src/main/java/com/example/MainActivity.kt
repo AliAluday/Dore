@@ -166,10 +166,14 @@ class MainActivity : ComponentActivity() {
                             key = "user_${signedInUser.uid}",
                             factory = factory
                         )
+                        LaunchedEffect(signedInUser.uid) {
+                            viewModel.ensureCloudSyncStarted()
+                        }
                         DoriAppRoot(
                             viewModel = viewModel,
                             onSignOut = {
                                 scope.launch {
+                                    viewModel.prepareSignOut()
                                     GoogleAuthManager.signOut(this@MainActivity)
                                     authError = null
                                     currentUser = null
@@ -272,7 +276,6 @@ fun DoriAppRoot(
                         selectedDistrict = state.preferences.selectedDistrict,
                         isDarkMode = state.preferences.isDarkMode,
                         activeBookingCount = state.activeBookings.size,
-                        isSimulationRunning = state.isLiveSimulationRunning,
                         searchQuery = state.searchQuery,
                         isSearchExpanded = isSearchExpanded,
                         onToggleSearch = {
@@ -349,7 +352,7 @@ fun DoriAppRoot(
                         else -> ProfileScreen(
                             state = state,
                             hasNotificationPermission = hasNotificationPermission,
-                            onResetDemoData = viewModel::factoryResetAllData,
+                            onSyncCloud = { viewModel.syncLocalBridge(silent = false) },
                             onRequestNotificationPermission = requestNotificationPermission,
                             onSelectDistrict = viewModel::selectDistrict,
                             onToggleDarkMode = viewModel::toggleDarkMode,

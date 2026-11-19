@@ -25,18 +25,21 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isValidConfig(data, userId) {
-      return data.userId == userId &&
-        data.selectedDistrict is string && data.selectedDistrict.size() <= 80 &&
-        data.isDarkMode is bool &&
-        data.userName is string && data.userName.size() <= 100 &&
-        data.userPhone is string && data.userPhone.size() <= 30 &&
-        data.userAge is string && data.userAge.size() <= 20 &&
-        data.optionalNote is string && data.optionalNote.size() <= 300 &&
-        data.loyaltyPoints is int && data.loyaltyPoints >= 0 && data.loyaltyPoints <= 100000 &&
-        data.muteSound is bool &&
-        data.muteVibration is bool &&
-        data.allowNewBookings is bool &&
+    function isBootstrappedAdmin() {
+      return isSignedIn() &&
+        'email_verified' in request.auth.token &&
+        request.auth.token.email_verified == true &&
+        'email' in request.auth.token &&
+        request.auth.token.email == 'alialhadidia2008@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() ||
+        (isSignedIn() && exists(/databases/$(database)/documents/admin_users/$(request.auth.uid)));
+    }
+
+    function isValidPlatformConfig(data) {
+      return data.allowNewBookings is bool &&
         data.enableFastestTurn is bool &&
         data.enableQrCode is bool &&
         data.enableWhatsAppShare is bool &&
@@ -49,13 +52,27 @@ service cloud.firestore {
         (data.disabledCategories.size() == 0 || data.disabledCategories[0] is string) &&
         data.broadcastMessage is string && data.broadcastMessage.size() <= 300 &&
         data.controlRevision is int && data.controlRevision >= 0 &&
-        data.queueResetRevision is int && data.queueResetRevision >= 0 &&
-        data.loyaltyRevision is int && data.loyaltyRevision >= 0;
+        data.queueResetRevision is int && data.queueResetRevision >= 0;
     }
 
-    function isValidVenue(data, userId) {
+    function isValidUserProfile(data, userId) {
       return data.userId == userId &&
-        data.venueId is int && data.venueId > 0 &&
+        data.email is string && data.email.size() <= 160 &&
+        data.selectedDistrict is string && data.selectedDistrict.size() <= 80 &&
+        data.isDarkMode is bool &&
+        data.userName is string && data.userName.size() <= 100 &&
+        data.userPhone is string && data.userPhone.size() <= 30 &&
+        data.userAge is string && data.userAge.size() <= 20 &&
+        data.optionalNote is string && data.optionalNote.size() <= 300 &&
+        data.loyaltyPoints is int && data.loyaltyPoints >= 0 && data.loyaltyPoints <= 100000 &&
+        data.muteSound is bool &&
+        data.muteVibration is bool &&
+        data.favoriteVenueIds is list && data.favoriteVenueIds.size() <= 200 &&
+        (data.favoriteVenueIds.size() == 0 || data.favoriteVenueIds[0] is int);
+    }
+
+    function isValidVenue(data) {
+      return data.venueId is int && data.venueId > 0 &&
         data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
         data.city is string && data.city.size() >= 1 && data.city.size() <= 80 &&
         data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
@@ -78,12 +95,11 @@ service cloud.firestore {
         data.nextTicketNumber is int && data.nextTicketNumber >= 1 && data.nextTicketNumber <= 10001 &&
         data.servedTodayCount is int && data.servedTodayCount >= 0 && data.servedTodayCount <= 10000 &&
         data.avgMinutesPerPerson is int && data.avgMinutesPerPerson >= 1 && data.avgMinutesPerPerson <= 180 &&
-        data.favorite is bool &&
         data.waitingCount is int && data.waitingCount >= 0 && data.waitingCount <= 10000;
     }
 
-    function isValidBooking(data, userId) {
-      return data.userId == userId &&
+    function isValidBooking(data) {
+      return data.userId is string && isValidId(data.userId) &&
         data.bookingId is int && data.bookingId > 0 &&
         data.ticketCode is string && data.ticketCode.size() >= 1 && data.ticketCode.size() <= 40 &&
         data.queueNumber is int && data.queueNumber >= 1 && data.queueNumber <= 10000 &&
@@ -111,8 +127,8 @@ service cloud.firestore {
         (!('userReview' in data) || data.userReview == null || (data.userReview is string && data.userReview.size() <= 400));
     }
 
-    function isValidQueueItem(data, userId) {
-      return data.userId == userId &&
+    function isValidQueueItem(data) {
+      return data.userId is string && isValidId(data.userId) &&
         data.queueItemId is int && data.queueItemId > 0 &&
         data.venueId is int && data.venueId > 0 &&
         data.ticketNumber is int && data.ticketNumber >= 1 && data.ticketNumber <= 10000 &&
@@ -126,8 +142,8 @@ service cloud.firestore {
         data.createdAtMillis is int && data.createdAtMillis >= 0;
     }
 
-    function isValidReview(data, userId) {
-      return data.userId == userId &&
+    function isValidReview(data) {
+      return data.userId is string && isValidId(data.userId) &&
         data.reviewId is int && data.reviewId > 0 &&
         data.venueId is int && data.venueId > 0 &&
         data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 120 &&
@@ -136,8 +152,8 @@ service cloud.firestore {
         data.createdAtMillis is int && data.createdAtMillis >= 0;
     }
 
-    function isValidSupportTicket(data, userId) {
-      return data.userId == userId &&
+    function isValidSupportTicket(data) {
+      return data.userId is string && isValidId(data.userId) &&
         data.externalId is string && data.externalId.size() >= 1 && data.externalId.size() <= 64 &&
         data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 120 &&
         data.senderPhone is string && data.senderPhone.size() <= 30 &&
@@ -153,8 +169,8 @@ service cloud.firestore {
         data.updatedAtMillis is int && data.updatedAtMillis >= 0;
     }
 
-    function isValidSupportMessage(data, userId) {
-      return data.userId == userId &&
+    function isValidSupportMessage(data) {
+      return data.userId is string && isValidId(data.userId) &&
         data.externalMessageId is string && data.externalMessageId.size() >= 1 && data.externalMessageId.size() <= 80 &&
         data.ticketExternalId is string && data.ticketExternalId.size() >= 1 && data.ticketExternalId.size() <= 64 &&
         data.fromAdmin is bool &&
@@ -163,9 +179,15 @@ service cloud.firestore {
         data.createdAtMillis is int && data.createdAtMillis >= 0;
     }
 
-    function isValidAdmin(data, userId) {
-      return data.userId == userId &&
-        data.adminId is int && data.adminId > 0 &&
+    function isValidAdminUser(data, adminUid) {
+      return data.uid == adminUid &&
+        data.email is string && data.email.size() <= 160 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+        data.role in ['SUPER_ADMIN', 'ADMIN'];
+    }
+
+    function isValidAdminProfile(data) {
+      return data.adminId is int && data.adminId > 0 &&
         data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
         data.roleTitle is string && data.roleTitle.size() >= 1 && data.roleTitle.size() <= 120 &&
         data.phone is string && data.phone.size() <= 30 &&
@@ -181,9 +203,8 @@ service cloud.firestore {
         data.createdAtMillis is int && data.createdAtMillis >= 0;
     }
 
-    function isValidProvider(data, userId) {
-      return data.userId == userId &&
-        data.providerId is int && data.providerId > 0 &&
+    function isValidProvider(data) {
+      return data.providerId is int && data.providerId > 0 &&
         data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
         data.providerRole is string && data.providerRole.size() >= 1 && data.providerRole.size() <= 40 &&
         data.customTitle is string && data.customTitle.size() >= 1 && data.customTitle.size() <= 80 &&
@@ -198,321 +219,458 @@ service cloud.firestore {
         data.createdAtMillis is int && data.createdAtMillis >= 0;
     }
 
+    // ==================== Global Platform Config ====================
+    match /platform/{configId} {
+      allow get: if isSignedIn() && configId == 'settings';
+      allow list, delete: if false;
+
+      allow create: if isAdmin() &&
+        configId == 'settings' &&
+        incoming().keys().hasAll([
+          'allowNewBookings', 'enableFastestTurn', 'enableQrCode', 'enableWhatsAppShare',
+          'enableReviews', 'enableLoyalty', 'enableOptionalFields', 'enableLiveAlerts',
+          'pointsPerBooking', 'disabledCategories', 'broadcastMessage',
+          'controlRevision', 'queueResetRevision', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'allowNewBookings', 'enableFastestTurn', 'enableQrCode', 'enableWhatsAppShare',
+          'enableReviews', 'enableLoyalty', 'enableOptionalFields', 'enableLiveAlerts',
+          'pointsPerBooking', 'disabledCategories', 'broadcastMessage',
+          'controlRevision', 'queueResetRevision', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidPlatformConfig(incoming());
+
+      allow update: if isAdmin() &&
+        configId == 'settings' &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidPlatformConfig(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'allowNewBookings', 'enableFastestTurn', 'enableQrCode', 'enableWhatsAppShare',
+          'enableReviews', 'enableLoyalty', 'enableOptionalFields', 'enableLiveAlerts',
+          'pointsPerBooking', 'disabledCategories', 'broadcastMessage',
+          'controlRevision', 'queueResetRevision', 'updatedAt'
+        ]);
+    }
+
+    // ==================== Private Per-User Profile ====================
     match /users/{userId} {
-      allow read, write: if false;
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow delete: if false;
 
-      match /config/{configId} {
-        allow list: if isOwner(userId);
-        allow get, delete: if isOwner(userId) && isValidId(configId);
-        allow create: if isOwner(userId) &&
-          isValidId(configId) &&
-          configId == 'settings' &&
-          incoming().keys().hasAll([
-            'userId', 'selectedDistrict', 'isDarkMode', 'userName', 'userPhone', 'userAge',
-            'optionalNote', 'loyaltyPoints', 'muteSound', 'muteVibration', 'allowNewBookings',
-            'enableFastestTurn', 'enableQrCode', 'enableWhatsAppShare', 'enableReviews',
-            'enableLoyalty', 'enableOptionalFields', 'enableLiveAlerts', 'pointsPerBooking',
-            'disabledCategories', 'broadcastMessage',
-            'controlRevision', 'queueResetRevision', 'loyaltyRevision', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().keys().hasOnly([
-            'userId', 'selectedDistrict', 'isDarkMode', 'userName', 'userPhone', 'userAge',
-            'optionalNote', 'loyaltyPoints', 'muteSound', 'muteVibration', 'allowNewBookings',
-            'enableFastestTurn', 'enableQrCode', 'enableWhatsAppShare', 'enableReviews',
-            'enableLoyalty', 'enableOptionalFields', 'enableLiveAlerts', 'pointsPerBooking',
-            'disabledCategories', 'broadcastMessage',
-            'controlRevision', 'queueResetRevision', 'loyaltyRevision', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidConfig(incoming(), userId);
+      allow create: if isOwner(userId) &&
+        isValidId(userId) &&
+        incoming().keys().hasAll([
+          'userId', 'email', 'selectedDistrict', 'isDarkMode', 'userName', 'userPhone',
+          'userAge', 'optionalNote', 'loyaltyPoints', 'muteSound', 'muteVibration',
+          'favoriteVenueIds', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'email', 'selectedDistrict', 'isDarkMode', 'userName', 'userPhone',
+          'userAge', 'optionalNote', 'loyaltyPoints', 'muteSound', 'muteVibration',
+          'favoriteVenueIds', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().loyaltyPoints == 0 &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidUserProfile(incoming(), userId);
 
-        allow update: if isOwner(userId) &&
-          isValidId(configId) &&
-          incoming().userId == existing().userId &&
-          incoming().createdAt == existing().createdAt &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidConfig(incoming(), userId) &&
-          incoming().diff(existing()).affectedKeys().hasOnly([
-            'selectedDistrict', 'isDarkMode', 'userName', 'userPhone', 'userAge', 'optionalNote',
-            'loyaltyPoints', 'muteSound', 'muteVibration', 'allowNewBookings', 'enableFastestTurn',
-            'enableQrCode', 'enableWhatsAppShare', 'enableReviews', 'enableLoyalty',
-            'enableOptionalFields', 'enableLiveAlerts', 'pointsPerBooking',
-            'disabledCategories', 'broadcastMessage',
-            'controlRevision', 'queueResetRevision', 'loyaltyRevision', 'updatedAt'
-          ]);
-      }
+      allow update: if isValidId(userId) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidUserProfile(incoming(), userId) && (
+          (isOwner(userId) &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'email', 'selectedDistrict', 'isDarkMode', 'userName', 'userPhone', 'userAge',
+              'optionalNote', 'muteSound', 'muteVibration', 'favoriteVenueIds', 'loyaltyPoints', 'updatedAt'
+            ]) &&
+            incoming().loyaltyPoints >= existing().loyaltyPoints &&
+            incoming().loyaltyPoints <= existing().loyaltyPoints + 100) ||
+          (isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['loyaltyPoints', 'updatedAt']))
+        );
+    }
 
-      match /venues/{venueDocId} {
-        allow list: if isOwner(userId);
-        allow get, delete: if isOwner(userId) && isValidId(venueDocId);
-        allow create: if isOwner(userId) &&
-          isValidId(venueDocId) &&
-          incoming().keys().hasAll([
-            'userId', 'venueId', 'name', 'city', 'category', 'specialty', 'area', 'priceDinar',
-            'rating', 'reviewCount', 'workingHours', 'phone', 'whatsapp', 'latitude', 'longitude',
-            'description', 'customOptionsCsv', 'open', 'paused', 'acceptingBookings',
-            'currentServingNumber', 'nextTicketNumber', 'servedTodayCount', 'avgMinutesPerPerson',
-            'favorite', 'waitingCount', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().keys().hasOnly([
-            'userId', 'venueId', 'name', 'city', 'category', 'specialty', 'area', 'priceDinar',
-            'rating', 'reviewCount', 'workingHours', 'phone', 'whatsapp', 'latitude', 'longitude',
-            'description', 'customOptionsCsv', 'open', 'paused', 'acceptingBookings',
-            'currentServingNumber', 'nextTicketNumber', 'servedTodayCount', 'avgMinutesPerPerson',
-            'favorite', 'waitingCount', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidVenue(incoming(), userId);
+    // ==================== Shared Public Venues Directory ====================
+    match /venues/{venueDocId} {
+      allow get: if isSignedIn() && isValidId(venueDocId);
+      allow list: if isSignedIn();
+      allow delete: if isAdmin() && isValidId(venueDocId);
 
-        allow update: if isOwner(userId) &&
-          isValidId(venueDocId) &&
-          incoming().userId == existing().userId &&
-          incoming().venueId == existing().venueId &&
-          incoming().createdAt == existing().createdAt &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidVenue(incoming(), userId) &&
-          incoming().diff(existing()).affectedKeys().hasOnly([
-            'name', 'city', 'category', 'specialty', 'area', 'priceDinar', 'rating',
-            'reviewCount', 'workingHours', 'phone', 'whatsapp', 'latitude', 'longitude',
-            'description', 'customOptionsCsv', 'open', 'paused', 'acceptingBookings',
-            'currentServingNumber', 'nextTicketNumber', 'servedTodayCount', 'avgMinutesPerPerson',
-            'favorite', 'waitingCount', 'updatedAt'
-          ]);
-      }
+      allow create: if isAdmin() &&
+        isValidId(venueDocId) &&
+        incoming().keys().hasAll([
+          'venueId', 'name', 'city', 'category', 'specialty', 'area', 'priceDinar',
+          'rating', 'reviewCount', 'workingHours', 'phone', 'whatsapp', 'latitude', 'longitude',
+          'description', 'customOptionsCsv', 'open', 'paused', 'acceptingBookings',
+          'currentServingNumber', 'nextTicketNumber', 'servedTodayCount', 'avgMinutesPerPerson',
+          'waitingCount', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'venueId', 'name', 'city', 'category', 'specialty', 'area', 'priceDinar',
+          'rating', 'reviewCount', 'workingHours', 'phone', 'whatsapp', 'latitude', 'longitude',
+          'description', 'customOptionsCsv', 'open', 'paused', 'acceptingBookings',
+          'currentServingNumber', 'nextTicketNumber', 'servedTodayCount', 'avgMinutesPerPerson',
+          'waitingCount', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidVenue(incoming());
 
-      match /bookings/{bookingDocId} {
-        allow list: if isOwner(userId);
-        allow get, delete: if isOwner(userId) && isValidId(bookingDocId);
-        allow create: if isOwner(userId) &&
-          isValidId(bookingDocId) &&
-          incoming().keys().hasAll([
-            'userId', 'bookingId', 'ticketCode', 'queueNumber', 'venueId', 'venueName',
-            'venueCity', 'venueCategory', 'venuePhone', 'customerName', 'customerPhone',
-            'selectedOption', 'notes', 'optionalInfo', 'priceDinar', 'status', 'stage',
-            'approvalStatus', 'handledByProvider', 'approvalNote',
-            'peopleAhead', 'estimatedMinutes', 'createdAtMillis', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().keys().hasOnly([
-            'userId', 'bookingId', 'ticketCode', 'queueNumber', 'venueId', 'venueName',
-            'venueCity', 'venueCategory', 'venuePhone', 'customerName', 'customerPhone',
-            'selectedOption', 'notes', 'optionalInfo', 'priceDinar', 'status', 'stage',
-            'approvalStatus', 'handledByProvider', 'approvalNote',
-            'peopleAhead', 'estimatedMinutes', 'createdAtMillis', 'completedAtMillis',
-            'userRating', 'userReview', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidBooking(incoming(), userId);
+      allow update: if isSignedIn() &&
+        isValidId(venueDocId) &&
+        incoming().venueId == existing().venueId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidVenue(incoming()) && (
+          (isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'city', 'category', 'specialty', 'area', 'priceDinar', 'rating',
+              'reviewCount', 'workingHours', 'phone', 'whatsapp', 'latitude', 'longitude',
+              'description', 'customOptionsCsv', 'open', 'paused', 'acceptingBookings',
+              'currentServingNumber', 'nextTicketNumber', 'servedTodayCount', 'avgMinutesPerPerson',
+              'waitingCount', 'updatedAt'
+            ])) ||
+          (incoming().diff(existing()).affectedKeys().hasOnly([
+              'currentServingNumber', 'nextTicketNumber', 'waitingCount',
+              'servedTodayCount', 'rating', 'reviewCount', 'updatedAt'
+            ]) &&
+            incoming().nextTicketNumber >= existing().nextTicketNumber &&
+            incoming().nextTicketNumber <= existing().nextTicketNumber + 1 &&
+            incoming().servedTodayCount >= existing().servedTodayCount &&
+            incoming().servedTodayCount <= existing().servedTodayCount + 1 &&
+            incoming().reviewCount >= existing().reviewCount &&
+            incoming().reviewCount <= existing().reviewCount + 1)
+        );
+    }
 
-        allow update: if isOwner(userId) &&
-          isValidId(bookingDocId) &&
-          incoming().userId == existing().userId &&
-          incoming().bookingId == existing().bookingId &&
-          incoming().ticketCode == existing().ticketCode &&
-          incoming().createdAt == existing().createdAt &&
-          incoming().createdAtMillis == existing().createdAtMillis &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidBooking(incoming(), userId) && (
-            (existing().status == 'ACTIVE' &&
-              incoming().diff(existing()).affectedKeys().hasOnly([
-                'status', 'stage', 'approvalStatus', 'handledByProvider', 'approvalNote',
-                'peopleAhead', 'estimatedMinutes', 'completedAtMillis',
-                'userRating', 'userReview', 'updatedAt'
-              ])) ||
-            (existing().status in ['COMPLETED', 'CANCELLED'] &&
-              incoming().status == existing().status &&
-              incoming().diff(existing()).affectedKeys().hasOnly([
-                'userRating', 'userReview', 'updatedAt'
-              ]))
-          );
-      }
+    // ==================== Cross-App Bookings (PII Isolated) ====================
+    match /bookings/{bookingDocId} {
+      allow get: if isSignedIn() && isValidId(bookingDocId) &&
+        (resource == null || existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin() && isValidId(bookingDocId);
 
-      match /queue_items/{queueDocId} {
-        allow list: if isOwner(userId);
-        allow get, delete: if isOwner(userId) && isValidId(queueDocId);
-        allow create: if isOwner(userId) &&
-          isValidId(queueDocId) &&
-          incoming().keys().hasAll([
-            'userId', 'queueItemId', 'venueId', 'ticketNumber', 'ticketCode',
-            'customerName', 'customerPhone', 'selectedOption', 'status',
-            'createdAtMillis', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().keys().hasOnly([
-            'userId', 'queueItemId', 'venueId', 'ticketNumber', 'ticketCode',
-            'customerName', 'customerPhone', 'selectedOption', 'status',
-            'bookingId', 'bookingTicketCode', 'createdAtMillis', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidQueueItem(incoming(), userId);
+      allow create: if isSignedIn() &&
+        isValidId(bookingDocId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().status == 'ACTIVE' &&
+        incoming().approvalStatus == 'PENDING' &&
+        incoming().handledByProvider == '' &&
+        incoming().approvalNote == '' &&
+        incoming().keys().hasAll([
+          'userId', 'bookingId', 'ticketCode', 'queueNumber', 'venueId', 'venueName',
+          'venueCity', 'venueCategory', 'venuePhone', 'customerName', 'customerPhone',
+          'selectedOption', 'notes', 'optionalInfo', 'priceDinar', 'status', 'stage',
+          'approvalStatus', 'handledByProvider', 'approvalNote',
+          'peopleAhead', 'estimatedMinutes', 'createdAtMillis', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'bookingId', 'ticketCode', 'queueNumber', 'venueId', 'venueName',
+          'venueCity', 'venueCategory', 'venuePhone', 'customerName', 'customerPhone',
+          'selectedOption', 'notes', 'optionalInfo', 'priceDinar', 'status', 'stage',
+          'approvalStatus', 'handledByProvider', 'approvalNote',
+          'peopleAhead', 'estimatedMinutes', 'createdAtMillis', 'completedAtMillis',
+          'userRating', 'userReview', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidBooking(incoming());
 
-        allow update: if isOwner(userId) &&
-          isValidId(queueDocId) &&
-          incoming().userId == existing().userId &&
-          incoming().queueItemId == existing().queueItemId &&
-          incoming().ticketCode == existing().ticketCode &&
-          incoming().createdAt == existing().createdAt &&
-          incoming().createdAtMillis == existing().createdAtMillis &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidQueueItem(incoming(), userId) &&
-          incoming().diff(existing()).affectedKeys().hasOnly([
-            'status', 'bookingId', 'bookingTicketCode', 'updatedAt'
-          ]);
-      }
+      allow update: if isSignedIn() &&
+        isValidId(bookingDocId) &&
+        incoming().userId == existing().userId &&
+        incoming().bookingId == existing().bookingId &&
+        incoming().ticketCode == existing().ticketCode &&
+        incoming().venueId == existing().venueId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().createdAtMillis == existing().createdAtMillis &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidBooking(incoming()) && (
+          (isAdmin() &&
+            existing().status == 'ACTIVE' &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'stage', 'approvalStatus', 'handledByProvider', 'approvalNote',
+              'peopleAhead', 'estimatedMinutes', 'completedAtMillis', 'updatedAt'
+            ])) ||
+          (existing().userId == request.auth.uid &&
+            existing().status == 'ACTIVE' &&
+            incoming().status in ['COMPLETED', 'CANCELLED'] &&
+            incoming().approvalStatus == existing().approvalStatus &&
+            incoming().handledByProvider == existing().handledByProvider &&
+            incoming().approvalNote == existing().approvalNote &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'stage', 'peopleAhead', 'estimatedMinutes', 'completedAtMillis',
+              'userRating', 'userReview', 'updatedAt'
+            ])) ||
+          (existing().userId == request.auth.uid &&
+            existing().status in ['COMPLETED', 'CANCELLED'] &&
+            incoming().status == existing().status &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'userRating', 'userReview', 'updatedAt'
+            ]))
+        );
+    }
 
-      match /reviews/{reviewDocId} {
-        allow list: if isOwner(userId);
-        allow get, delete: if isOwner(userId) && isValidId(reviewDocId);
-        allow create: if isOwner(userId) &&
-          isValidId(reviewDocId) &&
-          incoming().keys().hasAll([
-            'userId', 'reviewId', 'venueId', 'authorName', 'rating', 'comment',
-            'createdAtMillis', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().keys().hasOnly([
-            'userId', 'reviewId', 'venueId', 'authorName', 'rating', 'comment',
-            'createdAtMillis', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidReview(incoming(), userId);
+    // ==================== Live Venue Queue Items (PII Isolated) ====================
+    match /queue_items/{queueDocId} {
+      allow get: if isSignedIn() && isValidId(queueDocId) &&
+        (resource == null || existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin() && isValidId(queueDocId);
 
-        allow update: if isOwner(userId) &&
-          isValidId(reviewDocId) &&
-          incoming().userId == existing().userId &&
-          incoming().reviewId == existing().reviewId &&
-          incoming().createdAt == existing().createdAt &&
-          incoming().createdAtMillis == existing().createdAtMillis &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidReview(incoming(), userId) &&
-          incoming().diff(existing()).affectedKeys().hasOnly(['rating', 'comment', 'updatedAt']);
-      }
+      allow create: if isSignedIn() &&
+        isValidId(queueDocId) &&
+        (incoming().userId == request.auth.uid || isAdmin()) &&
+        incoming().keys().hasAll([
+          'userId', 'queueItemId', 'venueId', 'ticketNumber', 'ticketCode',
+          'customerName', 'customerPhone', 'selectedOption', 'status',
+          'createdAtMillis', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'queueItemId', 'venueId', 'ticketNumber', 'ticketCode',
+          'customerName', 'customerPhone', 'selectedOption', 'status',
+          'bookingId', 'bookingTicketCode', 'createdAtMillis', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidQueueItem(incoming());
 
-      match /support_tickets/{ticketDocId} {
-        allow list: if isOwner(userId);
-        allow get, delete: if isOwner(userId) && isValidId(ticketDocId);
-        allow create: if isOwner(userId) &&
-          isValidId(ticketDocId) &&
-          ticketDocId == incoming().externalId &&
-          incoming().keys().hasAll([
-            'userId', 'externalId', 'senderName', 'senderPhone', 'category', 'requestType',
-            'relatedVenueName', 'subject', 'message', 'status', 'adminReply', 'repliedByAdmin',
-            'createdAtMillis', 'updatedAtMillis', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().keys().hasOnly([
-            'userId', 'externalId', 'senderName', 'senderPhone', 'category', 'requestType',
-            'relatedVenueName', 'subject', 'message', 'status', 'adminReply', 'repliedByAdmin',
-            'createdAtMillis', 'updatedAtMillis', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidSupportTicket(incoming(), userId);
+      allow update: if isSignedIn() &&
+        isValidId(queueDocId) &&
+        incoming().userId == existing().userId &&
+        incoming().queueItemId == existing().queueItemId &&
+        incoming().ticketCode == existing().ticketCode &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().createdAtMillis == existing().createdAtMillis &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidQueueItem(incoming()) && (
+          (isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'bookingId', 'bookingTicketCode', 'updatedAt'
+            ])) ||
+          (existing().userId == request.auth.uid &&
+            incoming().status in ['DONE', 'SKIPPED'] &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'updatedAt'
+            ]))
+        );
+    }
 
-        allow update: if isOwner(userId) &&
-          isValidId(ticketDocId) &&
-          incoming().userId == existing().userId &&
-          incoming().externalId == existing().externalId &&
-          incoming().requestType == existing().requestType &&
-          incoming().createdAt == existing().createdAt &&
-          incoming().createdAtMillis == existing().createdAtMillis &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidSupportTicket(incoming(), userId) &&
-          incoming().diff(existing()).affectedKeys().hasOnly([
-            'senderName', 'status', 'adminReply', 'repliedByAdmin', 'updatedAtMillis', 'updatedAt'
-          ]);
-      }
+    // ==================== Public Venue Reviews ====================
+    match /reviews/{reviewDocId} {
+      allow get: if isSignedIn() && isValidId(reviewDocId);
+      allow list: if isSignedIn();
 
-      match /support_messages/{messageDocId} {
-        allow list: if isOwner(userId);
-        allow get, delete: if isOwner(userId) && isValidId(messageDocId);
-        allow create: if isOwner(userId) &&
-          isValidId(messageDocId) &&
-          messageDocId == incoming().externalMessageId &&
-          incoming().keys().hasAll([
-            'userId', 'externalMessageId', 'ticketExternalId', 'fromAdmin',
-            'senderName', 'body', 'createdAtMillis', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().keys().hasOnly([
-            'userId', 'externalMessageId', 'ticketExternalId', 'fromAdmin',
-            'senderName', 'body', 'createdAtMillis', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidSupportMessage(incoming(), userId);
+      allow create: if isSignedIn() &&
+        isValidId(reviewDocId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().keys().hasAll([
+          'userId', 'reviewId', 'venueId', 'authorName', 'rating', 'comment',
+          'createdAtMillis', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'reviewId', 'venueId', 'authorName', 'rating', 'comment',
+          'createdAtMillis', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidReview(incoming());
 
-        allow update: if false;
-      }
+      allow update: if isSignedIn() &&
+        isValidId(reviewDocId) &&
+        (existing().userId == request.auth.uid || isAdmin()) &&
+        incoming().userId == existing().userId &&
+        incoming().reviewId == existing().reviewId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().createdAtMillis == existing().createdAtMillis &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidReview(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['rating', 'comment', 'updatedAt']);
 
-      match /admins/{adminDocId} {
-        allow list: if isOwner(userId);
-        allow get, delete: if isOwner(userId) && isValidId(adminDocId);
-        allow create: if isOwner(userId) &&
-          isValidId(adminDocId) &&
-          incoming().keys().hasAll([
-            'userId', 'adminId', 'name', 'roleTitle', 'phone', 'active', 'superAdmin',
-            'canManageFeatures', 'canManageVenues', 'canManageQueues', 'canReplySupport',
-            'canManageProviders', 'canManageAdmins', 'canRunCommands',
-            'createdAtMillis', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().keys().hasOnly([
-            'userId', 'adminId', 'name', 'roleTitle', 'phone', 'active', 'superAdmin',
-            'canManageFeatures', 'canManageVenues', 'canManageQueues', 'canReplySupport',
-            'canManageProviders', 'canManageAdmins', 'canRunCommands',
-            'createdAtMillis', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidAdmin(incoming(), userId);
+      allow delete: if isSignedIn() && isValidId(reviewDocId) &&
+        (existing().userId == request.auth.uid || isAdmin());
+    }
 
-        allow update: if isOwner(userId) &&
-          isValidId(adminDocId) &&
-          incoming().userId == existing().userId &&
-          incoming().adminId == existing().adminId &&
-          incoming().createdAt == existing().createdAt &&
-          incoming().createdAtMillis == existing().createdAtMillis &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidAdmin(incoming(), userId) &&
-          incoming().diff(existing()).affectedKeys().hasOnly([
-            'name', 'roleTitle', 'phone', 'active', 'superAdmin',
-            'canManageFeatures', 'canManageVenues', 'canManageQueues', 'canReplySupport',
-            'canManageProviders', 'canManageAdmins', 'canRunCommands', 'updatedAt'
-          ]);
-      }
+    // ==================== Cross-App Support Tickets (PII Isolated) ====================
+    match /support_tickets/{ticketDocId} {
+      allow get: if isSignedIn() && isValidId(ticketDocId) &&
+        (resource == null || existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin() && isValidId(ticketDocId);
 
-      match /providers/{providerDocId} {
-        allow list: if isOwner(userId);
-        allow get, delete: if isOwner(userId) && isValidId(providerDocId);
-        allow create: if isOwner(userId) &&
-          isValidId(providerDocId) &&
-          incoming().keys().hasAll([
-            'userId', 'providerId', 'name', 'providerRole', 'customTitle', 'phone',
-            'venueId', 'venueName', 'canAcceptTickets', 'canCallNext', 'canPauseVenue',
-            'active', 'acceptedCount', 'createdAtMillis', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().keys().hasOnly([
-            'userId', 'providerId', 'name', 'providerRole', 'customTitle', 'phone',
-            'venueId', 'venueName', 'canAcceptTickets', 'canCallNext', 'canPauseVenue',
-            'active', 'acceptedCount', 'createdAtMillis', 'createdAt', 'updatedAt'
-          ]) &&
-          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidProvider(incoming(), userId);
+      allow create: if isSignedIn() &&
+        isValidId(ticketDocId) &&
+        ticketDocId == incoming().externalId &&
+        incoming().userId == request.auth.uid &&
+        incoming().status == 'SENT' &&
+        incoming().adminReply == '' &&
+        incoming().repliedByAdmin == '' &&
+        incoming().keys().hasAll([
+          'userId', 'externalId', 'senderName', 'senderPhone', 'category', 'requestType',
+          'relatedVenueName', 'subject', 'message', 'status', 'adminReply', 'repliedByAdmin',
+          'createdAtMillis', 'updatedAtMillis', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'externalId', 'senderName', 'senderPhone', 'category', 'requestType',
+          'relatedVenueName', 'subject', 'message', 'status', 'adminReply', 'repliedByAdmin',
+          'createdAtMillis', 'updatedAtMillis', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidSupportTicket(incoming());
 
-        allow update: if isOwner(userId) &&
-          isValidId(providerDocId) &&
-          incoming().userId == existing().userId &&
-          incoming().providerId == existing().providerId &&
-          incoming().createdAt == existing().createdAt &&
-          incoming().createdAtMillis == existing().createdAtMillis &&
-          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-          isValidProvider(incoming(), userId) &&
-          incoming().diff(existing()).affectedKeys().hasOnly([
-            'name', 'providerRole', 'customTitle', 'phone', 'venueId', 'venueName',
-            'canAcceptTickets', 'canCallNext', 'canPauseVenue', 'active', 'acceptedCount', 'updatedAt'
-          ]);
-      }
+      allow update: if isSignedIn() &&
+        isValidId(ticketDocId) &&
+        incoming().userId == existing().userId &&
+        incoming().externalId == existing().externalId &&
+        incoming().requestType == existing().requestType &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().createdAtMillis == existing().createdAtMillis &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidSupportTicket(incoming()) && (
+          (isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'adminReply', 'repliedByAdmin', 'updatedAtMillis', 'updatedAt'
+            ])) ||
+          (existing().userId == request.auth.uid &&
+            existing().status != 'CLOSED' &&
+            incoming().status in ['SENT', 'DELIVERED'] &&
+            incoming().adminReply == existing().adminReply &&
+            incoming().repliedByAdmin == existing().repliedByAdmin &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'senderName', 'status', 'updatedAtMillis', 'updatedAt'
+            ]))
+        );
+    }
+
+    // ==================== Cross-App Support Messages (PII Isolated, Append-Only) ====================
+    match /support_messages/{messageDocId} {
+      allow get: if isSignedIn() && isValidId(messageDocId) &&
+        (resource == null || existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(messageDocId);
+
+      allow create: if isSignedIn() &&
+        isValidId(messageDocId) &&
+        messageDocId == incoming().externalMessageId &&
+        incoming().keys().hasAll([
+          'userId', 'externalMessageId', 'ticketExternalId', 'fromAdmin',
+          'senderName', 'body', 'createdAtMillis', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'externalMessageId', 'ticketExternalId', 'fromAdmin',
+          'senderName', 'body', 'createdAtMillis', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidSupportMessage(incoming()) && (
+          (incoming().userId == request.auth.uid && incoming().fromAdmin == false) ||
+          (isAdmin() && incoming().fromAdmin == true)
+        );
+    }
+
+    // ==================== Control App Authorized Admin Registry ====================
+    match /admin_users/{adminUid} {
+      allow get: if isValidId(adminUid) && (isOwner(adminUid) || isAdmin());
+      allow list: if isAdmin();
+      allow delete: if isAdmin() && isValidId(adminUid);
+
+      allow create: if isAdmin() &&
+        isValidId(adminUid) &&
+        incoming().keys().hasAll(['uid', 'email', 'displayName', 'role', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['uid', 'email', 'displayName', 'role', 'createdAt', 'updatedAt']) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidAdminUser(incoming(), adminUid);
+
+      allow update: if isAdmin() &&
+        isValidId(adminUid) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidAdminUser(incoming(), adminUid) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'role', 'updatedAt']);
+    }
+
+    // ==================== Control App Staff Profiles (Admin Only) ====================
+    match /admins/{adminDocId} {
+      allow list: if isAdmin();
+      allow get, delete: if isAdmin() && isValidId(adminDocId);
+
+      allow create: if isAdmin() &&
+        isValidId(adminDocId) &&
+        incoming().keys().hasAll([
+          'adminId', 'name', 'roleTitle', 'phone', 'active', 'superAdmin',
+          'canManageFeatures', 'canManageVenues', 'canManageQueues', 'canReplySupport',
+          'canManageProviders', 'canManageAdmins', 'canRunCommands',
+          'createdAtMillis', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'adminId', 'name', 'roleTitle', 'phone', 'active', 'superAdmin',
+          'canManageFeatures', 'canManageVenues', 'canManageQueues', 'canReplySupport',
+          'canManageProviders', 'canManageAdmins', 'canRunCommands',
+          'createdAtMillis', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidAdminProfile(incoming());
+
+      allow update: if isAdmin() &&
+        isValidId(adminDocId) &&
+        incoming().adminId == existing().adminId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().createdAtMillis == existing().createdAtMillis &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidAdminProfile(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'roleTitle', 'phone', 'active', 'superAdmin',
+          'canManageFeatures', 'canManageVenues', 'canManageQueues', 'canReplySupport',
+          'canManageProviders', 'canManageAdmins', 'canRunCommands', 'updatedAt'
+        ]);
+    }
+
+    // ==================== Control App Service Providers (Admin Only) ====================
+    match /providers/{providerDocId} {
+      allow list: if isAdmin();
+      allow get, delete: if isAdmin() && isValidId(providerDocId);
+
+      allow create: if isAdmin() &&
+        isValidId(providerDocId) &&
+        incoming().keys().hasAll([
+          'providerId', 'name', 'providerRole', 'customTitle', 'phone',
+          'venueId', 'venueName', 'canAcceptTickets', 'canCallNext', 'canPauseVenue',
+          'active', 'acceptedCount', 'createdAtMillis', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'providerId', 'name', 'providerRole', 'customTitle', 'phone',
+          'venueId', 'venueName', 'canAcceptTickets', 'canCallNext', 'canPauseVenue',
+          'active', 'acceptedCount', 'createdAtMillis', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidProvider(incoming());
+
+      allow update: if isAdmin() &&
+        isValidId(providerDocId) &&
+        incoming().providerId == existing().providerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().createdAtMillis == existing().createdAtMillis &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        isValidProvider(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'providerRole', 'customTitle', 'phone', 'venueId', 'venueName',
+          'canAcceptTickets', 'canCallNext', 'canPauseVenue', 'active', 'acceptedCount', 'updatedAt'
+        ]);
     }
   }
 }

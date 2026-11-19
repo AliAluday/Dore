@@ -307,9 +307,10 @@ data class UserProfileSettings(
     val userPhone: String = "",
     val userAge: String = "",
     val optionalNote: String = "",
-    val loyaltyPoints: Int = 60,
+    val loyaltyPoints: Int = 0,
     val muteSound: Boolean = false,
     val muteVibration: Boolean = false,
+    val favoriteVenueIds: Set<Int> = emptySet(),
     val activeAdminId: Long = 1L,
     val activeProviderId: Long = 0L,
     val controlConfig: UserAppControlConfig = UserAppControlConfig()

@@ -46,6 +46,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -78,6 +79,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
+import com.example.data.cloud.CloudSyncStatus
 import com.example.data.local.VenueEntity
 import com.example.data.model.MedicalSpecialty
 import com.example.data.model.ServiceCategory
@@ -485,32 +487,49 @@ fun ExploreScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(40.dp)
-                            )
-                            Text(
-                                text = "لا توجد مراكز مطابقة",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "جرّب تغيير البحث أو إزالة الفلاتر لعرض جميع المراكز المفتوحة.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            if (state.selectedArea != null || state.searchQuery.isNotBlank() || state.showFavoritesOnly) {
-                                Button(
-                                    onClick = {
-                                        onSelectArea(null)
-                                        onClearSearch()
-                                        if (state.showFavoritesOnly) onToggleFavoritesOnly()
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                                ) {
-                                    Text("إعادة ضبط الفلاتر")
+                            if (state.allVenues.isEmpty() && state.cloudSync.status == CloudSyncStatus.SYNCING) {
+                                CircularProgressIndicator(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(34.dp)
+                                )
+                                Text(
+                                    text = "جاري مزامنة المراكز من السحابة...",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "يتم الآن تحميل أحدث المراكز والأدوار المتاحة في نينوى.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                                Text(
+                                    text = "لا توجد مراكز مطابقة",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "جرّب تغيير البحث أو إزالة الفلاتر لعرض جميع المراكز المفتوحة.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (state.selectedArea != null || state.searchQuery.isNotBlank() || state.showFavoritesOnly) {
+                                    Button(
+                                        onClick = {
+                                            onSelectArea(null)
+                                            onClearSearch()
+                                            if (state.showFavoritesOnly) onToggleFavoritesOnly()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                    ) {
+                                        Text("إعادة ضبط الفلاتر")
+                                    }
                                 }
                             }
                         }

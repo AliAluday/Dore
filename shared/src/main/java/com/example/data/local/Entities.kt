@@ -86,7 +86,8 @@ data class BookingEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val completedAt: Long? = null,
     val userRating: Int? = null,
-    val userReview: String? = null
+    val userReview: String? = null,
+    val ownerUid: String = ""
 )
 
 @Entity(tableName = "merchant_queue_items")
@@ -100,7 +101,8 @@ data class MerchantQueueItemEntity(
     val selectedOption: String,
     val status: String = QueueItemStatus.WAITING.name,
     val bookingId: Long? = null,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val ownerUid: String = ""
 )
 
 @Entity(tableName = "support_tickets")
@@ -119,7 +121,8 @@ data class SupportTicketEntity(
     val repliedByAdmin: String = "",
     val syncedToControl: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val ownerUid: String = ""
 )
 
 @Entity(tableName = "support_messages")
@@ -131,7 +134,8 @@ data class SupportMessageEntity(
     val senderName: String,
     val body: String,
     val syncedToPeer: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val ownerUid: String = ""
 )
 
 @Entity(tableName = "admin_accounts")

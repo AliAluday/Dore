@@ -141,8 +141,6 @@ fun ControlPanelScreen(
     onCompleteAllActive: () -> Unit,
     onCancelAllActive: () -> Unit,
     onResetAllQueues: () -> Unit,
-    onAdjustLoyaltyPoints: (Int) -> Unit,
-    onResetLoyaltyPoints: () -> Unit,
     onFactoryReset: () -> Unit,
     onSyncBridge: () -> Unit,
     onSignOut: () -> Unit = {},
@@ -787,61 +785,6 @@ fun ControlPanelScreen(
                                 )
                             }
                             item {
-                                Card(
-                                    shape = RoundedCornerShape(18.dp),
-                                    border = BorderStroke(1.dp, AmberGold.copy(alpha = 0.4f)),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(14.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = "نقاط ولاء المستخدم (${state.preferences.loyaltyPoints})",
-                                                style = MaterialTheme.typography.titleSmall,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Text(
-                                                text = "منح مكافأة فورية أو تصفير الرصيد",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            Button(
-                                                onClick = {
-                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    onAdjustLoyaltyPoints(50)
-                                                    if (canRunCommands) {
-                                                        lastExecutedCommand = "آخر إجراء مُنفَّذ: إضافة +50 نقطة ولاء ✓"
-                                                    }
-                                                },
-                                                colors = ButtonDefaults.buttonColors(containerColor = AmberGold, contentColor = Color(0xFF1F1600)),
-                                                modifier = Modifier.testTag("ctrl_cmd_add_50_points")
-                                            ) {
-                                                Text("+50", fontWeight = FontWeight.Bold)
-                                            }
-                                            OutlinedButton(
-                                                onClick = {
-                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    if (canRunCommands) {
-                                                        pendingBatchAction = BatchCommandAction.RESET_POINTS
-                                                    } else {
-                                                        onResetLoyaltyPoints()
-                                                    }
-                                                }
-                                            ) {
-                                                Text("تصفير")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            item {
                                 CommandActionCard(
                                     title = "إعادة ضبط المصنع بالكامل",
                                     subtitle = "استعادة المراكز الأولية والطاقم وإعدادات نسخة المستخدم الافتراضية",
@@ -1035,7 +978,6 @@ fun ControlPanelScreen(
                             BatchCommandAction.COMPLETE_ALL -> onCompleteAllActive()
                             BatchCommandAction.CANCEL_ALL -> onCancelAllActive()
                             BatchCommandAction.RESET_QUEUES -> onResetAllQueues()
-                            BatchCommandAction.RESET_POINTS -> onResetLoyaltyPoints()
                         }
                         lastExecutedCommand = "آخر إجراء مُنفَّذ: ${action.successBanner} ✓"
                         pendingBatchAction = null
@@ -1105,12 +1047,6 @@ private enum class BatchCommandAction(
         dialogBody = "ستتم إعادة ترقيم جميع المراكز والبدء من التذكرة #1.",
         confirmLabel = "تصفير الطوابير",
         successBanner = "تصفير جميع الطوابير والبدء من #1"
-    ),
-    RESET_POINTS(
-        dialogTitle = "تأكيد تصفير نقاط الولاء",
-        dialogBody = "سيتم تصفير رصيد نقاط الولاء للمستخدم إلى 0.",
-        confirmLabel = "تصفير الرصيد",
-        successBanner = "تصفير رصيد نقاط الولاء"
     )
 }
 

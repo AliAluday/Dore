@@ -34,7 +34,6 @@ import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Vibration
@@ -92,7 +91,7 @@ import com.example.ui.viewmodel.DoriUiState
 fun ProfileScreen(
     state: DoriUiState,
     hasNotificationPermission: Boolean,
-    onResetDemoData: () -> Unit,
+    onSyncCloud: () -> Unit = {},
     onRequestNotificationPermission: () -> Unit,
     onSelectDistrict: (NinevehDistrict) -> Unit,
     onToggleDarkMode: () -> Unit,
@@ -115,7 +114,6 @@ fun ProfileScreen(
     }
     val animatedProgress by animateFloatAsState(targetValue = rawProgress, label = "loyaltyProgress")
     var districtMenuExpanded by remember { mutableStateOf(false) }
-    var showResetDialog by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showEditAccountDialog by remember { mutableStateOf(false) }
 
@@ -133,7 +131,7 @@ fun ProfileScreen(
             item {
                 ProfileSectionLabel("الحساب والمزامنة السحابية")
             }
-            // Account Info & Local Trial Mode Card
+            // Account Info & Cloud Sync Card
             item {
                 val accountNameDisplay = prefs.userName.ifBlank {
                     state.activeBookings.firstOrNull()?.customerName
@@ -267,21 +265,20 @@ fun ProfileScreen(
                             Spacer(modifier = Modifier.width(4.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 OutlinedButton(
-                                    onClick = { showResetDialog = true },
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusUrgent),
+                                    onClick = onSyncCloud,
                                     shape = RoundedCornerShape(10.dp),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                     modifier = Modifier
                                         .height(32.dp)
-                                        .testTag("profile_reset_demo_button")
+                                        .testTag("profile_sync_cloud_button")
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.RestartAlt,
-                                        contentDescription = "إعادة ضبط البيانات",
+                                        imageVector = Icons.Default.Sync,
+                                        contentDescription = "مزامنة السحابة",
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(modifier = Modifier.width(3.dp))
-                                    Text("تصفير", style = MaterialTheme.typography.labelSmall)
+                                    Text("مزامنة", style = MaterialTheme.typography.labelSmall)
                                 }
                                 if (sync.userEmail.isNotBlank() || sync.status != CloudSyncStatus.OFFLINE) {
                                     OutlinedButton(
@@ -722,32 +719,6 @@ fun ProfileScreen(
                 }
             }
         }
-    }
-
-    if (showResetDialog) {
-        AlertDialog(
-            onDismissRequest = { showResetDialog = false },
-            title = { Text("مسح التذاكر وإعادة الضبط") },
-            text = {
-                Text("سيتم مسح التذاكر الحالية واستعادة المراكز ونقاط الولاء الافتراضية على حسابك.")
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onResetDemoData()
-                        showResetDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = StatusUrgent)
-                ) {
-                    Text("نعم، تصفير")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) {
-                    Text("تراجع")
-                }
-            }
-        )
     }
 
     if (showSignOutDialog) {

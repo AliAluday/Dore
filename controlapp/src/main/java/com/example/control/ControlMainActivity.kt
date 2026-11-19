@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -70,10 +71,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.cloud.AdminAccessState
 import com.example.data.cloud.GoogleAuthManager
 import com.example.data.cloud.UserCancelledSignInException
 import com.example.data.model.AdminPermissionType
 import com.example.data.model.SupportTicketStatus
+import com.example.ui.components.ControlAccessDeniedScreen
 import com.example.ui.components.DoriAuthScreen
 import com.example.ui.components.LiveOverlayAlertBanner
 import com.example.ui.components.TopStickyHeader
@@ -84,6 +87,7 @@ import com.example.ui.screens.SupportInboxScreen
 import com.example.ui.screens.TeamAndProvidersScreen
 import com.example.ui.screens.buildControlThreadMessages
 import com.example.ui.theme.DoriTheme
+import com.example.ui.theme.EmeraldPrimary
 import com.example.ui.viewmodel.AppTab
 import com.example.ui.viewmodel.DoriAppMode
 import com.example.ui.viewmodel.DoriViewModel
@@ -168,10 +172,14 @@ class ControlMainActivity : ComponentActivity() {
                             key = "ctrl_${signedInUser.uid}",
                             factory = factory
                         )
+                        LaunchedEffect(signedInUser.uid) {
+                            viewModel.ensureCloudSyncStarted()
+                        }
                         ControlAppRoot(
                             viewModel = viewModel,
                             onSignOut = {
                                 scope.launch {
+                                    viewModel.prepareSignOut()
                                     GoogleAuthManager.signOut(this@ControlMainActivity)
                                     authError = null
                                     currentUser = null
@@ -227,6 +235,42 @@ private fun ControlAppRoot(
     }
 
     DoriTheme(darkTheme = state.preferences.isDarkMode) {
+        if (viewModel.isCloudSyncEnabled && state.cloudSync.adminAccess == AdminAccessState.CHECKING) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(color = EmeraldPrimary)
+                        Text(
+                            text = "جاري التحقق من صلاحيات الإدارة السحابية...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            return@DoriTheme
+        }
+
+        if (viewModel.isCloudSyncEnabled && state.cloudSync.adminAccess == AdminAccessState.UNAUTHORIZED) {
+            ControlAccessDeniedScreen(
+                userEmail = state.cloudSync.userEmail,
+                userUid = state.cloudSync.userUid,
+                onRetry = viewModel::retryAdminAccessCheck,
+                onSignOut = onSignOut
+            )
+            return@DoriTheme
+        }
+
         Box(modifier = Modifier.fillMaxSize()) {
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
@@ -242,7 +286,6 @@ private fun ControlAppRoot(
                         selectedDistrict = state.preferences.selectedDistrict,
                         isDarkMode = state.preferences.isDarkMode,
                         activeBookingCount = state.activeBookings.size,
-                        isSimulationRunning = state.isLiveSimulationRunning,
                         searchQuery = "",
                         isSearchExpanded = false,
                         onToggleSearch = {},
@@ -277,8 +320,7 @@ private fun ControlAppRoot(
                             onMarkNoShow = viewModel::markCustomerNoShow,
                             onTogglePauseQueue = viewModel::togglePauseQueue,
                             onToggleAcceptingBookings = viewModel::toggleAcceptingBookings,
-                            onAddWalkIn = viewModel::addWalkIn,
-                            onToggleLiveSimulation = viewModel::toggleLiveSimulation
+                            onAddWalkIn = viewModel::addWalkIn
                         )
 
                         AppTab.CONTROL_TEAM -> TeamAndProvidersScreen(
@@ -294,7 +336,9 @@ private fun ControlAppRoot(
                             onOpenProviderWorkspace = { providerId ->
                                 viewModel.setActiveProvider(providerId)
                                 viewModel.selectTab(AppTab.CONTROL_QUEUES)
-                            }
+                            },
+                            onAuthorizeCloudAdmin = viewModel::authorizeCloudAdmin,
+                            onRevokeCloudAdmin = viewModel::revokeCloudAdmin
                         )
 
                         AppTab.CONTROL_SUPPORT -> SupportInboxScreen(
@@ -321,8 +365,6 @@ private fun ControlAppRoot(
                             onCompleteAllActive = viewModel::completeAllActiveBookings,
                             onCancelAllActive = viewModel::cancelAllActiveBookings,
                             onResetAllQueues = viewModel::resetAllQueuesToOne,
-                            onAdjustLoyaltyPoints = viewModel::adjustLoyaltyPoints,
-                            onResetLoyaltyPoints = viewModel::resetLoyaltyPoints,
                             onFactoryReset = viewModel::factoryResetAllData,
                             onSyncBridge = { viewModel.syncLocalBridge(silent = false) },
                             onSignOut = onSignOut

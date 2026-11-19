@@ -28,11 +28,13 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
@@ -76,6 +78,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.data.cloud.CloudAdminUser
+import com.example.data.cloud.DoriCloudSyncManager
 import com.example.data.local.AdminAccountEntity
 import com.example.data.local.ServiceProviderEntity
 import com.example.data.model.AdminPermissionType
@@ -122,11 +126,15 @@ fun TeamAndProvidersScreen(
     onUpdateProvider: (ServiceProviderEntity) -> Unit,
     onDeleteProvider: (Long) -> Unit,
     onOpenProviderWorkspace: (Long) -> Unit,
+    onAuthorizeCloudAdmin: (uid: String, email: String, displayName: String) -> Unit = { _, _, _ -> },
+    onRevokeCloudAdmin: (uid: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedSubTab by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var showAddAdminDialog by remember { mutableStateOf(false) }
+    var showAddCloudAdminDialog by remember { mutableStateOf(false) }
+    var revokingCloudAdmin by remember { mutableStateOf<CloudAdminUser?>(null) }
     var editingAdmin by remember { mutableStateOf<AdminAccountEntity?>(null) }
     var deletingAdmin by remember { mutableStateOf<AdminAccountEntity?>(null) }
     var showAddProviderDialog by remember { mutableStateOf(false) }
@@ -240,6 +248,20 @@ fun TeamAndProvidersScreen(
                                 onSelectActiveAdmin(id)
                             },
                             onOpenAddAdmin = { showAddAdminDialog = true }
+                        )
+                    }
+
+                    item {
+                        CloudAuthorizedAdminsCard(
+                            currentUserUid = state.cloudSync.userUid,
+                            currentUserEmail = state.cloudSync.userEmail,
+                            authorizedAdmins = state.cloudSync.authorizedAdmins,
+                            canManageAdmins = canManageAdmins,
+                            onOpenAddCloudAdmin = { showAddCloudAdminDialog = true },
+                            onRequestRevoke = { target ->
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                revokingCloudAdmin = target
+                            }
                         )
                     }
 
@@ -446,6 +468,274 @@ fun TeamAndProvidersScreen(
             }
         )
     }
+
+    if (showAddCloudAdminDialog) {
+        AddCloudAdminDialog(
+            onDismiss = { showAddCloudAdminDialog = false },
+            onConfirm = { uid, email, displayName ->
+                onAuthorizeCloudAdmin(uid, email, displayName)
+                showAddCloudAdminDialog = false
+            }
+        )
+    }
+
+    revokingCloudAdmin?.let { target ->
+        AlertDialog(
+            onDismissRequest = { revokingCloudAdmin = null },
+            title = { Text("سحب صلاحية الدخول السحابي") },
+            text = {
+                Text("هل أنت متأكد من سحب صلاحية الدخول لنسخة التحكم عن «${target.displayName.ifBlank { target.email }}»؟")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onRevokeCloudAdmin(target.uid)
+                        revokingCloudAdmin = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatusUrgent)
+                ) {
+                    Text("سحب الصلاحية")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { revokingCloudAdmin = null }) {
+                    Text("تراجع")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun CloudAuthorizedAdminsCard(
+    currentUserUid: String,
+    currentUserEmail: String,
+    authorizedAdmins: List<CloudAdminUser>,
+    canManageAdmins: Boolean,
+    onOpenAddCloudAdmin: () -> Unit,
+    onRequestRevoke: (CloudAdminUser) -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(15.dp),
+        border = BorderStroke(1.dp, IndigoAccentLight.copy(alpha = 0.4f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(11.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(IndigoAccentLight.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudDone,
+                            contentDescription = null,
+                            tint = IndigoAccentLight,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "حسابات Google المخوّلة للإدارة السحابية (${authorizedAdmins.size})",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (currentUserEmail.isNotBlank()) "حسابك الحالي: $currentUserEmail"
+                            else "فقط الحسابات المسجلة هنا يمكنها فتح دوري تحكم",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            if (authorizedAdmins.isEmpty()) {
+                Text(
+                    text = "الحساب الأساسي فقط مخوّل حالياً. يمكنك إضافة معرّف (UID) أي مشرف آخر لتفعيل دخوله.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    authorizedAdmins.forEach { entry ->
+                        val isSelf = entry.uid == currentUserUid
+                        val isBootstrapped = entry.email.equals(
+                            DoriCloudSyncManager.BOOTSTRAPPED_ADMIN_EMAIL,
+                            ignoreCase = true
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(11.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = entry.displayName.ifBlank { entry.email.ifBlank { entry.uid } },
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        if (isSelf) {
+                                            Surface(
+                                                shape = CircleShape,
+                                                color = StatusOpen.copy(alpha = 0.16f)
+                                            ) {
+                                                Text(
+                                                    text = "أنت",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = StatusOpen,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Text(
+                                        text = "${entry.email.ifBlank { "بدون بريد" }} • ${entry.uid.take(12)}...",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                if (canManageAdmins && !isSelf && !isBootstrapped) {
+                                    IconButton(
+                                        onClick = { onRequestRevoke(entry) },
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .testTag("revoke_cloud_admin_${entry.uid}")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "سحب الصلاحية السحابية",
+                                            tint = StatusUrgent,
+                                            modifier = Modifier.size(17.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            OutlinedButton(
+                onClick = onOpenAddCloudAdmin,
+                enabled = canManageAdmins,
+                shape = RoundedCornerShape(11.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(38.dp)
+                    .testTag("add_cloud_admin_button")
+            ) {
+                Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "تخويل حساب Google جديد للإدارة (UID)",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddCloudAdminDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (uid: String, email: String, displayName: String) -> Unit
+) {
+    var uidInput by remember { mutableStateOf("") }
+    var emailInput by remember { mutableStateOf("") }
+    var nameInput by remember { mutableStateOf("") }
+    val trimmedUid = uidInput.trim()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تخويل حساب Google للإدارة السحابية") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "اطلب من المشرف تسجيل الدخول في دوري تحكم ونسخ معرّف الحساب (UID) الظاهر له ثم ألصقه هنا.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = uidInput,
+                    onValueChange = { uidInput = it },
+                    label = { Text("معرّف الحساب (Firebase UID) *") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("cloud_admin_uid_input")
+                )
+                OutlinedTextField(
+                    value = emailInput,
+                    onValueChange = { emailInput = it },
+                    label = { Text("البريد الإلكتروني (Google)") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("cloud_admin_email_input")
+                )
+                OutlinedTextField(
+                    value = nameInput,
+                    onValueChange = { nameInput = it },
+                    label = { Text("الاسم الظاهر") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("cloud_admin_name_input")
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(trimmedUid, emailInput.trim(), nameInput.trim()) },
+                enabled = trimmedUid.length >= 6,
+                colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                modifier = Modifier.testTag("confirm_add_cloud_admin_button")
+            ) {
+                Text("منح الصلاحية")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("إلغاء")
+            }
+        }
+    )
 }
 
 @Composable

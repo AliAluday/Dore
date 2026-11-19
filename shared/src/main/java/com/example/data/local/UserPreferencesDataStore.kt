@@ -27,7 +27,7 @@ class UserPreferencesDataStore(context: Context) {
         val controlRevision: Long = 0L,
         val queueResetRevision: Long = 0L,
         val loyaltyRevision: Long = 0L,
-        val loyaltyPoints: Int = 60,
+        val loyaltyPoints: Int = 0,
         val controlConfig: UserAppControlConfig = UserAppControlConfig()
     )
 
@@ -47,6 +47,7 @@ class UserPreferencesDataStore(context: Context) {
         val LOYALTY_POINTS = intPreferencesKey("loyalty_points")
         val MUTE_SOUND = booleanPreferencesKey("mute_sound")
         val MUTE_VIBRATION = booleanPreferencesKey("mute_vibration")
+        val FAVORITE_VENUE_IDS = stringSetPreferencesKey("favorite_venue_ids")
         val ACTIVE_ADMIN_ID = longPreferencesKey("active_admin_id")
         val ACTIVE_PROVIDER_ID = longPreferencesKey("active_provider_id")
 
@@ -82,9 +83,13 @@ class UserPreferencesDataStore(context: Context) {
             userPhone = prefs[Keys.USER_PHONE] ?: "",
             userAge = prefs[Keys.USER_AGE] ?: "",
             optionalNote = prefs[Keys.OPTIONAL_NOTE] ?: "",
-            loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 60,
+            loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 0,
             muteSound = prefs[Keys.MUTE_SOUND] ?: false,
             muteVibration = prefs[Keys.MUTE_VIBRATION] ?: false,
+            favoriteVenueIds = prefs[Keys.FAVORITE_VENUE_IDS]
+                ?.mapNotNull { it.toIntOrNull() }
+                ?.toSet()
+                ?: emptySet(),
             activeAdminId = prefs[Keys.ACTIVE_ADMIN_ID] ?: 1L,
             activeProviderId = prefs[Keys.ACTIVE_PROVIDER_ID] ?: 0L,
             controlConfig = readControlConfig(prefs)
@@ -131,7 +136,7 @@ class UserPreferencesDataStore(context: Context) {
 
     suspend fun addLoyaltyPoints(delta: Int) {
         appContext.dataStore.edit {
-            val current = it[Keys.LOYALTY_POINTS] ?: 60
+            val current = it[Keys.LOYALTY_POINTS] ?: 0
             it[Keys.LOYALTY_POINTS] = (current + delta).coerceAtLeast(0)
         }
     }
@@ -139,6 +144,30 @@ class UserPreferencesDataStore(context: Context) {
     suspend fun setLoyaltyPoints(points: Int) {
         appContext.dataStore.edit {
             it[Keys.LOYALTY_POINTS] = points.coerceAtLeast(0)
+        }
+    }
+
+    suspend fun toggleFavoriteVenueId(venueId: Int): Set<Int> {
+        var result: Set<Int> = emptySet()
+        appContext.dataStore.edit { prefs ->
+            val current = prefs[Keys.FAVORITE_VENUE_IDS]
+                ?.mapNotNull { it.toIntOrNull() }
+                ?.toMutableSet()
+                ?: mutableSetOf()
+            if (venueId in current) {
+                current.remove(venueId)
+            } else {
+                current.add(venueId)
+            }
+            prefs[Keys.FAVORITE_VENUE_IDS] = current.map { it.toString() }.toSet()
+            result = current.toSet()
+        }
+        return result
+    }
+
+    suspend fun setFavoriteVenueIds(ids: Set<Int>) {
+        appContext.dataStore.edit { prefs ->
+            prefs[Keys.FAVORITE_VENUE_IDS] = ids.map { it.toString() }.toSet()
         }
     }
 
@@ -174,7 +203,7 @@ class UserPreferencesDataStore(context: Context) {
                 controlRevision = nextRev,
                 queueResetRevision = prefs[Keys.CTRL_QUEUE_RESET_REVISION] ?: 0L,
                 loyaltyRevision = prefs[Keys.CTRL_LOYALTY_REVISION] ?: 0L,
-                loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 60,
+                loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 0,
                 controlConfig = readControlConfig(prefs)
             )
         }
@@ -199,7 +228,7 @@ class UserPreferencesDataStore(context: Context) {
                 controlRevision = nextRev,
                 queueResetRevision = prefs[Keys.CTRL_QUEUE_RESET_REVISION] ?: 0L,
                 loyaltyRevision = prefs[Keys.CTRL_LOYALTY_REVISION] ?: 0L,
-                loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 60,
+                loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 0,
                 controlConfig = readControlConfig(prefs)
             )
         }
@@ -212,7 +241,7 @@ class UserPreferencesDataStore(context: Context) {
             controlRevision = prefs[Keys.CTRL_REVISION] ?: 0L,
             queueResetRevision = prefs[Keys.CTRL_QUEUE_RESET_REVISION] ?: 0L,
             loyaltyRevision = prefs[Keys.CTRL_LOYALTY_REVISION] ?: 0L,
-            loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 60,
+            loyaltyPoints = prefs[Keys.LOYALTY_POINTS] ?: 0,
             controlConfig = readControlConfig(prefs)
         )
     }
@@ -271,12 +300,21 @@ class UserPreferencesDataStore(context: Context) {
         }
     }
 
-    suspend fun applyCloudConfigSnapshot(
-        settings: UserProfileSettings,
+    suspend fun applyPlatformConfigSnapshot(
+        controlConfig: UserAppControlConfig,
         controlRevision: Long,
-        queueResetRevision: Long,
-        loyaltyRevision: Long
+        queueResetRevision: Long
     ) {
+        appContext.dataStore.edit {
+            writeControlConfig(it, controlConfig)
+            it[Keys.CTRL_REVISION] = maxOf(it[Keys.CTRL_REVISION] ?: 0L, controlRevision)
+            it[Keys.CTRL_QUEUE_RESET_REVISION] = maxOf(it[Keys.CTRL_QUEUE_RESET_REVISION] ?: 0L, queueResetRevision)
+            it[Keys.APPLIED_CTRL_REVISION] = maxOf(it[Keys.APPLIED_CTRL_REVISION] ?: 0L, controlRevision)
+            it[Keys.APPLIED_QUEUE_RESET_REVISION] = maxOf(it[Keys.APPLIED_QUEUE_RESET_REVISION] ?: 0L, queueResetRevision)
+        }
+    }
+
+    suspend fun applyUserProfileSnapshot(settings: UserProfileSettings) {
         appContext.dataStore.edit {
             it[Keys.SELECTED_DISTRICT] = settings.selectedDistrict.displayName
             it[Keys.IS_DARK_MODE] = settings.isDarkMode
@@ -287,13 +325,19 @@ class UserPreferencesDataStore(context: Context) {
             it[Keys.LOYALTY_POINTS] = settings.loyaltyPoints.coerceAtLeast(0)
             it[Keys.MUTE_SOUND] = settings.muteSound
             it[Keys.MUTE_VIBRATION] = settings.muteVibration
-            writeControlConfig(it, settings.controlConfig)
-            it[Keys.CTRL_REVISION] = maxOf(it[Keys.CTRL_REVISION] ?: 0L, controlRevision)
-            it[Keys.CTRL_QUEUE_RESET_REVISION] = maxOf(it[Keys.CTRL_QUEUE_RESET_REVISION] ?: 0L, queueResetRevision)
-            it[Keys.CTRL_LOYALTY_REVISION] = maxOf(it[Keys.CTRL_LOYALTY_REVISION] ?: 0L, loyaltyRevision)
-            it[Keys.APPLIED_CTRL_REVISION] = maxOf(it[Keys.APPLIED_CTRL_REVISION] ?: 0L, controlRevision)
-            it[Keys.APPLIED_QUEUE_RESET_REVISION] = maxOf(it[Keys.APPLIED_QUEUE_RESET_REVISION] ?: 0L, queueResetRevision)
-            it[Keys.APPLIED_LOYALTY_REVISION] = maxOf(it[Keys.APPLIED_LOYALTY_REVISION] ?: 0L, loyaltyRevision)
+            it[Keys.FAVORITE_VENUE_IDS] = settings.favoriteVenueIds.map { id -> id.toString() }.toSet()
+        }
+    }
+
+    suspend fun clearUserSessionPreferences() {
+        appContext.dataStore.edit {
+            it.remove(Keys.USER_NAME)
+            it.remove(Keys.USER_PHONE)
+            it.remove(Keys.USER_AGE)
+            it.remove(Keys.OPTIONAL_NOTE)
+            it.remove(Keys.LOYALTY_POINTS)
+            it.remove(Keys.FAVORITE_VENUE_IDS)
+            it.remove(Keys.ACTIVE_PROVIDER_ID)
         }
     }
 

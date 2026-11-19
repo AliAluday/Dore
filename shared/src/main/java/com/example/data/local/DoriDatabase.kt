@@ -21,7 +21,7 @@ import com.example.data.model.ServiceCategory
         AdminAccountEntity::class,
         ServiceProviderEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class DoriDatabase : RoomDatabase() {
